@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+server/node_modules/
+
+# Build output
+dist/
+
+# Environment variables (NEVER commit secrets)
+.env
+.env.local
+.env.production
+server/.env
+
+# SQLite database (data is local, not for git)
+server/*.sqlite
+server/backups/
+server/ssl/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Vite
+vite.config.ts.timestamp-*

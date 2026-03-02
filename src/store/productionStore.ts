@@ -1,0 +1,121 @@
+import { create } from 'zustand';
+import { ProductionEntry, ProductionStatus } from '@/types';
+import { apiFetch } from '@/lib/apiClient';
+
+interface ProductionState {
+    entries: ProductionEntry[];
+    isLoading: boolean;
+
+    // Actions
+    fetchProductionEntries: () => Promise<void>;
+    addEntry: (entry: Omit<ProductionEntry, 'id' | 'status' | 'totalAmount'>) => Promise<void>;
+    updateEntry: (id: string, updates: Partial<ProductionEntry>) => Promise<void>;
+    approveEntry: (id: string) => Promise<void>;
+    rejectEntry: (id: string) => Promise<void>;
+    deleteEntry: (id: string) => Promise<void>;
+    getEntriesByEmployee: (employeeId: string) => ProductionEntry[];
+}
+
+export const useProductionStore = create<ProductionState>((set, get) => ({
+    entries: [],
+    isLoading: false,
+
+    fetchProductionEntries: async () => {
+        set({ isLoading: true });
+        try {
+            const res = await apiFetch(`/production`);
+            if (res.ok) set({ entries: await res.json() });
+        } catch (err) {
+            console.error('Failed to fetch production entries:', err);
+        } finally {
+            set({ isLoading: false });
+        }
+    },
+
+    addEntry: async (entry) => {
+        const newEntry: ProductionEntry = {
+            ...entry,
+            id: Math.random().toString(36).substr(2, 9),
+            totalAmount: entry.qty * entry.rate,
+            status: ProductionStatus.PENDING,
+        };
+        // Optimistic update
+        set(state => ({ entries: [newEntry, ...state.entries] }));
+        try {
+            const res = await apiFetch(`/production`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newEntry),
+            });
+            if (res.ok) {
+                const saved = await res.json();
+                // Replace optimistic entry with server-saved entry
+                set(state => ({ entries: state.entries.map(e => e.id === newEntry.id ? { ...newEntry, ...saved } : e) }));
+            }
+        } catch (err) {
+            console.error('Failed to save production entry:', err);
+        }
+    },
+
+    updateEntry: async (id, updates) => {
+        // Optimistic update
+        set(state => ({ entries: state.entries.map(e => e.id === id ? { ...e, ...updates } : e) }));
+        try {
+            await apiFetch(`/production/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates),
+            });
+        } catch (err) {
+            console.error('Failed to update production entry:', err);
+        }
+    },
+
+    approveEntry: async (id) => {
+        const payload = { status: ProductionStatus.APPROVED };
+        // Optimistic update
+        set(state => ({ entries: state.entries.map(e => e.id === id ? { ...e, ...payload } : e) }));
+        try {
+            await apiFetch(`/production/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+        } catch (err) {
+            console.error('Failed to approve production entry:', err);
+            // Revert on error
+            set(state => ({ entries: state.entries.map(e => e.id === id ? { ...e, status: ProductionStatus.PENDING } : e) }));
+        }
+    },
+
+    rejectEntry: async (id) => {
+        const payload = { status: ProductionStatus.REJECTED };
+        set(state => ({ entries: state.entries.map(e => e.id === id ? { ...e, ...payload } : e) }));
+        try {
+            await apiFetch(`/production/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+        } catch (err) {
+            console.error('Failed to reject production entry:', err);
+            set(state => ({ entries: state.entries.map(e => e.id === id ? { ...e, status: ProductionStatus.PENDING } : e) }));
+        }
+    },
+
+    deleteEntry: async (id) => {
+        // Optimistic removal
+        const previous = get().entries;
+        set(state => ({ entries: state.entries.filter(e => e.id !== id) }));
+        try {
+            const res = await apiFetch(`/production/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Delete failed');
+        } catch (err) {
+            console.error('Failed to delete production entry:', err);
+            // Restore on failure
+            set({ entries: previous });
+        }
+    },
+
+    getEntriesByEmployee: (employeeId) => get().entries.filter(e => e.employeeId === employeeId),
+}));
