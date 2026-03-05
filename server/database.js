@@ -366,6 +366,28 @@ const initDB = async () => {
     try {
         await sequelize.sync({ alter: true }); // alter: true adds new columns without dropping data
         console.log('Database synced successfully.');
+
+        // Seed initial admin if database is empty (useful for fresh Render deployments)
+        const bcrypt = require('bcrypt');
+        const count = await Employee.count();
+        if (count === 0) {
+            console.log('🌱 Empty database detected. Seeding initial admin ACLLP-01...');
+            const hashedPassword = await bcrypt.hash('8824834657@AA', 10);
+            await Company.create({ id: 'c1', name: 'SM Payroll Default', code: 'SM' });
+            await Employee.create({
+                id: 'admin1',
+                companyId: 'c1',
+                code: 'ACLLP-01',
+                name: 'Admin',
+                phone: '8824834657',
+                role: 'ADMIN',
+                password: hashedPassword,
+                status: 'ACTIVE',
+                baseSalary: 0
+            });
+            console.log('✅ Default admin ACLLP-01 seeded successfully.');
+        }
+
     } catch (error) {
         console.error('Database sync failed:', error);
         throw error;
