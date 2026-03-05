@@ -99,19 +99,48 @@ router.post('/bulk', async (req, res) => {
     try {
         const { clients, companyId } = req.body;
         if (!Array.isArray(clients) || !companyId) return res.status(400).json({ error: 'clients[] and companyId required' });
+
         let inserted = 0;
+        const now = new Date().toISOString();
+
+        // Disable alter config that might lock DB
         for (let i = 0; i < clients.length; i++) {
             const c = clients[i];
-            const row = { id: c.id || uuidv4(), companyId, code: c.code || `C-${String(Date.now()).slice(-4)}${i}`, ...c };
+            const row = {
+                id: c.id || uuidv4(),
+                companyId,
+                code: c.code || `C-${String(Date.now()).slice(-4)}${i}`,
+                name: c.name || 'Unknown',
+                shopName: c.shopName || null,
+                phone: c.phone || null,
+                city: c.city || null,
+                type: c.type || 'RETAIL',
+                createdAt: now,
+                updatedAt: now
+            };
+
             try {
-                await Client.create(row);
+                // Force raw insertion to prevent Sequelize Model hook/validation infinite locks
+                const keys = Object.keys(row);
+                const values = keys.map(k => row[k]);
+                const placeholders = keys.map(() => '?').join(', ');
+
+                await sequelize.query(
+                    `INSERT INTO "Clients" ("${keys.join('", "')}") VALUES (${placeholders})`,
+                    { replacements: values }
+                );
                 inserted++;
             } catch (err) {
                 console.warn('Skipped client row', i, err.message);
             }
         }
-        res.json({ inserted, total: clients.length });
-    } catch (e) { addError(e, 'POST /api/clients/bulk'); res.status(500).json({ error: e.message }); }
+
+        // Force return immediately
+        res.status(200).json({ inserted, total: clients.length });
+    } catch (e) {
+        if (addError) addError(e, 'POST /api/clients/bulk');
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // PUT /api/clients/:id
