@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Lock, Camera, Mail, Phone, MapPin, ShieldCheck, CheckCircle2, XCircle } from 'lucide-react';
+import { User, Camera, Mail, Phone, MapPin, ShieldCheck, CheckCircle2, XCircle } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { PasswordStrengthInput, isPasswordValid } from '@/components/ui/PasswordStrengthInput';
@@ -208,10 +208,10 @@ export const UserProfile = () => {
                                     onChange={e => setPwdForm(f => ({ ...f, confirmPassword: e.target.value }))}
                                     placeholder="Re-enter new password"
                                     className={`w-full bg-dark-bg border rounded-xl px-4 py-3 text-white text-sm focus:outline-none transition-colors ${confirmMismatch
-                                            ? 'border-red-500/60 focus:border-red-500'
-                                            : pwdForm.confirmPassword && !confirmMismatch
-                                                ? 'border-green-500/60 focus:border-green-500'
-                                                : 'border-dark-border focus:border-primary-500'
+                                        ? 'border-red-500/60 focus:border-red-500'
+                                        : pwdForm.confirmPassword && !confirmMismatch
+                                            ? 'border-green-500/60 focus:border-green-500'
+                                            : 'border-dark-border focus:border-primary-500'
                                         }`}
                                 />
                                 {confirmMismatch && (
