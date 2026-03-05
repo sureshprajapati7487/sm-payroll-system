@@ -99,9 +99,18 @@ router.post('/bulk', async (req, res) => {
     try {
         const { clients, companyId } = req.body;
         if (!Array.isArray(clients) || !companyId) return res.status(400).json({ error: 'clients[] and companyId required' });
-        const rows = clients.map((c, i) => ({ id: c.id || uuidv4(), companyId, code: c.code || `C-${String(i + 1).padStart(4, '0')}`, ...c }));
-        const result = await Client.bulkCreate(rows, { ignoreDuplicates: true });
-        res.json({ inserted: result.length, total: rows.length });
+        let inserted = 0;
+        for (let i = 0; i < clients.length; i++) {
+            const c = clients[i];
+            const row = { id: c.id || uuidv4(), companyId, code: c.code || `C-${String(Date.now()).slice(-4)}${i}`, ...c };
+            try {
+                await Client.create(row);
+                inserted++;
+            } catch (err) {
+                console.warn('Skipped client row', i, err.message);
+            }
+        }
+        res.json({ inserted, total: clients.length });
     } catch (e) { addError(e, 'POST /api/clients/bulk'); res.status(500).json({ error: e.message }); }
 });
 
