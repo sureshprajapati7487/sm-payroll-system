@@ -1,12 +1,33 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const path = require('path');
 
-// Initialize SQLite Database
-const sequelize = new Sequelize({
-    dialect: 'sqlite',
-    storage: path.join(__dirname, 'database.sqlite'),
-    logging: false
-});
+// ── Database Connection ────────────────────────────────────────────────────────
+// Production (Render): uses DATABASE_URL (PostgreSQL)
+// Development (local): uses SQLite file
+let sequelize;
+
+if (process.env.DATABASE_URL) {
+    // PostgreSQL — Render free tier
+    sequelize = new Sequelize(process.env.DATABASE_URL, {
+        dialect: 'postgres',
+        dialectOptions: {
+            ssl: {
+                require: true,
+                rejectUnauthorized: false  // required for Render's self-signed cert
+            }
+        },
+        logging: false
+    });
+    console.log('🐘 Using PostgreSQL database');
+} else {
+    // SQLite — local development
+    sequelize = new Sequelize({
+        dialect: 'sqlite',
+        storage: path.join(__dirname, 'database.sqlite'),
+        logging: false
+    });
+    console.log('📁 Using SQLite database (local)');
+}
 
 // ── 1. Company ────────────────────────────────────────────────────────────────
 const Company = sequelize.define('Company', {
