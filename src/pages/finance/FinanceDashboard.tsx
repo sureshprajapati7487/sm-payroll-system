@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { DollarSign, TrendingUp, Building, PieChart, Download, RefreshCw, AlertCircle } from 'lucide-react';
 import { usePayrollStore } from '@/store/payrollStore';
 import { useLoanStore } from '@/store/loanStore';
@@ -16,7 +16,7 @@ export const FinanceDashboard = () => {
     // ── Stores ────────────────────────────────────────────────────────────────
     const { slips, fetchPayroll } = usePayrollStore();
     const { loans } = useLoanStore();
-    const { expenses, fetchExpenses, getStats } = useExpenseStore();
+    const { fetchExpenses, getStats } = useExpenseStore();
 
     useEffect(() => {
         fetchPayroll(currentMonth);
@@ -36,7 +36,7 @@ export const FinanceDashboard = () => {
     const totalLoanBalance = activeLoans.reduce((sum, l) => sum + l.balance, 0);
 
     // ── PF/ESI Dues (from current slips) ─────────────────────────────────────
-    const totalPFDues = currentSlips.reduce((sum, s) => sum + (s.pfDeduction || 0) + (s.employerPf || 0), 0);
+    const totalPFDues = currentSlips.reduce((sum, s) => sum + (s.pfDeduction || 0), 0);
 
     // ── Expenses ─────────────────────────────────────────────────────────────
     const expenseStats = getStats(currentMonth);
@@ -153,10 +153,10 @@ export const FinanceDashboard = () => {
                                 <stat.icon className={`w-6 h-6 ${stat.color}`} />
                             </div>
                             <span className={`text-xs font-medium px-2 py-1 rounded-full ${stat.change.startsWith('+') || stat.positive
-                                    ? 'bg-green-500/20 text-green-400'
-                                    : stat.change.startsWith('-')
-                                        ? 'bg-red-500/20 text-red-400'
-                                        : 'bg-dark-surface text-dark-muted'
+                                ? 'bg-green-500/20 text-green-400'
+                                : stat.change.startsWith('-')
+                                    ? 'bg-red-500/20 text-red-400'
+                                    : 'bg-dark-surface text-dark-muted'
                                 }`}>
                                 {stat.change}
                             </span>

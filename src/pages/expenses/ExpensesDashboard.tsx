@@ -7,10 +7,12 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { SkeletonPage } from '@/components/SkeletonLoaders';
+import { useDialog } from '@/components/DialogProvider';
 
 export const ExpensesDashboard = () => {
     const { user } = useAuthStore();
     const { expenses, isLoading, addExpense, updateStatus, deleteExpense, getStats } = useExpenseStore();
+    const { confirm } = useDialog();
 
     // State
     const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
@@ -289,8 +291,9 @@ export const ExpensesDashboard = () => {
                                                                     </>
                                                                 )}
                                                                 <button
-                                                                    onClick={() => {
-                                                                        if (confirm('Delete this entry?')) deleteExpense(exp.id);
+                                                                    onClick={async () => {
+                                                                        const ok = await confirm({ title: 'Expense Delete Karein?', message: `"${exp.description}" entry ko delete karna chahte hain?`, confirmLabel: 'Haan, Delete Karo', cancelLabel: 'Cancel', variant: 'danger' });
+                                                                        if (ok) deleteExpense(exp.id);
                                                                     }}
                                                                     className="p-1.5 hover:bg-red-500/20 text-dark-muted hover:text-red-500 rounded transition-colors"
                                                                     title="Delete"

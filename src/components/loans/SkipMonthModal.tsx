@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Clock, X } from 'lucide-react';
 import { useLoanStore } from '@/store/loanStore';
+import { useDialog } from '@/components/DialogProvider';
 
 interface SkipMonthModalProps {
     loanId: string;
@@ -11,6 +12,7 @@ export const SkipMonthModal = ({ loanId, onClose }: SkipMonthModalProps) => {
     const { requestSkipMonth, loans } = useLoanStore();
     const [monthYear, setMonthYear] = useState('');
     const [reason, setReason] = useState('');
+    const { toast } = useDialog();
 
     const loan = loans.find(l => l.id === loanId);
     if (!loan) return null;
@@ -21,12 +23,12 @@ export const SkipMonthModal = ({ loanId, onClose }: SkipMonthModalProps) => {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!monthYear || !reason.trim()) {
-            alert('Please fill all fields!');
+            toast('Sabhi fields bharein!', 'error');
             return;
         }
 
         requestSkipMonth(loanId, monthYear, reason);
-        alert('Skip request submitted for approval!');
+        toast('Skip request approval ke liye submit ho gayi!', 'success');
         onClose();
     };
 

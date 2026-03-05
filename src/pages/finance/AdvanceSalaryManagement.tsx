@@ -7,6 +7,7 @@ import {
 import { useAdvanceSalaryStore } from '@/store/advanceSalaryStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAuthStore } from '@/store/authStore';
+import { useDialog } from '@/components/DialogProvider';
 
 const STATUS_COLORS = {
     approved: 'bg-green-500/20 text-green-400 border-green-500/30',
@@ -19,6 +20,7 @@ export const AdvanceSalaryManagement = () => {
     const { _rawEmployees: employees } = useEmployeeStore();
     const { user } = useAuthStore();
     const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+    const { confirm } = useDialog();
 
     const [showForm, setShowForm] = useState(false);
     const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
@@ -55,7 +57,14 @@ export const AdvanceSalaryManagement = () => {
         showToast(false, 'Request rejected');
     };
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete this request permanently?')) return;
+        const ok = await confirm({
+            title: 'Advance Request Delete Karein?',
+            message: 'Is advance salary request ko permanently delete karna chahte hain?',
+            confirmLabel: 'Haan, Delete Karo',
+            cancelLabel: 'Cancel',
+            variant: 'danger',
+        });
+        if (!ok) return;
         await deleteRequest(id);
         showToast(true, 'Request deleted');
     };

@@ -10,6 +10,7 @@ import {
 import { exportToExcel } from '@/utils/exportUtils';
 import { clsx } from 'clsx';
 import { sendPayslipWhatsApp, sendBulkPayslipWhatsApp } from '@/utils/whatsappService';
+import { useDialog } from '@/components/DialogProvider';
 
 interface PayrollDisbursementModalProps {
     month: string;
@@ -23,6 +24,7 @@ export const PayrollDisbursementModal = ({ month, onClose }: PayrollDisbursement
 
     const [selectedSlips, setSelectedSlips] = useState<Set<string>>(new Set());
     const [waBulkProgress, setWaBulkProgress] = useState<{ done: number; total: number } | null>(null);
+    const { confirm } = useDialog();
 
     const slips = getSlipsByMonth(month);
 
@@ -36,9 +38,16 @@ export const PayrollDisbursementModal = ({ month, onClose }: PayrollDisbursement
     const toggleAll = () => {
         setSelectedSlips(prev => prev.size === slips.length ? new Set() : new Set(slips.map(s => s.id)));
     };
-    const handleApproveSelected = () => {
+    const handleApproveSelected = async () => {
         if (selectedSlips.size === 0) return;
-        if (confirm(`Approve & Mark Paid for ${selectedSlips.size} selected employees?`)) {
+        const ok = await confirm({
+            title: `${selectedSlips.size} Employees Ko Paid Mark Karein?`,
+            message: `${selectedSlips.size} selected employees ka salary disburse karke Paid mark karna chahte hain?`,
+            confirmLabel: 'Haan, Approve Karo',
+            cancelLabel: 'Cancel',
+            variant: 'warning',
+        });
+        if (ok) {
             selectedSlips.forEach(id => { const s = slips.find(x => x.id === id); if (s && s.status !== PayrollStatus.PAID) markAsPaid(id); });
             setSelectedSlips(new Set());
         }
@@ -51,8 +60,15 @@ export const PayrollDisbursementModal = ({ month, onClose }: PayrollDisbursement
     const totalPaid = slips.filter(s => s.status === PayrollStatus.PAID).reduce((sum, s) => sum + s.netSalary, 0);
     const pendingCount = slips.filter(s => s.status !== PayrollStatus.PAID).length;
 
-    const handleApproveAll = () => {
-        if (confirm(`Approve & Mark Paid for ALL ${slips.length} employees? Total: ₹${totalPayout.toLocaleString()}`)) {
+    const handleApproveAll = async () => {
+        const ok = await confirm({
+            title: 'Sabhi Employees Ko Paid Mark Karein?',
+            message: `Sabhi ${slips.length} employees ka total ₹${totalPayout.toLocaleString()} salary disburse karna chahte hain?`,
+            confirmLabel: 'Haan, Approve All',
+            cancelLabel: 'Cancel',
+            variant: 'warning',
+        });
+        if (ok) {
             slips.forEach(slip => { if (slip.status !== PayrollStatus.PAID) markAsPaid(slip.id); });
         }
     };

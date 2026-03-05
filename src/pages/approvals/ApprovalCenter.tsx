@@ -9,6 +9,7 @@ import { CheckCircle, XCircle, UserCheck, Wallet, Hammer, Eye } from 'lucide-rea
 import { clsx } from 'clsx';
 import { calculateSalary } from '@/utils/salaryCalculator';
 import { EmployeeHistoryModal } from '@/components/payroll/EmployeeHistoryModal';
+import { useDialog } from '@/components/DialogProvider';
 
 export const ApprovalCenter = () => {
     const { user } = useAuthStore();
@@ -20,6 +21,7 @@ export const ApprovalCenter = () => {
     const [category, setCategory] = useState<'LOANS' | 'PRODUCTION'>('LOANS');
     const [filter, setFilter] = useState<'MY_APPROVALS' | 'ALL' | 'HISTORY'>('MY_APPROVALS');
     const [selectedEmpForStatement, setSelectedEmpForStatement] = useState<Employee | null>(null);
+    const { confirm } = useDialog();
 
     const currentMonth = "2026-01"; // Dynamically derived from System Time
 
@@ -252,9 +254,10 @@ export const ApprovalCenter = () => {
                                                 {canAct && !isHistory && (
                                                     <div className="flex items-center justify-end gap-2">
                                                         <button
-                                                            onClick={() => {
+                                                            onClick={async () => {
                                                                 const action = (isMyCheck && loan.status === LoanStatus.REQUESTED) ? 'Verify' : 'Approve';
-                                                                if (confirm(`${action} this Request?`)) approveLoan(loan.id);
+                                                                const ok = await confirm({ title: `Loan ${action}?`, message: `Kya aap is loan request ko ${action.toLowerCase()} karna chahte hain?`, confirmLabel: `Haan, ${action}`, cancelLabel: 'Cancel', variant: 'info' });
+                                                                if (ok) approveLoan(loan.id);
                                                             }}
                                                             className="flex items-center gap-1.5 px-3 py-1.5 bg-success/20 text-success hover:bg-success hover:text-white rounded-lg transition-colors text-xs font-bold"
                                                         >
@@ -262,8 +265,9 @@ export const ApprovalCenter = () => {
                                                             {(isMyCheck && loan.status === LoanStatus.REQUESTED) ? 'Verify' : 'Approve'}
                                                         </button>
                                                         <button
-                                                            onClick={() => {
-                                                                if (confirm('Reject Request?')) rejectLoan(loan.id);
+                                                            onClick={async () => {
+                                                                const ok = await confirm({ title: 'Loan Reject Karein?', message: 'Kya aap yeh loan request reject karna chahte hain?', confirmLabel: 'Haan, Reject Karo', cancelLabel: 'Cancel', variant: 'danger' });
+                                                                if (ok) rejectLoan(loan.id);
                                                             }}
                                                             className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors text-xs font-bold"
                                                         >
@@ -341,8 +345,9 @@ export const ApprovalCenter = () => {
                                                 {entry.status === ProductionStatus.PENDING && (
                                                     <div className="flex items-center justify-end gap-2">
                                                         <button
-                                                            onClick={() => {
-                                                                if (confirm('Approve this work entry?')) approveEntry(entry.id);
+                                                            onClick={async () => {
+                                                                const ok = await confirm({ title: 'Work Entry Approve?', message: 'Is production entry ko approve karna chahte hain?', confirmLabel: 'Approve', cancelLabel: 'Cancel', variant: 'info' });
+                                                                if (ok) approveEntry(entry.id);
                                                             }}
                                                             className="p-1.5 bg-success/20 text-success hover:bg-success hover:text-white rounded-lg transition-colors"
                                                             title="Approve"
@@ -350,8 +355,9 @@ export const ApprovalCenter = () => {
                                                             <CheckCircle className="w-4 h-4" />
                                                         </button>
                                                         <button
-                                                            onClick={() => {
-                                                                if (confirm('Reject this work entry?')) rejectEntry(entry.id);
+                                                            onClick={async () => {
+                                                                const ok = await confirm({ title: 'Work Entry Reject?', message: 'Is production entry ko reject karna chahte hain?', confirmLabel: 'Reject', cancelLabel: 'Cancel', variant: 'danger' });
+                                                                if (ok) rejectEntry(entry.id);
                                                             }}
                                                             className="p-1.5 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors"
                                                             title="Reject"

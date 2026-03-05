@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Zap, X, IndianRupee } from 'lucide-react';
 import { useLoanStore } from '@/store/loanStore';
+import { useDialog } from '@/components/DialogProvider';
 
 interface EarlySettlementModalProps {
     loanId: string;
@@ -10,6 +11,7 @@ interface EarlySettlementModalProps {
 export const EarlySettlementModal = ({ loanId, onClose }: EarlySettlementModalProps) => {
     const { requestEarlySettlement, approveSettlement, processSettlement, loans } = useLoanStore();
     const [discount, setDiscount] = useState(0);
+    const { toast } = useDialog();
 
     const loan = loans.find(l => l.id === loanId);
     if (!loan) return null;
@@ -19,21 +21,21 @@ export const EarlySettlementModal = ({ loanId, onClose }: EarlySettlementModalPr
 
     const handleRequestSettlement = () => {
         requestEarlySettlement(loanId);
-        alert('Settlement request submitted!');
+        toast('Settlement request submit ho gayi!', 'success');
     };
 
     const handleApprove = () => {
         if (discount > loan.balance) {
-            alert('Discount cannot exceed outstanding amount!');
+            toast('Discount outstanding amount se zyada nahi ho sakta!', 'error');
             return;
         }
         approveSettlement(loanId, discount);
-        alert('Settlement approved! Employee can now pay.');
+        toast('Settlement approved! Employee pay kar sakta hai.', 'success');
     };
 
     const handleProcessPayment = () => {
         processSettlement(loanId);
-        alert('Settlement processed! Loan closed.');
+        toast('Settlement process ho gaya! Loan band ho gaya.', 'success');
         onClose();
     };
 

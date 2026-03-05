@@ -8,6 +8,7 @@ import {
     Download, Search, Edit2, Check, X, Star, Flag, Sparkles
 } from 'lucide-react';
 import { Holiday } from '@/types';
+import { useDialog } from '@/components/DialogProvider';
 
 // ── Indian National & Festival Holidays 2026 ──────────────────────────────────
 const INDIAN_HOLIDAYS_2026: Omit<Holiday, 'id'>[] = [
@@ -50,6 +51,7 @@ export const HolidayManager = () => {
     const { hasPermission } = useAuthStore();
     const { holidays, isLoading, fetchHolidays, addHoliday, updateHoliday, removeHoliday, bulkImport } = useHolidayStore();
     const canManage = hasPermission(PERMISSIONS.MANAGE_HOLIDAYS);
+    const { confirm } = useDialog();
 
     const currentYear = new Date().getFullYear();
     const [selectedYear, setSelectedYear] = useState(currentYear);
@@ -116,7 +118,14 @@ export const HolidayManager = () => {
     };
 
     const handleDelete = async (id: string, name: string) => {
-        if (!confirm(`Delete "${name}"?`)) return;
+        const ok = await confirm({
+            title: 'Holiday Delete Karein?',
+            message: `"${name}" holiday ko permanently delete karna chahte hain?`,
+            confirmLabel: 'Haan, Delete Karo',
+            cancelLabel: 'Cancel',
+            variant: 'danger',
+        });
+        if (!ok) return;
         await removeHoliday(id);
         showToast(true, 'Holiday deleted');
     };

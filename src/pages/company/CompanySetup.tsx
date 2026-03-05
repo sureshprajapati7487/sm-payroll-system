@@ -5,11 +5,13 @@ import { useEmployeeStore } from '@/store/employeeStore';
 import { Roles, EmployeeStatus } from '@/types';
 import { Building2, MapPin, ArrowRight } from 'lucide-react';
 import { PasswordStrengthInput, isPasswordValid } from '@/components/ui/PasswordStrengthInput';
+import { useDialog } from '@/components/DialogProvider';
 
 export const CompanySetup = () => {
     const navigate = useNavigate();
     const { addCompany, switchCompany } = useMultiCompanyStore();
     const { addEmployee } = useEmployeeStore();
+    const { alert } = useDialog();
 
     // Form State
     const [formData, setFormData] = useState({
@@ -96,7 +98,11 @@ export const CompanySetup = () => {
             }
 
             // Show Success Message
-            alert("Company Created Successfully! Please Login with your Admin ID.");
+            await alert({
+                title: '✅ Company Created!',
+                message: 'Aapki company successfully create ho gayi. Ab apni Admin ID se login karein.',
+                variant: 'info',
+            });
 
             navigate('/login');
         } else {

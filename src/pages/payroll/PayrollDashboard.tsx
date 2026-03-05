@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { LoanSummaryModal } from '@/components/loans/LoanSummaryModal';
+import { useDialog } from '@/components/DialogProvider';
 import { PayrollDisbursementModal } from '@/components/payroll/PayrollDisbursementModal';
 import { EmployeeHistoryModal } from '@/components/payroll/EmployeeHistoryModal';
 import { Employee } from '@/types';
@@ -40,6 +41,7 @@ export const PayrollDashboard = () => {
     const [showLoanModal, setShowLoanModal] = useState(false);
     const [showDisbursementModal, setShowDisbursementModal] = useState(false);
     const [selectedHistoryEmployee, setSelectedHistoryEmployee] = useState<Employee | null>(null);
+    const { confirm } = useDialog();
 
     // Fetch payroll data from server when month changes
     useEffect(() => {
@@ -68,7 +70,14 @@ export const PayrollDashboard = () => {
     const totalPayout = filteredSlips.reduce((sum, s) => sum + s.netSalary, 0);
 
     const handleGenerate = async () => {
-        if (confirm(`Generate Payroll for ${selectedMonth}? This will overwrite existing slips for this month.`)) {
+        const ok = await confirm({
+            title: '💸 Payroll Generate Karein?',
+            message: `${selectedMonth} maah ka payroll generate karna chahte hain? Pehle se existing slips overwrite ho jayengi.`,
+            confirmLabel: 'Haan, Generate Karo',
+            cancelLabel: 'Cancel',
+            variant: 'warning',
+        });
+        if (ok) {
             await generateMonthlyPayroll(selectedMonth, user?.name);
         }
     };

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
+import { useDialog } from '@/components/DialogProvider';
 
 interface TrashItem {
     id: string;
@@ -24,6 +25,7 @@ export const TrashManagement = () => {
         }
     ]);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, step: number } | null>(null);
+    const { toast } = useDialog();
 
     const filteredItems = items.filter(item => item.type === activeTab && item.isDeleted);
 
@@ -31,14 +33,14 @@ export const TrashManagement = () => {
         setItems(items.map(item =>
             item.id === id ? { ...item, isDeleted: false } : item
         ));
-        alert('Item restored successfully!');
+        toast('Item successfully restore ho gaya!', 'success');
     };
 
     const handlePermanentDelete = (id: string) => {
         if (deleteConfirm?.id === id && deleteConfirm.step === 3) {
             setItems(items.filter(item => item.id !== id));
             setDeleteConfirm(null);
-            alert('Item permanently deleted!');
+            toast('Item permanently delete ho gaya!', 'warning');
         } else if (deleteConfirm?.id === id) {
             setDeleteConfirm({ id, step: deleteConfirm.step + 1 });
         } else {

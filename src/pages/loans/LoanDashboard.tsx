@@ -35,12 +35,14 @@ import { EarlySettlementModal } from '@/components/loans/EarlySettlementModal';
 import { BulkLoanEntryModal } from '@/components/loans/BulkLoanEntryModal';
 import { LoanHistoryModal } from '@/components/loans/LoanHistoryModal';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { useDialog } from '@/components/DialogProvider';
 
 export const LoanDashboard = () => {
     const { user, hasPermission } = useAuthStore();
     const { loans, requestLoan, approveLoan, rejectLoan, updateEMI } = useLoanStore();
     const { employees } = useEmployeeStore();
     const { loanTypes } = useSystemConfigStore();
+    const { toast } = useDialog();
 
     const [searchParams] = useSearchParams();
     const initialSearch = searchParams.get('search') || '';
@@ -179,7 +181,7 @@ export const LoanDashboard = () => {
         // ✅ MAX LIMIT VALIDATION
         const limitCheck = useLoanStore.getState().canTakeLoan(form.employeeId, amount);
         if (!limitCheck.allowed) {
-            alert(`❌ ${limitCheck.message}`);
+            toast(`❌ ${limitCheck.message}`, 'error');
             return;
         }
 

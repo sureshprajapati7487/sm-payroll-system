@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
+import { useDialog } from '@/components/DialogProvider';
 
 interface BackupFile {
     filename: string;
@@ -37,6 +38,7 @@ export function DatabaseBackup() {
     const [toggling, setToggling] = useState(false);
     const [deleting, setDeleting] = useState<string | null>(null);
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const { confirm } = useDialog();
 
     const showMsg = (type: 'success' | 'error', text: string) => {
         setMessage({ type, text });
@@ -101,7 +103,14 @@ export function DatabaseBackup() {
     };
 
     const handleDelete = async (filename: string) => {
-        if (!confirm(`"${filename}" delete karein?\nYeh permanently delete ho jayega.`)) return;
+        const ok = await confirm({
+            title: 'Backup Delete Karein?',
+            message: `"${filename}" ko permanently delete karna chahte hain? Yeh wapas nahi aayega.`,
+            confirmLabel: 'Haan, Delete Karo',
+            cancelLabel: 'Cancel',
+            variant: 'danger',
+        });
+        if (!ok) return;
         setDeleting(filename);
         try {
             const res = await apiFetch(`/backup/${filename}`, { method: 'DELETE' });

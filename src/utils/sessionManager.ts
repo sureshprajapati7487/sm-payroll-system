@@ -93,10 +93,11 @@ export class SessionManager {
         // Logout user
         useAuthStore.getState().logout();
 
-        // Show alert
+        // Show toast via global event that DialogProvider listens to
         if (typeof window !== 'undefined') {
-            alert('Your session has expired due to inactivity. Please login again.');
-            window.location.href = '/';
+            window.dispatchEvent(new CustomEvent('session-expired', {
+                detail: { message: 'Your session has expired due to inactivity. Please login again.' }
+            }));
         }
     }
 
@@ -114,8 +115,9 @@ export class SessionManager {
             console.log('⏰ Session no longer active');
             useAuthStore.getState().logout();
             if (typeof window !== 'undefined') {
-                alert('Your session has expired. Please login again.');
-                window.location.href = '/';
+                window.dispatchEvent(new CustomEvent('session-expired', {
+                    detail: { message: 'Your session has expired. Please login again.' }
+                }));
             }
         }
     }

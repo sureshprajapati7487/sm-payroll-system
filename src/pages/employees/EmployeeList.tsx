@@ -12,6 +12,7 @@ import { clsx } from 'clsx';
 import { CredentialsModal } from '@/components/payroll/CredentialsModal';
 import { SkeletonCardGrid } from '@/components/SkeletonLoaders';
 import { Employee, EmployeeStatus, ShiftType, SalaryType } from '@/types';
+import { useDialog } from '@/components/DialogProvider';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type SortKey = 'name' | 'department' | 'basicSalary' | 'joiningDate';
@@ -53,6 +54,7 @@ export const EmployeeList = () => {
     const navigate = useNavigate();
     const { employees, isLoading, deleteEmployee } = useEmployeeStore();
     const { hasPermission } = useAuthStore();
+    const { confirm } = useDialog();
     const [credentialEmployee, setCredentialEmployee] = useState<Employee | null>(null);
     const [showFilters, setShowFilters] = useState(false);
 
@@ -520,7 +522,17 @@ export const EmployeeList = () => {
                                         )}
                                         {hasPermission(PERMISSIONS.DELETE_EMPLOYEE) && (
                                             <button
-                                                onClick={() => { if (confirm('Delete this employee?')) deleteEmployee(employee.id); }}
+                                                onClick={async () => {
+                                                    const ok = await confirm({
+                                                        title: 'Employee Delete Karein?',
+                                                        message: `"${employee.name}" ko permanently delete karna chahte hain?`,
+                                                        detail: 'Iska sara payroll aur attendance data bhi delete ho jayega.',
+                                                        confirmLabel: 'Haan, Delete Karo',
+                                                        cancelLabel: 'Cancel',
+                                                        variant: 'danger',
+                                                    });
+                                                    if (ok) deleteEmployee(employee.id);
+                                                }}
                                                 className="p-1.5 rounded-lg bg-danger/10 text-danger hover:bg-danger hover:text-white transition-colors"
                                                 title="Delete"
                                             >

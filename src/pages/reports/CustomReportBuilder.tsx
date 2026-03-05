@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { FileBarChart, Save, Download, GripVertical, Eye, EyeOff } from 'lucide-react';
 import { useCustomReportStore, ReportColumn } from '@/store/customReportStore';
 import { useEmployeeStore } from '@/store/employeeStore';
+import { useDialog } from '@/components/DialogProvider';
 
 export const CustomReportBuilder = () => {
     const { availableColumns, saveTemplate, templates } = useCustomReportStore();
     const { employees } = useEmployeeStore();
+    const { toast } = useDialog();
 
     // State for builder
     const [reportName, setReportName] = useState('');
@@ -29,7 +31,7 @@ export const CustomReportBuilder = () => {
             filters: []
         });
 
-        alert('Report template saved successfully!');
+        toast('Report template successfully save ho gaya!', 'success');
         setReportName('');
     };
 

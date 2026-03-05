@@ -52,11 +52,12 @@ interface LoanData {
 // ── 1. Payslip WhatsApp ───────────────────────────────────────────────────────
 export const sendPayslipWhatsApp = (
     employee: Employee,
-    slip: SlipData
+    slip: SlipData,
+    onError?: (msg: string) => void
 ): void => {
     const phone = sanitizePhone(employee.whatsappNumber || employee.phone);
     if (!phone) {
-        alert(`⚠️ ${employee.name} ka WhatsApp number nahi milaa.\nEmployee Profile mein whatsappNumber set karein.`);
+        (onError ?? console.warn)(`⚠️ ${employee.name} ka WhatsApp number nahi milaa. Employee Profile mein whatsappNumber set karein.`);
         return;
     }
 
@@ -83,13 +84,14 @@ export const sendPayslipWhatsApp = (
 // ── 2. Loan Approved WhatsApp ─────────────────────────────────────────────────
 export const sendLoanApprovalWhatsApp = (
     employee: Pick<Employee, 'name' | 'code' | 'phone' | 'whatsappNumber'>,
-    loan: LoanData
+    loan: LoanData,
+    onError?: (msg: string) => void
 ): void => {
     const phone = sanitizePhone(
         (employee as any).whatsappNumber || employee.phone
     );
     if (!phone) {
-        alert(`⚠️ ${employee.name} ka WhatsApp number nahi milaa.`);
+        (onError ?? console.warn)(`⚠️ ${employee.name} ka WhatsApp number nahi milaa.`);
         return;
     }
 
@@ -116,13 +118,14 @@ export const sendLoanApprovalWhatsApp = (
 // ── 3. Loan Rejected WhatsApp ─────────────────────────────────────────────────
 export const sendLoanRejectionWhatsApp = (
     employee: Pick<Employee, 'name' | 'code' | 'phone' | 'whatsappNumber'>,
-    loan: LoanData
+    loan: LoanData,
+    onError?: (msg: string) => void
 ): void => {
     const phone = sanitizePhone(
         (employee as any).whatsappNumber || employee.phone
     );
     if (!phone) {
-        alert(`⚠️ ${employee.name} ka WhatsApp number nahi milaa.`);
+        (onError ?? console.warn)(`⚠️ ${employee.name} ka WhatsApp number nahi milaa.`);
         return;
     }
 
@@ -142,7 +145,9 @@ export const sendLoanRejectionWhatsApp = (
 // ── 4. Bulk Payslip WhatsApp (with delay between each) ───────────────────────
 export const sendBulkPayslipWhatsApp = (
     employeeSlips: { employee: Employee; slip: SlipData }[],
-    onProgress?: (done: number, total: number) => void
+    onProgress?: (done: number, total: number) => void,
+    onError?: (msg: string) => void,
+    onConfirm?: (msg: string) => Promise<boolean>
 ): void => {
     if (employeeSlips.length === 0) return;
 
@@ -151,17 +156,26 @@ export const sendBulkPayslipWhatsApp = (
     );
 
     if (validSlips.length === 0) {
-        alert('⚠️ Kisi bhi employee ka WhatsApp number registered nahi hai.\nEmployee Profile mein whatsappNumber set karein.');
+        (onError ?? console.warn)('⚠️ Kisi bhi employee ka WhatsApp number registered nahi hai. Employee Profile mein whatsappNumber set karein.');
         return;
     }
 
     const missing = employeeSlips.length - validSlips.length;
     if (missing > 0) {
-        const confirmSend = window.confirm(
-            `${missing} employee(on) ka WhatsApp number nahi hai.\n` +
-            `Baaki ${validSlips.length} ko bhejein?`
-        );
-        if (!confirmSend) return;
+        const proceed = async () => {
+            const shouldSend = onConfirm
+                ? await onConfirm(`${missing} employee(on) ka WhatsApp number nahi hai. Baaki ${validSlips.length} ko bhejein?`)
+                : window.confirm(`${missing} employee(on) ka WhatsApp number nahi hai.\nBaaki ${validSlips.length} ko bhejein?`);
+            if (!shouldSend) return;
+            validSlips.forEach(({ employee, slip }, i) => {
+                setTimeout(() => {
+                    sendPayslipWhatsApp(employee, slip, onError);
+                    onProgress?.(i + 1, validSlips.length);
+                }, i * 1500);
+            });
+        };
+        proceed();
+        return;
     }
 
     // Open one by one with 1.5s delay (browsers block rapid popups)

@@ -67,6 +67,7 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary, PageErrorBoundary } from '@/components/ErrorBoundary';
 import { CameraPunchWidget } from '@/components/CameraPunchWidget';
 import { GlobalPunchFAB } from '@/components/GlobalPunchFAB';
+import { DialogProvider } from '@/components/DialogProvider';
 
 // New Reporting & Finance Pages
 import { ReportBuilder } from '@/pages/reports/ReportBuilder';
@@ -159,118 +160,120 @@ function App() {
 
     return (
         <ErrorBoundary>
-            <BrowserRouter>
-                <ForceIpRedirect />
-                <LoanApprovalModal />
-                <CommandPalette />
-                <CameraPunchWidget />
-                <GlobalPunchFAB />
-                {showWarning && (
-                    <SessionTimeoutModal
-                        secondsLeft={secondsLeft}
-                        onStayLoggedIn={extendSession}
-                        onLogout={doLogout}
-                    />
-                )}
-                <Routes>
-                    {/* Public Routes — AuthGuard: already logged-in users seedha /dashboard jao */}
-                    <Route path="/" element={<AuthGuard><LoginPage /></AuthGuard>} />
-                    <Route path="/login" element={<AuthGuard><LoginPage /></AuthGuard>} />
-                    <Route path="/company-setup" element={<CompanySetup />} />
-                    <Route path="/quick-action" element={<QuickActionPage />} />
-                    <Route path="/go/:action/:id" element={<QuickActionPage />} />
+            <DialogProvider>
+                <BrowserRouter>
+                    <ForceIpRedirect />
+                    <LoanApprovalModal />
+                    <CommandPalette />
+                    <CameraPunchWidget />
+                    <GlobalPunchFAB />
+                    {showWarning && (
+                        <SessionTimeoutModal
+                            secondsLeft={secondsLeft}
+                            onStayLoggedIn={extendSession}
+                            onLogout={doLogout}
+                        />
+                    )}
+                    <Routes>
+                        {/* Public Routes — AuthGuard: already logged-in users seedha /dashboard jao */}
+                        <Route path="/" element={<AuthGuard><LoginPage /></AuthGuard>} />
+                        <Route path="/login" element={<AuthGuard><LoginPage /></AuthGuard>} />
+                        <Route path="/company-setup" element={<CompanySetup />} />
+                        <Route path="/quick-action" element={<QuickActionPage />} />
+                        <Route path="/go/:action/:id" element={<QuickActionPage />} />
 
-                    {/* Protected Dashboard Routes */}
-                    <Route element={<ProtectedRoute />}>
-                        <Route element={
-                            <CompanyGuard>
-                                <DashboardLayout />
-                            </CompanyGuard>
-                        }>
-                            {/* Dashboard is no longer default root, but default AFTER login */}
-                            <Route path="/dashboard" element={<Dashboard />} />
-                            <Route path="/unauthorized" element={<UnauthorizedPage />} />
+                        {/* Protected Dashboard Routes */}
+                        <Route element={<ProtectedRoute />}>
+                            <Route element={
+                                <CompanyGuard>
+                                    <DashboardLayout />
+                                </CompanyGuard>
+                            }>
+                                {/* Dashboard is no longer default root, but default AFTER login */}
+                                <Route path="/dashboard" element={<Dashboard />} />
+                                <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-                            {/* Employee Module */}
-                            <Route path="/employees" element={<EmployeeList />} />
-                            <Route path="/employees/new" element={<EmployeeForm />} />
-                            <Route path="/employees/:id" element={<EmployeeProfile />} />
-                            <Route path="/employees/:id/edit" element={<EmployeeForm />} />
+                                {/* Employee Module */}
+                                <Route path="/employees" element={<EmployeeList />} />
+                                <Route path="/employees/new" element={<EmployeeForm />} />
+                                <Route path="/employees/:id" element={<EmployeeProfile />} />
+                                <Route path="/employees/:id/edit" element={<EmployeeForm />} />
 
-                            {/* Existing Modules */}
-                            <Route path="/attendance" element={<PageErrorBoundary pageName="Attendance"><AttendanceDashboard /></PageErrorBoundary>} />
-                            <Route path="/attendance/holidays" element={<PageErrorBoundary pageName="Holiday Manager"><HolidayManager /></PageErrorBoundary>} />
-                            <Route path="/attendance/kiosk" element={<PageErrorBoundary pageName="Face Kiosk"><FaceKioskPage /></PageErrorBoundary>} />
-                            <Route path="/salesman" element={<PageErrorBoundary pageName="Salesman Dashboard"><SalesmanDashboard /></PageErrorBoundary>} />
-                            <Route path="/salesman/clients" element={<PageErrorBoundary pageName="Client / Party List"><ClientListPage /></PageErrorBoundary>} />
-                            <Route path="/production" element={<PageErrorBoundary pageName="Production Dashboard"><ProductionDashboard /></PageErrorBoundary>} />
-                            <Route path="/production/rates" element={<PageErrorBoundary pageName="Rate Manager"><RateManager /></PageErrorBoundary>} />
-                            <Route path="/production/workgroups" element={<PageErrorBoundary pageName="Work Groups"><WorkGroupManager /></PageErrorBoundary>} />
-                            <Route path="/production/bulk" element={<PageErrorBoundary pageName="Bulk Production Entry"><BulkEntryForm /></PageErrorBoundary>} />
-                            <Route path="/leaves" element={<PageErrorBoundary pageName="Leave Dashboard"><LeaveDashboard /></PageErrorBoundary>} />
-                            <Route path="/loans" element={<PageErrorBoundary pageName="Loan Manager"><LoanDashboard /></PageErrorBoundary>} />
-                            <Route path="/approvals" element={<PageErrorBoundary pageName="Approval Center"><ApprovalCenter /></PageErrorBoundary>} />
-                            <Route path="/payroll" element={<PageErrorBoundary pageName="Payroll Dashboard"><PayrollDashboard /></PageErrorBoundary>} />
-                            <Route path="/payroll/history" element={<PageErrorBoundary pageName="Payroll History"><PayrollHistory /></PageErrorBoundary>} />
-                            <Route path="/payroll/simulation" element={<PageErrorBoundary pageName="Payroll Simulation"><PayrollSimulation /></PageErrorBoundary>} />
-                            <Route path="/payroll/slip/:id" element={<PageErrorBoundary pageName="Payslip"><PayslipView /></PageErrorBoundary>} />
+                                {/* Existing Modules */}
+                                <Route path="/attendance" element={<PageErrorBoundary pageName="Attendance"><AttendanceDashboard /></PageErrorBoundary>} />
+                                <Route path="/attendance/holidays" element={<PageErrorBoundary pageName="Holiday Manager"><HolidayManager /></PageErrorBoundary>} />
+                                <Route path="/attendance/kiosk" element={<PageErrorBoundary pageName="Face Kiosk"><FaceKioskPage /></PageErrorBoundary>} />
+                                <Route path="/salesman" element={<PageErrorBoundary pageName="Salesman Dashboard"><SalesmanDashboard /></PageErrorBoundary>} />
+                                <Route path="/salesman/clients" element={<PageErrorBoundary pageName="Client / Party List"><ClientListPage /></PageErrorBoundary>} />
+                                <Route path="/production" element={<PageErrorBoundary pageName="Production Dashboard"><ProductionDashboard /></PageErrorBoundary>} />
+                                <Route path="/production/rates" element={<PageErrorBoundary pageName="Rate Manager"><RateManager /></PageErrorBoundary>} />
+                                <Route path="/production/workgroups" element={<PageErrorBoundary pageName="Work Groups"><WorkGroupManager /></PageErrorBoundary>} />
+                                <Route path="/production/bulk" element={<PageErrorBoundary pageName="Bulk Production Entry"><BulkEntryForm /></PageErrorBoundary>} />
+                                <Route path="/leaves" element={<PageErrorBoundary pageName="Leave Dashboard"><LeaveDashboard /></PageErrorBoundary>} />
+                                <Route path="/loans" element={<PageErrorBoundary pageName="Loan Manager"><LoanDashboard /></PageErrorBoundary>} />
+                                <Route path="/approvals" element={<PageErrorBoundary pageName="Approval Center"><ApprovalCenter /></PageErrorBoundary>} />
+                                <Route path="/payroll" element={<PageErrorBoundary pageName="Payroll Dashboard"><PayrollDashboard /></PageErrorBoundary>} />
+                                <Route path="/payroll/history" element={<PageErrorBoundary pageName="Payroll History"><PayrollHistory /></PageErrorBoundary>} />
+                                <Route path="/payroll/simulation" element={<PageErrorBoundary pageName="Payroll Simulation"><PayrollSimulation /></PageErrorBoundary>} />
+                                <Route path="/payroll/slip/:id" element={<PageErrorBoundary pageName="Payslip"><PayslipView /></PageErrorBoundary>} />
 
-                            {/* Expenses */}
-                            <Route path="/expenses" element={<PageErrorBoundary pageName="Expenses"><ExpensesDashboard /></PageErrorBoundary>} />
+                                {/* Expenses */}
+                                <Route path="/expenses" element={<PageErrorBoundary pageName="Expenses"><ExpensesDashboard /></PageErrorBoundary>} />
 
-                            {/* Calculator Pages */}
-                            <Route path="/calculators/ctc" element={<CTCCalculator />} />
-                            <Route path="/calculators/tds" element={<TDSCalculator />} />
-                            <Route path="/calculators/pfesi" element={<PFESICalculator />} />
+                                {/* Calculator Pages */}
+                                <Route path="/calculators/ctc" element={<CTCCalculator />} />
+                                <Route path="/calculators/tds" element={<TDSCalculator />} />
+                                <Route path="/calculators/pfesi" element={<PFESICalculator />} />
 
-                            {/* Admin Tools */}
-                            <Route path="/admin/bulk-import" element={<PageErrorBoundary pageName="Bulk Import"><BulkImport /></PageErrorBoundary>} />
-                            <Route path="/admin/audit-logs" element={<PageErrorBoundary pageName="Audit Logs"><AuditLogs /></PageErrorBoundary>} />
-                            <Route path="/admin/backup" element={<PageErrorBoundary pageName="Database Backup"><DatabaseBackup /></PageErrorBoundary>} />
-                            <Route path="/admin/trash" element={<PageErrorBoundary pageName="Trash Management"><TrashManagement /></PageErrorBoundary>} />
-                            <Route path="/admin/drafts" element={<PageErrorBoundary pageName="Draft Manager"><DraftManager /></PageErrorBoundary>} />
-                            <Route path="/admin/consistency" element={<PageErrorBoundary pageName="Data Consistency"><DataConsistencyChecker /></PageErrorBoundary>} />
-                            <Route path="/admin/seed" element={<PageErrorBoundary pageName="Data Seeding"><DataSeeding /></PageErrorBoundary>} />
+                                {/* Admin Tools */}
+                                <Route path="/admin/bulk-import" element={<PageErrorBoundary pageName="Bulk Import"><BulkImport /></PageErrorBoundary>} />
+                                <Route path="/admin/audit-logs" element={<PageErrorBoundary pageName="Audit Logs"><AuditLogs /></PageErrorBoundary>} />
+                                <Route path="/admin/backup" element={<PageErrorBoundary pageName="Database Backup"><DatabaseBackup /></PageErrorBoundary>} />
+                                <Route path="/admin/trash" element={<PageErrorBoundary pageName="Trash Management"><TrashManagement /></PageErrorBoundary>} />
+                                <Route path="/admin/drafts" element={<PageErrorBoundary pageName="Draft Manager"><DraftManager /></PageErrorBoundary>} />
+                                <Route path="/admin/consistency" element={<PageErrorBoundary pageName="Data Consistency"><DataConsistencyChecker /></PageErrorBoundary>} />
+                                <Route path="/admin/seed" element={<PageErrorBoundary pageName="Data Seeding"><DataSeeding /></PageErrorBoundary>} />
 
-                            {/* Reports & Finance */}
-                            <Route path="/reports/builder" element={<PageErrorBoundary pageName="Report Builder"><ReportBuilder /></PageErrorBoundary>} />
-                            <Route path="/reports/custom" element={<PageErrorBoundary pageName="Custom Reports"><CustomReportBuilder /></PageErrorBoundary>} />
-                            <Route path="/reports/scheduled" element={<PageErrorBoundary pageName="Scheduled Reports"><ScheduledReports /></PageErrorBoundary>} />
-                            <Route path="/finance/dashboard" element={<PageErrorBoundary pageName="Finance Dashboard"><FinanceDashboard /></PageErrorBoundary>} />
-                            <Route path="/finance/department" element={<PageErrorBoundary pageName="Department Finance"><DepartmentFinanceReport /></PageErrorBoundary>} />
-                            <Route path="/finance/cost-centers" element={<PageErrorBoundary pageName="Cost Centers"><CostCenterMapping /></PageErrorBoundary>} />
-                            <Route path="/finance/advance-salary" element={<PageErrorBoundary pageName="Advance Salary"><AdvanceSalaryManagement /></PageErrorBoundary>} />
+                                {/* Reports & Finance */}
+                                <Route path="/reports/builder" element={<PageErrorBoundary pageName="Report Builder"><ReportBuilder /></PageErrorBoundary>} />
+                                <Route path="/reports/custom" element={<PageErrorBoundary pageName="Custom Reports"><CustomReportBuilder /></PageErrorBoundary>} />
+                                <Route path="/reports/scheduled" element={<PageErrorBoundary pageName="Scheduled Reports"><ScheduledReports /></PageErrorBoundary>} />
+                                <Route path="/finance/dashboard" element={<PageErrorBoundary pageName="Finance Dashboard"><FinanceDashboard /></PageErrorBoundary>} />
+                                <Route path="/finance/department" element={<PageErrorBoundary pageName="Department Finance"><DepartmentFinanceReport /></PageErrorBoundary>} />
+                                <Route path="/finance/cost-centers" element={<PageErrorBoundary pageName="Cost Centers"><CostCenterMapping /></PageErrorBoundary>} />
+                                <Route path="/finance/advance-salary" element={<PageErrorBoundary pageName="Advance Salary"><AdvanceSalaryManagement /></PageErrorBoundary>} />
 
-                            {/* Statutory Compliance */}
-                            <Route path="/statutory/form16" element={<PageErrorBoundary pageName="Form 16 Generator"><Form16Generator /></PageErrorBoundary>} />
-                            <Route path="/statutory/reports" element={<PageErrorBoundary pageName="Statutory Reports"><StatutoryReports /></PageErrorBoundary>} />
+                                {/* Statutory Compliance */}
+                                <Route path="/statutory/form16" element={<PageErrorBoundary pageName="Form 16 Generator"><Form16Generator /></PageErrorBoundary>} />
+                                <Route path="/statutory/reports" element={<PageErrorBoundary pageName="Statutory Reports"><StatutoryReports /></PageErrorBoundary>} />
 
-                            {/* Settings */}
-                            <Route path="/settings" element={<GeneralSettings />} />
-                            <Route path="/settings/security" element={<SecuritySettings />} />
-                            <Route path="/settings/profile" element={<UserProfile />} />
-                            <Route path="/settings/theme" element={<ThemeCustomizer />} />
-                            <Route path="/settings/language" element={<LanguageSettings />} />
-                            <Route path="/settings/server-status" element={<ServerStatusDashboard />} />
-                            <Route path="/settings/notifications" element={<NotificationSettings />} />
-                            <Route path="/configuration" element={<ConfigurationPage />} />
-                            <Route path="/security/alerts" element={<SecurityAlerts />} />
+                                {/* Settings */}
+                                <Route path="/settings" element={<GeneralSettings />} />
+                                <Route path="/settings/security" element={<SecuritySettings />} />
+                                <Route path="/settings/profile" element={<UserProfile />} />
+                                <Route path="/settings/theme" element={<ThemeCustomizer />} />
+                                <Route path="/settings/language" element={<LanguageSettings />} />
+                                <Route path="/settings/server-status" element={<ServerStatusDashboard />} />
+                                <Route path="/settings/notifications" element={<NotificationSettings />} />
+                                <Route path="/configuration" element={<ConfigurationPage />} />
+                                <Route path="/security/alerts" element={<SecurityAlerts />} />
 
-                            {/* Company Management */}
-                            <Route path="/company/switcher" element={<CompanySwitcher />} />
+                                {/* Company Management */}
+                                <Route path="/company/switcher" element={<CompanySwitcher />} />
 
-                            {/* Mobile Features */}
-                            <Route path="/mobile/checkin" element={<QuickCheckIn />} />
-                            <Route path="/mobile/dashboard" element={<MobileDashboard />} />
+                                {/* Mobile Features */}
+                                <Route path="/mobile/checkin" element={<QuickCheckIn />} />
+                                <Route path="/mobile/dashboard" element={<MobileDashboard />} />
 
-                            <Route path="/help" element={<HelpCenter />} />
+                                <Route path="/help" element={<HelpCenter />} />
+                            </Route>
                         </Route>
-                    </Route>
 
-                    {/* Public Routes */}
-                    <Route path="*" element={<NotFound />} />
-                </Routes>
-            </BrowserRouter>
+                        {/* Public Routes */}
+                        <Route path="*" element={<NotFound />} />
+                    </Routes>
+                </BrowserRouter>
+            </DialogProvider>
         </ErrorBoundary>
     );
 }

@@ -5,12 +5,14 @@ import { usePayrollStore } from '@/store/payrollStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { exportToExcel, exportPayrollToPDF } from '@/utils/exportUtils';
 import { Download, FileSpreadsheet, Search, ArrowUpRight } from 'lucide-react';
+import { useDialog } from '@/components/DialogProvider';
 
 
 export const PayrollHistory = () => {
     const { rollbackToVersion, getVersionHistory } = usePayrollVersionStore();
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [showConfirm, setShowConfirm] = useState<string | null>(null);
+    const { toast } = useDialog();
 
     const [month, year] = selectedMonth.split('-');
     const history = getVersionHistory(month, parseInt(year));
@@ -18,7 +20,7 @@ export const PayrollHistory = () => {
     const handleRollback = (versionId: string) => {
         rollbackToVersion(versionId);
         setShowConfirm(null);
-        alert('Payroll rolled back successfully!');
+        toast('Payroll successfully rollback ho gaya!', 'success');
     };
 
     const getStatusColor = (status: string) => {

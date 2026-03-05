@@ -7,6 +7,7 @@ import { MapPin, Navigation, Save, ToggleLeft, ToggleRight, Target } from 'lucid
 import { useSystemConfigStore } from '@/store/systemConfigStore';
 import { useAuthStore } from '@/store/authStore';
 import { Roles } from '@/types';
+import { useDialog } from '@/components/DialogProvider';
 
 export const PunchLocationSettings = () => {
     const { user } = useAuthStore();
@@ -21,6 +22,7 @@ export const PunchLocationSettings = () => {
     const [saved, setSaved] = useState(false);
     const [detecting, setDetecting] = useState(false);
     const [detectError, setDetectError] = useState<string | null>(null);
+    const { toast } = useDialog();
 
     // Only admin/superadmin can access
     if (user?.role !== Roles.ADMIN && user?.role !== Roles.SUPER_ADMIN) return null;
@@ -32,11 +34,11 @@ export const PunchLocationSettings = () => {
         const radius = parseInt(form.radiusMeters, 10);
 
         if (isNaN(lat) || isNaN(lng)) {
-            alert('Valid latitude aur longitude enter karein.');
+            toast('Valid latitude aur longitude enter karein.', 'error');
             return;
         }
         if (isNaN(radius) || radius < 10) {
-            alert('Radius kam se kam 10 meters hona chahiye.');
+            toast('Radius kam se kam 10 meters hona chahiye.', 'error');
             return;
         }
 

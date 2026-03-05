@@ -11,6 +11,7 @@ import {
     Eye, Navigation, Building2, User, Calendar, RefreshCw, Map, FileDown,
     ChevronDown, IndianRupee, Radar, Zap, History
 } from 'lucide-react';
+import { useDialog } from '@/components/DialogProvider';
 
 // ── Excel Download helper — Blob approach (works on HTTPS + LAN IP) ──────────
 function downloadExcel(headers: string[], rows: (string | number | undefined | null | boolean)[][], filename: string, sheetName = 'Sheet1') {
@@ -277,6 +278,7 @@ const ClientModal = ({ client, salesEmployees, onClose, onSave }: {
 const CheckOutModal = ({ visit, onClose, onCheckOut }: { visit: ClientVisitRecord; onClose: () => void; onCheckOut: (p: any) => Promise<void> }) => {
     const [form, setForm] = useState({ outcome: 'NO_ORDER' as VisitOutcome, orderAmount: 0, collectionAmount: 0, notes: '', nextVisitDate: '' });
     const [saving, setSaving] = useState(false);
+    const { toast } = useDialog();
     const inp = 'w-full rounded-lg px-3 py-2 text-sm';
     const handleCheckOut = async () => {
         setSaving(true);
@@ -285,7 +287,7 @@ const CheckOutModal = ({ visit, onClose, onCheckOut }: { visit: ClientVisitRecor
             try { const p = await getCurrentLocation(); lat = p.lat; lng = p.lng; } catch { }
             await onCheckOut({ ...form, lat, lng });
             onClose();
-        } catch (e: any) { alert(e.message); }
+        } catch (e: any) { toast(e.message, 'error'); }
         setSaving(false);
     };
     const elapsed = Math.round((Date.now() - new Date(visit.checkInAt).getTime()) / 60000);
@@ -427,6 +429,7 @@ const BulkImportModal = ({
     const [dragOver, setDragOver] = useState(false);
     const [errMsg, setErrMsg] = useState('');
     const fileRef = useRef<HTMLInputElement>(null);
+    const { toast } = useDialog();
 
     const normalise = (rows: any[]) => {
         setErrMsg('');
@@ -476,7 +479,7 @@ const BulkImportModal = ({
         if (!parsed.length) return;
         setImporting(true);
         try { await onImport(parsed, companyId); onClose(); }
-        catch (e: any) { alert(e.message); }
+        catch (e: any) { toast(e.message, 'error'); }
         setImporting(false);
     };
 
@@ -655,6 +658,7 @@ const GeofenceEventLog = ({ events, onClear }: { events: GeofenceEvent[]; onClea
 // ── Main Component ────────────────────────────────────────────────────────────
 export const ClientListPage = () => {
     const { clients, fetchClients, addClient, updateClient, deleteClient, bulkImportClients, setClientLocation, checkIn, checkOut, fetchActiveVisit, activeVisit, loading } = useClientStore();
+    const { toast } = useDialog();
     const { employees } = useEmployeeStore();
     const { user } = useAuthStore();
     const { currentCompanyId } = useMultiCompanyStore();
@@ -705,8 +709,8 @@ export const ClientListPage = () => {
         try {
             const { lat, lng } = await getCurrentLocation();
             await setClientLocation(clientId, lat, lng, user?.id || '');
-            alert(`✅ Location set!\nLat: ${lat.toFixed(6)}\nLng: ${lng.toFixed(6)}`);
-        } catch (e: any) { alert('GPS Error: ' + e.message); }
+            toast(`✅ Location set!\nLat: ${lat.toFixed(6)}\nLng: ${lng.toFixed(6)}`, 'success');
+        } catch (e: any) { toast('GPS Error: ' + e.message, 'error'); }
         setGpsLoading(null);
     };
 
@@ -718,7 +722,7 @@ export const ClientListPage = () => {
             let lat, lng;
             try { const p = await getCurrentLocation(); lat = p.lat; lng = p.lng; } catch { }
             await checkIn({ companyId: currentCompanyId!, clientId: client.id, salesmanId: user.id, salesmanName: user.name, lat, lng, purpose: purpose as any });
-        } catch (e: any) { alert('Check-in Error: ' + e.message); }
+        } catch (e: any) { toast('Check-in Error: ' + e.message, 'error'); }
         setCheckingIn(null);
     };
 
@@ -1059,7 +1063,7 @@ export const ClientListPage = () => {
                             await deleteClient(deleteConfirm.id);
                             setDeleteConfirm(null);
                         } catch (e: any) {
-                            alert('Delete failed: ' + e.message);
+                            toast('Delete failed: ' + e.message, 'error');
                         }
                         setDeleting(false);
                     }}

@@ -7,6 +7,7 @@ import { clsx } from 'clsx';
 
 import { useAuthStore } from '@/store/authStore';
 import { useSystemConfigStore } from '@/store/systemConfigStore';
+import { useDialog } from '@/components/DialogProvider';
 
 interface BulkLoanEntryModalProps {
     onClose: () => void;
@@ -29,6 +30,7 @@ export const BulkLoanEntryModal = ({ onClose }: BulkLoanEntryModalProps) => {
     const { requestLoan } = useLoanStore();
     const { employees } = useEmployeeStore();
     const { user } = useAuthStore();
+    const { confirm, toast } = useDialog();
 
     const [rows, setRows] = useState<LoanRow[]>([
         { id: '1', employeeId: '', type: LoanType.ADVANCE_CASH, amount: 0, tenureMonths: 1, emiAmount: 0, startDate: new Date().toISOString().split('T')[0] }
@@ -72,15 +74,22 @@ export const BulkLoanEntryModal = ({ onClose }: BulkLoanEntryModalProps) => {
         }));
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         // Validate
         const validRows = rows.filter(r => r.employeeId && r.amount > 0);
         if (validRows.length === 0) {
-            alert('Please add at least one valid loan entry.');
+            toast('Pehle kam se kam ek valid loan entry add karein.', 'error');
             return;
         }
 
-        if (confirm(`Process ${validRows.length} loan entries?`)) {
+        const ok = await confirm({
+            title: `${validRows.length} Loan Entries Process Karein?`,
+            message: `${validRows.length} employees ke liye loan/advance entries submit hogi.`,
+            confirmLabel: 'Haan, Process Karo',
+            cancelLabel: 'Cancel',
+            variant: 'warning',
+        });
+        if (ok) {
             validRows.forEach(row => {
                 requestLoan({
                     employeeId: row.employeeId,
@@ -88,14 +97,10 @@ export const BulkLoanEntryModal = ({ onClose }: BulkLoanEntryModalProps) => {
                     amount: row.amount,
                     tenureMonths: row.tenureMonths,
                     emiAmount: row.emiAmount,
-                    reason: row.remarks || 'Bulk Entry', // Use remarks if present
+                    reason: row.remarks || 'Bulk Entry',
                     issuedDate: row.startDate,
                     approverId: user?.id || 'ADMIN',
-                    checkingApproverId: row.checkingApproverId // Auto-approve logic needed? 
-                    // requestLoan creates "REQUESTED" status. 
-                    // User probably wants them APPROVED directly if Admin is doing it.
-                    // I will check useLoanStore logic. Usually requestLoan makes it REQUESTED.
-                    // Ideally I should utilize an 'addLoan' or 'approveLoan' immediately if I am Admin.
+                    checkingApproverId: row.checkingApproverId
                 });
             });
             onClose();
