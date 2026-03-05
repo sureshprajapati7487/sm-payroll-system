@@ -364,8 +364,9 @@ const ClientVisit = sequelize.define('ClientVisit', {
 // ── Sync Database ─────────────────────────────────────────────────────────────
 const initDB = async () => {
     try {
-        const isPostgres = String(process.env.DATABASE_URL).startsWith('postgresql');
-        await sequelize.sync({ alter: isPostgres });
+        console.log('Syncing database...');
+        // DANGEROUS on production: do not use { alter: true } as it locks tables and causes hangs
+        await sequelize.sync();
         console.log('Database synced successfully.');
 
         // Seed initial admin if database is empty (useful for fresh Render deployments)
@@ -376,24 +377,18 @@ const initDB = async () => {
             const hashedPassword = await bcrypt.hash('8824834657@AA', 10);
             await Company.create({ id: 'c1', name: 'SM Payroll Default', code: 'SM' });
             await Employee.create({
-                id: 'admin1',
+                id: 'ACLLP-01',
                 companyId: 'c1',
-                code: 'ACLLP-01',
-                name: 'Admin',
-                phone: '8824834657',
-                role: 'ADMIN',
+                name: 'Suresh Owner',
+                designation: 'Owner',
+                role: 'SUPER_ADMIN',
                 password: hashedPassword,
-                status: 'ACTIVE',
-                baseSalary: 0
+                status: 'ACTIVE'
             });
-            console.log('✅ Default admin ACLLP-01 seeded successfully.');
+            console.log('✅ Admin ACLLP-01 created with default password.');
         }
-
-    } catch (error) {
-        console.error('Database sync failed:', error);
-        throw error;
+    } catch (err) {
+        console.error('❌ Failed to sync database:', err);
     }
 };
-
 module.exports = { sequelize, Company, Employee, Attendance, Production, Leave, Loan, SalarySlip, Expense, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, initDB };
-
