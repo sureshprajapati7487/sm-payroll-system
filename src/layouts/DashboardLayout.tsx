@@ -209,7 +209,7 @@ export const DashboardLayout = () => {
     };
 
     // ── Sidebar Content (shared: desktop + mobile overlay) ──────────────────
-    const SidebarContent = () => (
+    const renderSidebarContent = () => (
         <div className="flex flex-col h-full">
             {/* Logo */}
             <div className="px-5 pt-3 pb-4 flex items-center gap-3 border-b border-dark-border">
@@ -362,7 +362,7 @@ export const DashboardLayout = () => {
 
             {/* ── Desktop Sidebar ──────────────────────────────────────────── */}
             <aside className="hidden md:flex w-[220px] flex-col bg-dark-card border-r border-dark-border fixed h-full z-10">
-                <SidebarContent />
+                {renderSidebarContent()}
             </aside>
 
             {/* ── Mobile Sidebar Overlay ───────────────────────────────────── */}
@@ -379,7 +379,7 @@ export const DashboardLayout = () => {
                             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                             className="fixed left-0 top-0 h-full w-[260px] bg-dark-card border-r border-dark-border z-40 md:hidden"
                         >
-                            <SidebarContent />
+                            {renderSidebarContent()}
                         </motion.aside>
                     </>
                 )}
