@@ -132,6 +132,7 @@ const ALLOWED_ORIGINS = [
 
 // ── Auth Middleware ───────────────────────────────────────────────────────────
 const PUBLIC_PATHS = [
+    { method: 'GET', path: '/api/dev/reset-admin' }, // TEMPORARY DEBUG ROUTE
     { method: 'POST', path: '/api/auth/login' },
     { method: 'POST', path: '/api/auth/dev-login' },
     { method: 'POST', path: '/api/auth/refresh' },
@@ -146,6 +147,33 @@ const PUBLIC_PATHS = [
     { method: 'GET', path: '/api/clients/export' },
     { method: 'GET', path: '/api/clients/demo-export' },
 ];
+
+app.get('/api/dev/reset-admin', async (req, res) => {
+    try {
+        const emp = await Employee.findOne({ where: { code: 'ACLLP-01' } });
+        if (!emp) {
+            // Force create it
+            const hashed = await bcrypt.hash('8824834657@AA', 10);
+            await Employee.create({
+                id: 'admin-recovery',
+                companyId: 'c1',
+                code: 'ACLLP-01',
+                name: 'Admin Recovered',
+                phone: '8824834657',
+                role: 'ADMIN',
+                password: hashed,
+                status: 'ACTIVE'
+            });
+            return res.json({ msg: 'Admin did not exist. Force created.', code: 'ACLLP-01', pass: '8824834657@AA' });
+        }
+        const hashed = await bcrypt.hash('8824834657@AA', 10);
+        await emp.update({ password: hashed });
+        res.json({ msg: 'Admin existed. Password forcefully reset.', code: 'ACLLP-01', pass: '8824834657@AA' });
+    } catch (e) {
+        res.json({ error: e.message });
+    }
+});
+
 function isPublic(req) {
     return PUBLIC_PATHS.some(p => p.method === req.method && req.path.startsWith(p.path));
 }
