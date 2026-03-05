@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { InfoTip } from '@/components/ui/InfoTip';
 import { useDepartmentStore, DeptSalaryBasis } from '@/store/departmentStore';
 import { useWorkGroupStore } from '@/store/workGroupStore';
 import { useShiftStore } from '@/store/shiftStore';
@@ -333,7 +334,7 @@ interface SalesConfig {
 }
 
 const DEFAULT_SALES_CFG: SalesConfig = {
-    gpsRadiusMeters: 500,
+    gpsRadiusMeters: 50,
     maxDailyVisits: 20,
     minVisitDurationMins: 5,
     maxVisitDurationMins: 180,
@@ -403,6 +404,8 @@ const SalesmanConfigPanel = () => {
         </button>
     );
 
+    // InfoTip is now a shared global component from @/components/ui/InfoTip
+
     return (
         <div className="space-y-8 max-w-4xl">
             {/* Header */}
@@ -425,34 +428,32 @@ const SalesmanConfigPanel = () => {
                         Visit Settings
                     </h3>
                     <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-xs text-slate-400 uppercase block mb-1">GPS Radius (meters)</label>
+                        <div className="relative">
+                            <InfoTip id="gpsRadiusMeters" label="GPS Radius (meters)" />
                             <input type="number" value={cfg.gpsRadiusMeters} onChange={e => update('gpsRadiusMeters', +e.target.value)} className={inp} min={50} max={5000} step={50} />
                             <p className="text-[10px] text-slate-500 mt-1">Client se itni door check-in allow hoga</p>
                         </div>
-                        <div>
-                            <label className="text-xs text-slate-400 uppercase block mb-1">Max Daily Visits</label>
+                        <div className="relative">
+                            <InfoTip id="maxDailyVisits" label="Max Daily Visits" />
                             <input type="number" value={cfg.maxDailyVisits} onChange={e => update('maxDailyVisits', +e.target.value)} className={inp} min={1} max={100} />
                         </div>
-                        <div>
-                            <label className="text-xs text-slate-400 uppercase block mb-1">Min Visit Duration (mins)</label>
+                        <div className="relative">
+                            <InfoTip id="minVisitDurationMins" label="Min Visit Duration (mins)" />
                             <input type="number" value={cfg.minVisitDurationMins} onChange={e => update('minVisitDurationMins', +e.target.value)} className={inp} min={1} max={60} />
                         </div>
-                        <div>
-                            <label className="text-xs text-slate-400 uppercase block mb-1">Max Visit Duration (mins)</label>
+                        <div className="relative">
+                            <InfoTip id="maxVisitDurationMins" label="Max Visit Duration (mins)" />
                             <input type="number" value={cfg.maxVisitDurationMins} onChange={e => update('maxVisitDurationMins', +e.target.value)} className={inp} min={30} max={480} />
                         </div>
-                        <div>
-                            <label className="text-xs text-slate-400 uppercase block mb-1">Check-In Start</label>
+                        <div className="relative">
+                            <InfoTip id="checkInTime" label="Check-In Start" />
                             <input type="time" value={cfg.checkInStartTime} onChange={e => update('checkInStartTime', e.target.value)} className={inp} />
                         </div>
-                        <div>
-                            <label className="text-xs text-slate-400 uppercase block mb-1">Check-In End</label>
+                        <div className="relative">
+                            <InfoTip id="checkInTime" label="Check-In End" />
                             <input type="time" value={cfg.checkInEndTime} onChange={e => update('checkInEndTime', e.target.value)} className={inp} />
                         </div>
                     </div>
-
-                    {/* Auto Checkout */}
                     <div className="flex items-center justify-between py-2 border-t border-slate-700/50">
                         <div>
                             <p className="text-sm text-white font-medium">Auto Checkout</p>
@@ -461,8 +462,8 @@ const SalesmanConfigPanel = () => {
                         <Toggle on={cfg.autoCheckout} onToggle={() => update('autoCheckout', !cfg.autoCheckout)} />
                     </div>
                     {cfg.autoCheckout && (
-                        <div>
-                            <label className="text-xs text-slate-400 uppercase block mb-1">Auto Checkout After (hours)</label>
+                        <div className="relative">
+                            <InfoTip id="autoCheckoutHours" label="Auto Checkout After (hours)" />
                             <input type="number" value={cfg.autoCheckoutHours} onChange={e => update('autoCheckoutHours', +e.target.value)} className={inp} min={1} max={24} />
                         </div>
                     )}
@@ -472,15 +473,17 @@ const SalesmanConfigPanel = () => {
                 <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 space-y-4">
                     <h3 className="font-bold text-white flex items-center gap-2 text-sm">
                         <span className="w-7 h-7 rounded-lg bg-green-500/20 flex items-center justify-center text-sm">💰</span>
-                        Commission & Targets
+                        Commission &amp; Targets
                     </h3>
-                    <div>
-                        <label className="text-xs text-slate-400 uppercase block mb-1">Base Commission (%)</label>
+                    <div className="relative">
+                        <InfoTip id="baseCommissionPct" label="Base Commission (%)" />
                         <input type="number" value={cfg.baseCommissionPct} onChange={e => update('baseCommissionPct', +e.target.value)} className={inp} min={0} max={50} step={0.5} />
                     </div>
-
                     <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-3 space-y-3">
-                        <p className="text-xs font-bold text-green-400 uppercase">Bonus Slabs</p>
+                        <div className="flex items-center gap-2">
+                            <p className="text-xs font-bold text-green-400 uppercase">Bonus Slabs</p>
+                            <InfoTip id="bonusSlabs" label="" />
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                             <div>
                                 <label className="text-[10px] text-slate-500 block mb-1">Slab 1 — Min Order (₹)</label>
@@ -499,21 +502,20 @@ const SalesmanConfigPanel = () => {
                                 <input type="number" value={cfg.bonusThreshold2Pct} onChange={e => update('bonusThreshold2Pct', +e.target.value)} className={inp} min={0} max={50} step={0.5} />
                             </div>
                         </div>
-                    </div>
-
-                    <div className="space-y-3 border-t border-slate-700/50 pt-3">
-                        <p className="text-xs font-bold text-orange-400 uppercase">Monthly Targets</p>
-                        <div>
-                            <label className="text-xs text-slate-400 block mb-1">Daily Visit Target</label>
-                            <input type="number" value={cfg.dailyVisitTarget} onChange={e => update('dailyVisitTarget', +e.target.value)} className={inp} min={1} max={50} />
-                        </div>
-                        <div>
-                            <label className="text-xs text-slate-400 block mb-1">Monthly Order Target (₹)</label>
-                            <input type="number" value={cfg.monthlyOrderTarget} onChange={e => update('monthlyOrderTarget', +e.target.value)} className={inp} step={10000} />
-                        </div>
-                        <div>
-                            <label className="text-xs text-slate-400 block mb-1">Monthly Collection Target (₹)</label>
-                            <input type="number" value={cfg.monthlyCollectionTarget} onChange={e => update('monthlyCollectionTarget', +e.target.value)} className={inp} step={10000} />
+                        <div className="space-y-3 border-t border-slate-700/50 pt-3">
+                            <p className="text-xs font-bold text-orange-400 uppercase">Monthly Targets</p>
+                            <div className="relative">
+                                <InfoTip id="dailyVisitTarget" label="Daily Visit Target" />
+                                <input type="number" value={cfg.dailyVisitTarget} onChange={e => update('dailyVisitTarget', +e.target.value)} className={inp} min={1} max={50} />
+                            </div>
+                            <div className="relative">
+                                <InfoTip id="monthlyOrderTarget" label="Monthly Order Target (₹)" />
+                                <input type="number" value={cfg.monthlyOrderTarget} onChange={e => update('monthlyOrderTarget', +e.target.value)} className={inp} step={10000} />
+                            </div>
+                            <div className="relative">
+                                <InfoTip id="monthlyCollectionTarget" label="Monthly Collection Target (₹)" />
+                                <input type="number" value={cfg.monthlyCollectionTarget} onChange={e => update('monthlyCollectionTarget', +e.target.value)} className={inp} step={10000} />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -525,12 +527,12 @@ const SalesmanConfigPanel = () => {
                         Client Management
                     </h3>
                     <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="text-xs text-slate-400 uppercase block mb-1">Max Clients / Salesman</label>
+                        <div className="relative">
+                            <InfoTip id="maxClientsPerSalesman" label="Max Clients / Salesman" />
                             <input type="number" value={cfg.maxClientsPerSalesman} onChange={e => update('maxClientsPerSalesman', +e.target.value)} className={inp} min={10} max={1000} />
                         </div>
-                        <div>
-                            <label className="text-xs text-slate-400 uppercase block mb-1">Overdue Alert (days)</label>
+                        <div className="relative">
+                            <InfoTip id="overdueAlertDays" label="Overdue Alert (days)" />
                             <input type="number" value={cfg.overdueAlertDays} onChange={e => update('overdueAlertDays', +e.target.value)} className={inp} min={1} max={90} />
                             <p className="text-[10px] text-slate-500 mt-1">Itne din baad next visit nahi ki toh overdue</p>
                         </div>
@@ -544,81 +546,79 @@ const SalesmanConfigPanel = () => {
                         Feature Switches
                     </h3>
                     {[
-                        { key: 'gpsRequired', label: 'GPS Mandatory', desc: 'Check-in GPS ke bina band hai', icon: '📍' },
-                        { key: 'photoRequired', label: 'Photo Required', desc: 'Check-in par client photo lena padega', icon: '📷' },
-                        { key: 'competitorTracking', label: 'Competitor Tracking', desc: 'Salesman competitor info note kar sake', icon: '🔍' },
-                        { key: 'offlineMode', label: 'Offline Mode', desc: 'Internet nahi hone par bhi data save', icon: '📶' },
-                    ].map(({ key, label, desc, icon }) => (
+                        { key: 'gpsRequired' as const, label: 'GPS Mandatory', desc: 'Check-in GPS ke bina band hai', icon: '📍', tipId: 'gpsRequired' },
+                        { key: 'photoRequired' as const, label: 'Photo Required', desc: 'Check-in par client photo lena padega', icon: '📷', tipId: 'photoRequired' },
+                        { key: 'competitorTracking' as const, label: 'Competitor Tracking', desc: 'Salesman competitor info note kar sake', icon: '🔍', tipId: 'competitorTracking' },
+                        { key: 'offlineMode' as const, label: 'Offline Mode', desc: 'Internet nahi hone par bhi data save', icon: '📶', tipId: 'offlineMode' },
+                    ].map(({ key, label, desc, icon, tipId }) => (
                         <div key={key} className="flex items-center justify-between py-3 border-b border-slate-700/30 last:border-0">
                             <div className="flex items-center gap-2">
                                 <span className="text-base">{icon}</span>
                                 <div>
-                                    <p className="text-sm text-white font-medium">{label}</p>
+                                    <InfoTip id={tipId} label={label} />
                                     <p className="text-[11px] text-slate-500">{desc}</p>
                                 </div>
                             </div>
-                            <Toggle
-                                on={cfg[key as keyof SalesConfig] as boolean}
-                                onToggle={() => update(key as keyof SalesConfig, !(cfg[key as keyof SalesConfig]) as any)}
-                            />
+                            <Toggle on={cfg[key]} onToggle={() => update(key, !cfg[key])} />
                         </div>
                     ))}
-                </div>
-            </div>
 
-            {/* Section 5: Visit Purposes (Full width) */}
-            <div className="bg-slate-800/40 border border-orange-500/20 rounded-2xl p-6">
-                <h3 className="font-bold text-white flex items-center gap-2 text-sm mb-4">
-                    <span className="w-7 h-7 rounded-lg bg-orange-500/20 flex items-center justify-center text-sm">🎯</span>
-                    Visit Purposes
-                    <span className="text-xs text-slate-500 font-normal ml-1">(Check-in ke waqt salesman jo purpose choose karta hai)</span>
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
-                    {cfg.visitPurposes.map(p => (
-                        <div key={p.key} className="group flex items-center gap-2 px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl">
-                            <span className="text-lg shrink-0">{p.emoji}</span>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold text-white truncate">{p.label}</p>
-                                <p className="text-[10px] text-slate-500 font-mono truncate">{p.key}</p>
+                </div>
+
+                {/* Section 5: Visit Purposes (Full width) */}
+                <div className="bg-slate-800/40 border border-orange-500/20 rounded-2xl p-6 lg:col-span-2">
+                    <h3 className="font-bold text-white flex items-center gap-2 text-sm mb-4">
+                        <span className="w-7 h-7 rounded-lg bg-orange-500/20 flex items-center justify-center text-sm">🎯</span>
+                        Visit Purposes
+                        <span className="text-xs text-slate-500 font-normal ml-1">(Check-in ke waqt salesman jo purpose choose karta hai)</span>
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
+                        {cfg.visitPurposes.map(p => (
+                            <div key={p.key} className="group flex items-center gap-2 px-3 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl">
+                                <span className="text-lg shrink-0">{p.emoji}</span>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-semibold text-white truncate">{p.label}</p>
+                                    <p className="text-[10px] text-slate-500 font-mono truncate">{p.key}</p>
+                                </div>
+                                <button
+                                    onClick={() => removePurpose(p.key)}
+                                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-slate-600 transition-all shrink-0"
+                                    title="Remove"
+                                >
+                                    <Trash2 className="w-3 h-3" />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => removePurpose(p.key)}
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-slate-600 transition-all shrink-0"
-                                title="Remove"
-                            >
-                                <Trash2 className="w-3 h-3" />
-                            </button>
+                        ))}
+                    </div>
+                    {/* Add New Purpose */}
+                    <div className="flex gap-2 items-end">
+                        <div className="w-14">
+                            <label className="text-[10px] text-slate-500 uppercase block mb-1">Emoji</label>
+                            <input value={newPurpose.emoji} onChange={e => setNewPurpose(p => ({ ...p, emoji: e.target.value }))} className={`${inp} text-center text-lg`} maxLength={2} />
                         </div>
-                    ))}
+                        <div className="flex-1">
+                            <label className="text-[10px] text-slate-500 uppercase block mb-1">Label (Display Name)</label>
+                            <input value={newPurpose.label} onChange={e => setNewPurpose(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Training" className={inp} />
+                        </div>
+                        <div className="flex-1">
+                            <label className="text-[10px] text-slate-500 uppercase block mb-1">Key (Internal)</label>
+                            <input value={newPurpose.key} onChange={e => setNewPurpose(p => ({ ...p, key: e.target.value.toUpperCase().replace(/\s+/g, '_') }))} placeholder="e.g. TRAINING" className={`${inp} font-mono`} />
+                        </div>
+                        <button onClick={addPurpose} disabled={!newPurpose.key || !newPurpose.label} className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-sm font-bold flex items-center gap-1 transition-all mb-0.5">
+                            <Plus className="w-4 h-4" /> Add
+                        </button>
+                    </div>
                 </div>
-                {/* Add New Purpose */}
-                <div className="flex gap-2 items-end">
-                    <div className="w-14">
-                        <label className="text-[10px] text-slate-500 uppercase block mb-1">Emoji</label>
-                        <input value={newPurpose.emoji} onChange={e => setNewPurpose(p => ({ ...p, emoji: e.target.value }))} className={`${inp} text-center text-lg`} maxLength={2} />
-                    </div>
-                    <div className="flex-1">
-                        <label className="text-[10px] text-slate-500 uppercase block mb-1">Label (Display Name)</label>
-                        <input value={newPurpose.label} onChange={e => setNewPurpose(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Training" className={inp} />
-                    </div>
-                    <div className="flex-1">
-                        <label className="text-[10px] text-slate-500 uppercase block mb-1">Key (Internal)</label>
-                        <input value={newPurpose.key} onChange={e => setNewPurpose(p => ({ ...p, key: e.target.value.toUpperCase().replace(/\s+/g, '_') }))} placeholder="e.g. TRAINING" className={`${inp} font-mono`} />
-                    </div>
-                    <button onClick={addPurpose} disabled={!newPurpose.key || !newPurpose.label} className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-sm font-bold flex items-center gap-1 transition-all mb-0.5">
-                        <Plus className="w-4 h-4" /> Add
-                    </button>
-                </div>
-            </div>
 
-            {/* Info Box */}
-            <div className="bg-orange-500/5 border border-orange-500/20 rounded-xl px-5 py-4 flex gap-3">
-                <span className="text-orange-400 text-lg shrink-0">💡</span>
-                <p className="text-sm text-slate-400">
-                    Yeh settings abhi <strong className="text-white">localStorage</strong> mein save hoti hain.
-                    Backend integration ke baad yeh settings automatically sabhi salesmen ke devices par sync hongi.
-                    <span className="text-orange-400 font-medium"> Save Changes</span> button dabana zaroori hai.
-                </p>
+                {/* Info Box */}
+                <div className="bg-orange-500/5 border border-orange-500/20 rounded-xl px-5 py-4 flex gap-3 lg:col-span-2">
+                    <span className="text-orange-400 text-lg shrink-0">💡</span>
+                    <p className="text-sm text-slate-400">
+                        Yeh settings abhi <strong className="text-white">localStorage</strong> mein save hoti hain.
+                        Backend integration ke baad yeh settings automatically sabhi salesmen ke devices par sync hongi.
+                        <span className="text-orange-400 font-medium"> Save Changes</span> button dabana zaroori hai.
+                    </p>
+                </div>
             </div>
         </div>
     );

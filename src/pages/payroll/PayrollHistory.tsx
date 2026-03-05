@@ -142,7 +142,14 @@ export const PayrollHistory = () => {
                     {history.length === 0 ? (
                         <div className="p-8 text-center text-dark-muted">
                             <History className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                            <div>No history found</div>
+                            <div className="font-medium text-white/60 mb-1">Is mahinе ke liye koi version history nahi</div>
+                            <div className="text-xs mb-3">Payroll run karne ke baad yahan versions dikhenge</div>
+                            <a
+                                href="/payroll"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-500/20 text-primary-400 rounded-lg text-xs hover:bg-primary-500/30 transition-all"
+                            >
+                                Payroll Generate Karein →
+                            </a>
                         </div>
                     ) : (
                         <div className="divide-y divide-dark-border max-h-[500px] overflow-y-auto">
@@ -253,10 +260,10 @@ export const PayrollHistory = () => {
                                                         ₹{slip.grossSalary.toLocaleString()}
                                                     </td>
                                                     <td className="p-4 text-right text-red-400">
-                                                        -₹{slip.totalDeductions.toLocaleString()}
+                                                        {slip.totalDeductions > 0 ? `-₹${slip.totalDeductions.toLocaleString()}` : '₹0'}
                                                     </td>
                                                     <td className="p-4 text-right text-green-400 font-bold">
-                                                        ₹{slip.netSalary.toLocaleString()}
+                                                        ₹{Math.max(0, slip.netSalary).toLocaleString()}
                                                     </td>
                                                     <td className="p-4">
                                                         <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${slip.status === 'PAID' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
@@ -284,7 +291,7 @@ export const PayrollHistory = () => {
 
                     <div className="flex justify-between items-center px-4 text-dark-muted text-sm">
                         <div>Showing {filteredSlips.length} records</div>
-                        <div>Total: ₹ {filteredSlips.reduce((sum, s) => sum + s.netSalary, 0).toLocaleString()}</div>
+                        <div>Total: ₹{Math.max(0, filteredSlips.reduce((sum, s) => sum + s.netSalary, 0)).toLocaleString()}</div>
                     </div>
 
                 </div>

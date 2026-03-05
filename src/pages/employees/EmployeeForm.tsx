@@ -8,6 +8,7 @@ import { useWorkGroupStore } from '@/store/workGroupStore';
 import { Employee, EmployeeStatus, Roles, SalaryType, ShiftType, StatutoryConfig } from '@/types';
 import { ArrowLeft, Save, User, Briefcase, CreditCard, Upload, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { PasswordStrengthInput, isPasswordValid } from '@/components/ui/PasswordStrengthInput';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 const DEFAULT_STATUTORY: StatutoryConfig = {
     pfApplicable: true,
@@ -294,7 +295,7 @@ export const EmployeeForm = () => {
                                 className={inputCls} placeholder="+91 98765 43210" />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs text-dark-muted uppercase">Joining Date</label>
+                            <InfoTip id="joiningDate" label="Joining Date" />
                             <input type="date" value={formData.joiningDate} onChange={e => handleChange('joiningDate', e.target.value)} className={inputCls} />
                         </div>
                     </div>
@@ -400,11 +401,12 @@ export const EmployeeForm = () => {
                             </select>
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs text-dark-muted uppercase">
-                                {formData.salaryType === SalaryType.MONTHLY ? 'Monthly Salary' :
+                            <InfoTip
+                                id="basicSalary"
+                                label={formData.salaryType === SalaryType.MONTHLY ? 'Monthly Salary' :
                                     formData.salaryType === SalaryType.DAILY ? 'Daily Rate' :
-                                        formData.salaryType === SalaryType.PRODUCTION ? 'Min. Guarantee (Optional)' : 'Hourly Rate'} (₹)
-                            </label>
+                                        formData.salaryType === SalaryType.PRODUCTION ? 'Min. Guarantee (Optional)' : 'Hourly Rate'}
+                            />
                             <input type="number" value={formData.basicSalary}
                                 onChange={e => handleChange('basicSalary', Number(e.target.value))} className={inputCls} />
                         </div>
@@ -415,11 +417,11 @@ export const EmployeeForm = () => {
                                     className={inputCls} placeholder="e.g. HDFC Bank" />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs text-dark-muted uppercase">Account Number</label>
+                                <InfoTip id="bankAccountNo" label="Account Number" />
                                 <input type="text" value={formData.bankDetails?.accountNumber} onChange={e => handleBankChange('accountNumber', e.target.value)} className={inputCls} />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs text-dark-muted uppercase">IFSC Code</label>
+                                <InfoTip id="ifscCode" label="IFSC Code" />
                                 <input type="text" value={formData.bankDetails?.ifscCode} onChange={e => handleBankChange('ifscCode', e.target.value)} className={inputCls} />
                             </div>
                         </div>
@@ -592,7 +594,7 @@ export const EmployeeForm = () => {
                                                 className={inputCls} placeholder="100XXXXXXXXX" />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-xs text-dark-muted uppercase">Rate (%)</label>
+                                            <InfoTip id="pfContribution" label="Rate (%)" />
                                             <input type="number" min="0" max="20" value={sc.pfRate ?? 12} onChange={e => handleStatutoryChange('pfRate', Number(e.target.value))}
                                                 className={inputCls} />
                                         </div>
@@ -617,7 +619,7 @@ export const EmployeeForm = () => {
                                                 className={inputCls} placeholder="ESIC IP Number" />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-xs text-dark-muted uppercase">Rate (%) — Default 0.75</label>
+                                            <InfoTip id="esiContribution" label="Rate (%) — Default 0.75" />
                                             <input type="number" min="0" max="5" step="0.01" value={sc.esicRate ?? 0.75} onChange={e => handleStatutoryChange('esicRate', Number(e.target.value))}
                                                 className={inputCls} />
                                         </div>

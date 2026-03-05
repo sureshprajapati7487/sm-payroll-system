@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Calculator, Download, RefreshCw } from 'lucide-react';
 import { CTCCalculator as CTCCalc } from '@/utils/ctcCalculator';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 export const CTCCalculator = () => {
     const [basicSalary, setBasicSalary] = useState<number>(30000);
@@ -55,9 +56,7 @@ export const CTCCalculator = () => {
                     <h3 className="text-lg font-semibold text-white mb-4">Input Details</h3>
 
                     <div>
-                        <label className="block text-sm font-medium text-white mb-2">
-                            Basic Salary (₹/month)
-                        </label>
+                        <InfoTip id="basicSalary" label="Basic Salary (₹/month)" />
                         <input
                             type="number"
                             value={basicSalary}
@@ -101,7 +100,7 @@ export const CTCCalculator = () => {
                         {/* Summary Cards */}
                         <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="glass rounded-2xl p-6">
-                                <div className="text-dark-muted text-sm mb-2">Total CTC (Annual)</div>
+                                <div className="flex items-center gap-1 mb-2"><InfoTip id="ctcAmount" label="Total CTC (Annual)" /></div>
                                 <div className="text-3xl font-bold text-primary-400">
                                     {formatCurrency(result.totalCTC * 12)}
                                 </div>
@@ -111,7 +110,7 @@ export const CTCCalculator = () => {
                             </div>
 
                             <div className="glass rounded-2xl p-6">
-                                <div className="text-dark-muted text-sm mb-2">In-Hand Salary</div>
+                                <div className="flex items-center gap-1 mb-2"><InfoTip id="netSalary" label="In-Hand Salary" /></div>
                                 <div className="text-3xl font-bold text-success">
                                     {formatCurrency(result.netSalary)}
                                 </div>
@@ -119,14 +118,14 @@ export const CTCCalculator = () => {
                             </div>
 
                             <div className="glass rounded-2xl p-6">
-                                <div className="text-dark-muted text-sm mb-2">Gross Salary</div>
+                                <div className="flex items-center gap-1 mb-2"><InfoTip id="grossSalary" label="Gross Salary" /></div>
                                 <div className="text-2xl font-bold text-white">
                                     {formatCurrency(result.grossSalary)}
                                 </div>
                             </div>
 
                             <div className="glass rounded-2xl p-6">
-                                <div className="text-dark-muted text-sm mb-2">Total Deductions</div>
+                                <div className="flex items-center gap-1 mb-2"><InfoTip id="totalDeductions" label="Total Deductions" /></div>
                                 <div className="text-2xl font-bold text-danger">
                                     {formatCurrency(result.totalDeductions)}
                                 </div>

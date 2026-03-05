@@ -3,12 +3,13 @@ import { useClientStore, SalesClient, ClientVisitRecord, VisitOutcome } from '@/
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAuthStore } from '@/store/authStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
+import { useGeofence, GeofenceEvent } from '@/hooks/useGeofence';
 import * as XLSX from 'xlsx';
 import {
     MapPin, Phone, Clock, CheckSquare, LogIn, LogOut, Plus, Search,
     Upload, Trash2, Edit3, X, Check, AlertTriangle, TrendingUp,
     Eye, Navigation, Building2, User, Calendar, RefreshCw, Map, FileDown,
-    ChevronDown, IndianRupee
+    ChevronDown, IndianRupee, Radar, Zap, History
 } from 'lucide-react';
 
 // ── Excel Download helper — Blob approach (works on HTTPS + LAN IP) ──────────
@@ -122,7 +123,68 @@ function getCurrentLocation(): Promise<{ lat: number; lng: number }> {
     });
 }
 
+// ── Delete Confirm Modal ──────────────────────────────────────────────────────
+const DeleteConfirmModal = ({ client, onCancel, onConfirm, deleting }: {
+    client: SalesClient;
+    onCancel: () => void;
+    onConfirm: () => void;
+    deleting: boolean;
+}) => (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onCancel} />
+        <div className="relative glass rounded-2xl border border-red-500/30 w-full max-w-sm shadow-2xl shadow-red-500/10 overflow-hidden">
+            {/* Red top bar */}
+            <div className="h-1.5 w-full bg-gradient-to-r from-red-500 to-rose-600" />
+            <div className="p-6 space-y-5">
+                {/* Icon + Title */}
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-red-500/20 border border-red-500/30 flex items-center justify-center shrink-0">
+                        <Trash2 className="w-6 h-6 text-red-400" />
+                    </div>
+                    <div>
+                        <h2 className="text-white font-bold text-base">Party Delete Karein?</h2>
+                        <p className="text-dark-muted text-xs mt-0.5">Ye action wapas nahi ho sakta</p>
+                    </div>
+                </div>
+
+                {/* Party info box */}
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+                    <p className="text-red-300 font-bold text-sm">{client.name}</p>
+                    {client.shopName && <p className="text-red-200/60 text-xs mt-0.5">{client.shopName}</p>}
+                    {client.phone && <p className="text-red-200/60 text-xs">📞 {client.phone}</p>}
+                    {client.totalVisits > 0 && (
+                        <p className="text-yellow-400 text-xs mt-1">
+                            ⚠️ Is party ki {client.totalVisits} visit record bhi delete ho jaayegi
+                        </p>
+                    )}
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-3">
+                    <button
+                        onClick={onCancel}
+                        className="flex-1 py-2.5 rounded-xl border border-dark-border text-dark-muted hover:text-white hover:border-white/20 text-sm font-semibold transition-all"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        disabled={deleting}
+                        className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-400 disabled:opacity-60 text-white text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-500/30"
+                    >
+                        {deleting
+                            ? <><RefreshCw className="w-4 h-4 animate-spin" /> Deleting...</>
+                            : <><Trash2 className="w-4 h-4" /> Haan, Delete Karo</>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
 // ── Add/Edit Client Modal ─────────────────────────────────────────────────────
+
 const ClientModal = ({ client, salesEmployees, onClose, onSave }: {
     client?: SalesClient | null;
     salesEmployees: { id: string; name: string }[];
@@ -541,6 +603,55 @@ const BulkImportModal = ({
     );
 };
 
+// ── Geofence Event Log ────────────────────────────────────────────────────────
+const GeofenceEventLog = ({ events, onClear }: { events: GeofenceEvent[]; onClear: () => void }) => {
+    if (!events.length) return null;
+    return (
+        <div className="glass rounded-2xl border border-purple-500/20 overflow-hidden">
+            <div className="px-5 py-3 border-b border-purple-500/20 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <History className="w-4 h-4 text-purple-400" />
+                    <h3 className="text-white font-bold text-sm">Geofence Events</h3>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 font-semibold">{events.length}</span>
+                </div>
+                <button onClick={onClear} className="text-xs text-dark-muted hover:text-white transition-colors">Clear</button>
+            </div>
+            <div className="divide-y divide-dark-border/30 max-h-[260px] overflow-y-auto">
+                {events.map(ev => (
+                    <div key={ev.id} className={`px-5 py-3 flex items-start gap-3 ${ev.type === 'ENTERED' ? 'hover:bg-green-500/5' : 'hover:bg-red-500/5'}`}>
+                        <div className={`mt-0.5 w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${ev.type === 'ENTERED' ? 'bg-green-500/20' : 'bg-red-500/20'
+                            }`}>
+                            {ev.type === 'ENTERED'
+                                ? <LogIn className="w-3.5 h-3.5 text-green-400" />
+                                : <LogOut className="w-3.5 h-3.5 text-red-400" />
+                            }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-white font-semibold text-sm">{ev.clientName}</p>
+                                {ev.shopName && <span className="text-xs text-dark-muted">• {ev.shopName}</span>}
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border ${ev.type === 'ENTERED'
+                                    ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                                    : 'bg-red-500/20 text-red-400 border-red-500/30'
+                                    }`}>
+                                    {ev.type === 'ENTERED' ? '🟢 Entered' : '🔴 Exited'}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-0.5 text-xs text-dark-muted flex-wrap">
+                                {ev.distanceMetres != null && <span>📍 {ev.distanceMetres}m</span>}
+                                {ev.durationMins != null && (
+                                    <span className="font-semibold text-orange-400">⏱ {ev.durationMins} min ruke</span>
+                                )}
+                                <span>{new Date(ev.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export const ClientListPage = () => {
     const { clients, fetchClients, addClient, updateClient, deleteClient, bulkImportClients, setClientLocation, checkIn, checkOut, fetchActiveVisit, activeVisit, loading } = useClientStore();
@@ -560,6 +671,9 @@ export const ClientListPage = () => {
     const [checkingIn, setCheckingIn] = useState<{ clientId: string; purpose: string } | null>(null);
     // purposePickerFor: clientId for which the purpose dropdown is open
     const [purposePickerFor, setPurposePickerFor] = useState<string | null>(null);
+    // deleteConfirm: client to delete (null = no dialog open)
+    const [deleteConfirm, setDeleteConfirm] = useState<SalesClient | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     const salesEmployees = useMemo(() => employees.filter(e => {
         const d = (e.department || '').toUpperCase();
@@ -571,6 +685,8 @@ export const ClientListPage = () => {
             fetchClients({ companyId: currentCompanyId });
             if (user?.id) fetchActiveVisit(user.id);
         }
+        // fetchClients + fetchActiveVisit — Zustand stable actions (safe)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentCompanyId, user?.id]);
 
     const filtered = useMemo(() => {
@@ -609,6 +725,17 @@ export const ClientListPage = () => {
     const activeClientId = activeVisit?.visit?.clientId;
     const isActiveVisit = !!activeVisit;
 
+    // ── Geofence Hook ─────────────────────────────────────────────────────────
+    const [geofenceEnabled, setGeofenceEnabled] = useState(true);
+    const { isTracking, nearbyClient, nearbyDistanceM, events: geoEvents, clearEvents, gpsError } = useGeofence({
+        salesmanId: user?.id,
+        salesmanName: user?.name,
+        companyId: currentCompanyId || undefined,
+        clients,
+        // radiusMetres: not passed — useGeofence will auto-read from System Settings → Salesman Config
+        enabled: geofenceEnabled,
+    });
+
     // Stats for top KPIs
     const totalClients = clients.length;
     const activeClients = clients.filter(c => c.status === 'ACTIVE').length;
@@ -618,6 +745,58 @@ export const ClientListPage = () => {
 
     return (
         <div className="space-y-6">
+
+            {/* ── Geofence Status Banner ── */}
+            <div className={`rounded-2xl border px-5 py-3.5 flex items-center gap-3 flex-wrap ${isTracking
+                ? nearbyClient
+                    ? 'bg-green-500/10 border-green-500/40'
+                    : 'bg-purple-500/10 border-purple-500/30'
+                : 'bg-dark-surface/50 border-dark-border'
+                }`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isTracking ? (nearbyClient ? 'bg-green-500/20' : 'bg-purple-500/20') : 'bg-dark-border/30'
+                    }`}>
+                    <Radar className={`w-4 h-4 ${isTracking ? (nearbyClient ? 'text-green-400 animate-pulse' : 'text-purple-400 animate-pulse') : 'text-dark-muted'
+                        }`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                    {isTracking ? (
+                        nearbyClient ? (
+                            <>
+                                <p className="text-green-300 font-bold text-sm flex items-center gap-2">
+                                    <Zap className="w-3.5 h-3.5" />
+                                    Auto: {nearbyClient.name}
+                                    {nearbyDistanceM != null && <span className="text-green-400/70 font-normal text-xs">({nearbyDistanceM}m)</span>}
+                                </p>
+                                <p className="text-green-200/70 text-xs">{nearbyClient.shopName || nearbyClient.city || ''} — 50m radius mein ho</p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-purple-300 font-semibold text-sm">🛰️ Geofence Active — Koi client paas nahi</p>
+                                <p className="text-purple-200/60 text-xs">50m radius mein aate hi auto check-in ho jayega</p>
+                            </>
+                        )
+                    ) : (
+                        <>
+                            <p className="text-dark-muted font-semibold text-sm">Geofence: Off</p>
+                            {gpsError && <p className="text-red-400 text-xs">{gpsError}</p>}
+                        </>
+                    )}
+                </div>
+                {/* Toggle */}
+                <button
+                    onClick={() => setGeofenceEnabled(p => !p)}
+                    className={`relative w-11 h-6 rounded-full transition-all duration-300 shrink-0 ${geofenceEnabled ? 'bg-purple-500' : 'bg-dark-border'
+                        }`}
+                    title={geofenceEnabled ? 'Geofence band karo' : 'Geofence chalu karo'}
+                >
+                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-300 ${geofenceEnabled ? 'left-5' : 'left-0.5'
+                        }`} />
+                </button>
+            </div>
+
+            {/* ── Geofence Event Log ── */}
+            {geoEvents.length > 0 && <GeofenceEventLog events={geoEvents} onClear={clearEvents} />}
+
             {/* Active visit banner */}
             {isActiveVisit && activeVisit?.visit && (
                 <div className="bg-green-500/15 border border-green-500/40 rounded-2xl px-5 py-4 flex items-center gap-4 flex-wrap">
@@ -773,8 +952,8 @@ export const ClientListPage = () => {
                                         </div>
                                     </div>
 
-                                    {/* Right: Action Buttons */}
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 md:opacity-100 transition-opacity shrink-0">
+                                    {/* Right: Action Buttons — always visible */}
+                                    <div className="flex items-center gap-1 shrink-0">
                                         {/* View History */}
                                         <button onClick={() => setHistoryClient(client)} title="Visit History" className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-white transition-colors">
                                             <Eye className="w-3.5 h-3.5" />
@@ -839,9 +1018,14 @@ export const ClientListPage = () => {
                                             <Edit3 className="w-3.5 h-3.5" />
                                         </button>
                                         {/* Delete */}
-                                        <button onClick={() => { if (confirm(`"${client.name}" delete karein?`)) deleteClient(client.id); }} className="p-1.5 rounded-lg hover:bg-red-500/10 text-dark-muted hover:text-red-400 transition-colors">
+                                        <button
+                                            onClick={() => setDeleteConfirm(client)}
+                                            title="Party Delete Karo"
+                                            className="p-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/30 text-red-400 hover:text-red-300 transition-colors"
+                                        >
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>
+
                                     </div>
                                 </div>
                             </div>
@@ -862,6 +1046,26 @@ export const ClientListPage = () => {
             {historyClient && <VisitHistoryModal client={historyClient} onClose={() => setHistoryClient(null)} />}
             {checkOutVisit && <CheckOutModal visit={checkOutVisit} onClose={() => setCheckOutVisit(null)} onCheckOut={async (p) => { await checkOut(checkOutVisit.id, p); }} />}
             {showBulk && <BulkImportModal companyId={currentCompanyId!} salesEmployees={salesEmployees.map(e => ({ id: e.id, name: e.name }))} onClose={() => setShowBulk(false)} onImport={async (data, cid) => { await bulkImportClients(data, cid); }} />}
+
+            {/* ── Custom Delete Confirm Modal ── */}
+            {deleteConfirm && (
+                <DeleteConfirmModal
+                    client={deleteConfirm}
+                    deleting={deleting}
+                    onCancel={() => { if (!deleting) setDeleteConfirm(null); }}
+                    onConfirm={async () => {
+                        setDeleting(true);
+                        try {
+                            await deleteClient(deleteConfirm.id);
+                            setDeleteConfirm(null);
+                        } catch (e: any) {
+                            alert('Delete failed: ' + e.message);
+                        }
+                        setDeleting(false);
+                    }}
+                />
+            )}
+
         </div>
     );
 };

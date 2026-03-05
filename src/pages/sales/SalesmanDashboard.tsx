@@ -272,7 +272,9 @@ const PerformanceTab = ({ salesEmployees }: { salesEmployees: { id: string; name
             setLoading(false);
         };
         fetchAll();
-    }, [salesEmployees.length]);
+        // salesEmployees stable key — object reference se re-render avoid
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [salesEmployees.map(e => e.id).join(',')]);
 
     if (!salesEmployees.length) {
         return (
@@ -431,6 +433,8 @@ const TodayActivityBanner = ({ companyId }: { companyId: string }) => {
 
     useEffect(() => {
         if (companyId) fetchVisits({ companyId, date: today });
+        // fetchVisits stable Zustand action — safe to add in deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [companyId]);
 
     const todayVisits = visits.filter(v => v.checkInAt?.startsWith(today));
@@ -483,6 +487,8 @@ export const SalesmanDashboard = () => {
     const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'DONE'>('ALL');
     const [searchEmp, setSearchEmp] = useState('');
     const [showDone, setShowDone] = useState(true);
+    const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+    const [pendingClearDone, setPendingClearDone] = useState(false);
 
     useEffect(() => { saveTasks(tasks); }, [tasks]);
 
@@ -490,7 +496,7 @@ export const SalesmanDashboard = () => {
         const base = currentCompanyId ? employees.filter(e => e.companyId === currentCompanyId) : employees;
         return base.filter(e => {
             const dept = (e.department || '').toUpperCase();
-            return dept.includes('SALES') || dept.includes('SELL') || dept.includes('SALESMAN');
+            return dept.includes('SALES') || dept.includes('SALESMAN');
         });
     }, [employees, currentCompanyId]);
 
@@ -536,12 +542,18 @@ export const SalesmanDashboard = () => {
         ));
     };
 
-    const deleteTask = (id: string) => {
-        if (confirm('Is task ko delete karein?')) setTasks(prev => prev.filter(t => t.id !== id));
+    const deleteTask = (id: string) => setPendingDelete(id);
+
+    const confirmDelete = () => {
+        if (pendingDelete) setTasks(prev => prev.filter(t => t.id !== pendingDelete));
+        setPendingDelete(null);
     };
 
-    const clearDone = () => {
-        if (confirm(`${done} completed tasks hata dein?`)) setTasks(prev => prev.filter(t => !t.done));
+    const clearDone = () => setPendingClearDone(true);
+
+    const confirmClearDone = () => {
+        setTasks(prev => prev.filter(t => !t.done));
+        setPendingClearDone(false);
     };
 
     const getEmpName = (id?: string) => salesEmployees.find(e => e.id === id)?.name || '—';
@@ -739,7 +751,7 @@ export const SalesmanDashboard = () => {
                         </div>
 
                         <div className="flex-1 overflow-y-auto max-h-[500px]">
-                            {(filter === 'ALL' || filter === 'PENDING') && (<>
+                            {filter !== 'DONE' && (<>
                                 {pendingTasks.length === 0 && (
                                     <div className="flex flex-col items-center justify-center py-12 text-dark-muted gap-3">
                                         <CheckCircle2 className="w-10 h-10 opacity-30 text-green-400" />
@@ -823,6 +835,42 @@ export const SalesmanDashboard = () => {
                         onSave={saveTask}
                         onClose={() => setModalTask(false)}
                     />
+                )}
+
+                {/* Delete Confirm */}
+                {pendingDelete && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setPendingDelete(null)} />
+                        <div className="relative glass rounded-2xl border border-red-500/30 p-6 w-full max-w-xs shadow-2xl text-center space-y-4">
+                            <div className="w-12 h-12 rounded-full bg-red-500/15 flex items-center justify-center mx-auto">
+                                <Trash2 className="w-6 h-6 text-red-400" />
+                            </div>
+                            <p className="text-white font-semibold">Task delete karein?</p>
+                            <p className="text-dark-muted text-xs">{tasks.find(t => t.id === pendingDelete)?.title}</p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setPendingDelete(null)} className="flex-1 py-2 rounded-xl border border-dark-border text-dark-muted hover:text-white text-sm transition-colors">Cancel</button>
+                                <button onClick={confirmDelete} className="flex-1 py-2 rounded-xl bg-red-500 hover:bg-red-400 text-white text-sm font-semibold transition-colors">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Clear Done Confirm */}
+                {pendingClearDone && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setPendingClearDone(false)} />
+                        <div className="relative glass rounded-2xl border border-orange-500/30 p-6 w-full max-w-xs shadow-2xl text-center space-y-4">
+                            <div className="w-12 h-12 rounded-full bg-orange-500/15 flex items-center justify-center mx-auto">
+                                <CheckCircle2 className="w-6 h-6 text-orange-400" />
+                            </div>
+                            <p className="text-white font-semibold">{done} completed tasks hatao?</p>
+                            <p className="text-dark-muted text-xs">Yeh action undo nahi hoga.</p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setPendingClearDone(false)} className="flex-1 py-2 rounded-xl border border-dark-border text-dark-muted hover:text-white text-sm transition-colors">Cancel</button>
+                                <button onClick={confirmClearDone} className="flex-1 py-2 rounded-xl bg-orange-500 hover:bg-orange-400 text-white text-sm font-semibold transition-colors">Clear All</button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </>)}
         </div>

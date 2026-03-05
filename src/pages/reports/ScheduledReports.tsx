@@ -333,12 +333,14 @@ export const ScheduledReports = () => {
             <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                 <div className="text-blue-400 font-semibold text-sm mb-1">
                     <Clock className="w-4 h-4 inline mr-2" />
-                    Manual Trigger Available — Email Delivery Coming Soon
+                    ℹ️ Run Now — CSV Download Available | Email Delivery: Coming Soon
                 </div>
-                <div className="text-dark-muted text-xs">
-                    Use <strong className="text-white">"Run Now"</strong> to instantly download a CSV report for any schedule.
-                    Automatic email delivery requires a server-side cron job — not yet implemented.
-                    All times are IST (Indian Standard Time).
+                <div className="text-dark-muted text-xs leading-relaxed">
+                    <span className="text-green-400 font-medium">✅ Kaam karta hai:</span>{' '}
+                    Kisi bhi schedule ka <strong className="text-white">"Run Now"</strong> button dabao — report turant CSV mein download ho jaayegi.
+                    {' '}<span className="text-yellow-400 font-medium">⏳ Coming Soon:</span>{' '}
+                    Automatic email delivery ke liye server-side cron job chahiye — woh abhi implement nahi hua hai.
+                    Sab times IST (Indian Standard Time) mein hain.
                 </div>
             </div>
         </div>

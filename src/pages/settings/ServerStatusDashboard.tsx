@@ -298,11 +298,11 @@ export const ServerStatusDashboard = () => {
         return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
     }, [autoRefresh, fetchHealth]);
 
-    const endpointGroups = health?.endpoints.reduce((acc, ep) => {
+    const endpointGroups = (health?.endpoints ?? []).reduce((acc, ep) => {
         if (!acc[ep.group]) acc[ep.group] = [];
         acc[ep.group].push(ep);
         return acc;
-    }, {} as Record<string, EndpointStatus[]>) ?? {};
+    }, {} as Record<string, EndpointStatus[]>);
 
     const routeGroups = FRONTEND_ROUTES.reduce((acc, r) => {
         if (!acc[r.group]) acc[r.group] = [];
@@ -310,8 +310,8 @@ export const ServerStatusDashboard = () => {
         return acc;
     }, {} as Record<string, typeof FRONTEND_ROUTES>);
 
-    const okCount = health?.endpoints.filter(e => e.status === 'ok').length ?? 0;
-    const errCount = health?.endpoints.filter(e => e.status === 'error').length ?? 0;
+    const okCount = health?.endpoints?.filter(e => e.status === 'ok').length ?? 0;
+    const errCount = health?.endpoints?.filter(e => e.status === 'error').length ?? 0;
     const totalErrors = health?.totalErrors ?? 0;
 
     return (
@@ -405,7 +405,7 @@ export const ServerStatusDashboard = () => {
                     <div className="flex items-center justify-between mb-2">
                         <Zap className={`w-5 h-5 ${errCount > 0 ? 'text-red-400' : totalErrors > 0 ? 'text-amber-400' : 'text-emerald-400'}`} />
                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${errCount > 0 ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                            {health ? `${okCount}/${health.endpoints.length}` : '—'}
+                            {health ? `${okCount}/${health.endpoints?.length ?? 0}` : '—'}
                         </span>
                     </div>
                     <p className="text-[11px] text-slate-500 uppercase tracking-wide mb-1">API Health</p>

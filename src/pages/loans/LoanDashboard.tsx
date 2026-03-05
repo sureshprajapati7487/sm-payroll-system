@@ -34,6 +34,7 @@ import { SkipMonthModal } from '@/components/loans/SkipMonthModal';
 import { EarlySettlementModal } from '@/components/loans/EarlySettlementModal';
 import { BulkLoanEntryModal } from '@/components/loans/BulkLoanEntryModal';
 import { LoanHistoryModal } from '@/components/loans/LoanHistoryModal';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 export const LoanDashboard = () => {
     const { user, hasPermission } = useAuthStore();
@@ -381,7 +382,7 @@ export const LoanDashboard = () => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs text-dark-muted mb-1">Total Amount (₹)</label>
+                                    <InfoTip id="loanAmount" label="Total Amount (₹)" />
                                     <input
                                         type="number"
                                         value={form.amount}
@@ -432,7 +433,7 @@ export const LoanDashboard = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs text-dark-muted mb-1">Months (Tenure)</label>
+                                    <InfoTip id="loanTenure" label="Months (Tenure)" />
                                     <input
                                         type="number"
                                         disabled={calcMode === 'EMI'}
@@ -461,7 +462,7 @@ export const LoanDashboard = () => {
                                     )}
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-dark-muted mb-1">Monthly EMI (₹)</label>
+                                    <InfoTip id="emiAmount" label="Monthly EMI (₹)" />
                                     <input
                                         type="number"
                                         disabled={calcMode === 'TENURE'}

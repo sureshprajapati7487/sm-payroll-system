@@ -10,6 +10,9 @@ import { AttendanceDashboard } from './pages/attendance/AttendanceDashboard';
 import { HolidayManager } from './pages/attendance/HolidayManager';
 import { FaceKioskPage } from './pages/attendance/FaceKioskPage';
 import { ProductionDashboard } from './pages/production/ProductionDashboard';
+import { RateManager } from './pages/production/RateManager';
+import { WorkGroupManager } from './pages/production/WorkGroupManager';
+import { BulkEntryForm } from './pages/production/BulkEntryForm';
 import { LeaveDashboard } from '@/pages/leaves/LeaveDashboard';
 import { LoanDashboard } from '@/pages/loans/LoanDashboard';
 import { PayrollDashboard } from '@/pages/payroll/PayrollDashboard';
@@ -79,6 +82,7 @@ import { DatabaseBackup } from '@/pages/admin/DatabaseBackup';
 import { HelpCenter } from '@/pages/support/HelpCenter';
 import { NotFound } from '@/pages/NotFound';
 import { SalesmanDashboard } from '@/pages/sales/SalesmanDashboard';
+import { ClientListPage } from '@/pages/sales/ClientListPage';
 
 
 
@@ -120,6 +124,7 @@ const AuthGuard = ({ children }: { children: JSX.Element }) => {
 
 import { useDataSync } from '@/hooks/useDataSync';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
+import { useGlobalGPS } from '@/hooks/useGlobalGPS';
 import { SessionTimeoutModal } from '@/components/SessionTimeoutModal';
 
 function App() {
@@ -137,6 +142,9 @@ function App() {
     const { showWarning, secondsLeft, extendSession, doLogout } = useSessionTimeout(30 * 60 * 1000);
 
     const { isAuthenticated } = useAuthStore();
+
+    // ── Global GPS: Login ke baad request, Logout tak active ──
+    useGlobalGPS(isAuthenticated);
 
     useEffect(() => {
         // Only fetch data after user has logged in (has a valid token)
@@ -194,7 +202,11 @@ function App() {
                             <Route path="/attendance/holidays" element={<PageErrorBoundary pageName="Holiday Manager"><HolidayManager /></PageErrorBoundary>} />
                             <Route path="/attendance/kiosk" element={<PageErrorBoundary pageName="Face Kiosk"><FaceKioskPage /></PageErrorBoundary>} />
                             <Route path="/salesman" element={<PageErrorBoundary pageName="Salesman Dashboard"><SalesmanDashboard /></PageErrorBoundary>} />
+                            <Route path="/salesman/clients" element={<PageErrorBoundary pageName="Client / Party List"><ClientListPage /></PageErrorBoundary>} />
                             <Route path="/production" element={<PageErrorBoundary pageName="Production Dashboard"><ProductionDashboard /></PageErrorBoundary>} />
+                            <Route path="/production/rates" element={<PageErrorBoundary pageName="Rate Manager"><RateManager /></PageErrorBoundary>} />
+                            <Route path="/production/workgroups" element={<PageErrorBoundary pageName="Work Groups"><WorkGroupManager /></PageErrorBoundary>} />
+                            <Route path="/production/bulk" element={<PageErrorBoundary pageName="Bulk Production Entry"><BulkEntryForm /></PageErrorBoundary>} />
                             <Route path="/leaves" element={<PageErrorBoundary pageName="Leave Dashboard"><LeaveDashboard /></PageErrorBoundary>} />
                             <Route path="/loans" element={<PageErrorBoundary pageName="Loan Manager"><LoanDashboard /></PageErrorBoundary>} />
                             <Route path="/approvals" element={<PageErrorBoundary pageName="Approval Center"><ApprovalCenter /></PageErrorBoundary>} />

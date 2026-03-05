@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Building2, ChevronDown, Plus, TrendingUp, Users, DollarSign } from 'lucide-react';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
+import { useEmployeeStore } from '@/store/employeeStore';
+import { usePayrollStore } from '@/store/payrollStore';
 import { AnimatedCounter } from '@/components/AnimatedCounter';
 
 export const CompanySwitcher = () => {
@@ -16,11 +18,24 @@ export const CompanySwitcher = () => {
         window.location.reload();
     };
 
-    // Mock consolidated stats
+    const { employees } = useEmployeeStore();
+    const { slips } = usePayrollStore();
+
+    // Real employee count from employeeStore
+    const realEmployeeCount = employees.length;
+
+    // Real payroll total from current month slips
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonthPayroll = useMemo(() =>
+        slips.filter(s => s.month === currentMonth).reduce((sum, s) => sum + s.netSalary, 0),
+        [slips, currentMonth]
+    );
+
     const consolidatedStats = {
-        totalEmployees: companies.reduce((sum, c) => sum + c.employeeCount, 0),
+        totalEmployees: realEmployeeCount,
         activeCompanies: activeCompanies.length,
-        totalPayroll: 2845000
+        totalPayroll: currentMonthPayroll > 0 ? currentMonthPayroll : companies.reduce((sum, c) => sum + (c.employeeCount || 0), 0) * 45000
     };
 
     return (

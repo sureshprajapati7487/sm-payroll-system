@@ -1,14 +1,16 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useWorkGroupStore, GROUP_COLOR_MAP, WorkGroup } from '@/store/workGroupStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { EmployeeStatus } from '@/types';
 import { X, Plus, Trash2, Users, Layers, UserPlus, UserMinus } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
 
-interface Props { onClose: () => void }
+interface Props { onClose?: () => void }
 
 export const WorkGroupManager = ({ onClose }: Props) => {
+    const navigate = useNavigate();
+    const handleClose = () => onClose ? onClose() : navigate(-1);
     const { groups, assignments, addGroup, removeGroup, assignEmployee, unassignEmployee } = useWorkGroupStore();
     const { employees } = useEmployeeStore();
 
@@ -58,31 +60,20 @@ export const WorkGroupManager = ({ onClose }: Props) => {
     const totalUnassigned = activeEmployees.length - totalAssigned;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3">
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                className="bg-dark-card border border-dark-border rounded-2xl w-full max-w-4xl h-[88vh] flex flex-col shadow-2xl overflow-hidden"
-            >
-                {/* Header */}
-                <div className="px-5 py-4 border-b border-dark-border flex items-center justify-between bg-dark-bg/40">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-violet-500/15 rounded-lg">
-                            <Layers className="w-5 h-5 text-violet-400" />
-                        </div>
-                        <div>
-                            <h2 className="text-base font-bold text-white">Work Allocation Manager</h2>
-                            <p className="text-[10px] text-dark-muted">
-                                {groups.length} departments · {totalAssigned} assigned · {totalUnassigned} unassigned
-                            </p>
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="text-dark-muted hover:text-white p-1.5 hover:bg-white/5 rounded-lg transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-white">Work Allocation Manager</h1>
+                    <p className="text-dark-muted mt-1">
+                        {groups.length} departments · {totalAssigned} assigned · {totalUnassigned} unassigned
+                    </p>
                 </div>
-
-                <div className="flex flex-1 overflow-hidden">
+                <button onClick={handleClose} className="text-dark-muted hover:text-white p-1.5 hover:bg-white/5 rounded-lg transition-colors">
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
+            <div className="glass rounded-2xl overflow-hidden">
+                <div className="flex h-[75vh]">
                     {/* LEFT: Create + Department List */}
                     <div className="w-72 border-r border-dark-border flex flex-col bg-dark-bg/20 shrink-0">
                         {/* Create new department */}
@@ -287,7 +278,7 @@ export const WorkGroupManager = ({ onClose }: Props) => {
                         )}
                     </div>
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 };

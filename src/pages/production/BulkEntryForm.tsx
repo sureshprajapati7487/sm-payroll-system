@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProductionStore } from '@/store/productionStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useRateStore } from '@/store/rateStore';
@@ -16,7 +17,9 @@ import { clsx } from 'clsx';
 
 type RowData = { item: string; rate: string; qty: string; remark: string };
 
-export const BulkEntryForm = ({ onClose }: { onClose: () => void }) => {
+export const BulkEntryForm = ({ onClose }: { onClose?: () => void }) => {
+    const navigate = useNavigate();
+    const handleClose = () => onClose ? onClose() : navigate(-1);
     const { employees } = useEmployeeStore();
     const { addEntry } = useProductionStore();
     const { items, getItem } = useRateStore();
@@ -159,13 +162,13 @@ export const BulkEntryForm = ({ onClose }: { onClose: () => void }) => {
             return;
         }
         showToast(`✅ ${count} entries save ho gayi!`);
-        setTimeout(onClose, 1400);
+        setTimeout(() => handleClose(), 1400);
     };
 
     const allSelected = activeEmployees.length > 0 && selectedEmpIds.size === activeEmployees.length;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2">
+        <div className="space-y-4">
 
             {/* Toast */}
             <AnimatePresence>
@@ -179,12 +182,7 @@ export const BulkEntryForm = ({ onClose }: { onClose: () => void }) => {
                 )}
             </AnimatePresence>
 
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-dark-card border border-dark-border rounded-2xl overflow-hidden flex flex-col w-full max-w-7xl h-[92vh] shadow-2xl"
-            >
+            <div className="glass border border-dark-border rounded-2xl overflow-hidden flex flex-col w-full">
                 {/* ── Header ── */}
                 <div className="px-5 py-3.5 border-b border-dark-border flex flex-wrap items-center justify-between bg-dark-bg/40 gap-3">
                     <div className="flex items-center gap-3">
@@ -196,7 +194,7 @@ export const BulkEntryForm = ({ onClose }: { onClose: () => void }) => {
                             <p className="text-[10px] text-dark-muted">Ek din mein sabke liye entries ek saath bharo</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-dark-muted hover:text-white hover:bg-white/5 p-1.5 rounded-lg transition-colors shrink-0">
+                    <button onClick={handleClose} className="text-dark-muted hover:text-white hover:bg-white/5 p-1.5 rounded-lg transition-colors shrink-0">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -492,8 +490,7 @@ export const BulkEntryForm = ({ onClose }: { onClose: () => void }) => {
                         </button>
                     </div>
                 </div>
-            </motion.div>
-
+            </div>
         </div>
     );
 };

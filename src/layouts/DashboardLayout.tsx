@@ -7,7 +7,9 @@ import {
     Users, CalendarClock, Wallet, Settings, Factory,
     LogOut, Menu, X, ShieldAlert, LayoutDashboard,
     Banknote, UserCheck, ChevronRight, Zap, ShieldCheck, Database, ShoppingBag,
-    MoreHorizontal
+    MoreHorizontal, Calculator, BarChart2, IndianRupee, TrendingUp, FileText,
+    Scale, Trash2, Upload, GitBranch, FlaskConical, Building2
+
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -27,9 +29,28 @@ const NAV_GROUPS = [
         items: [
             { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, perm: null },
             { label: 'Employees', path: '/employees', icon: Users, perm: PERMISSIONS.VIEW_EMPLOYEES },
-            { label: 'Attendance', path: '/attendance', icon: CalendarClock, perm: PERMISSIONS.VIEW_ATTENDANCE },
-            { label: 'Salesman', path: '/salesman', icon: ShoppingBag, perm: null },
-            { label: 'Production', path: '/production', icon: Factory, perm: PERMISSIONS.VIEW_PRODUCTION },
+            {
+                label: 'Attendance', path: '/attendance', icon: CalendarClock, perm: PERMISSIONS.VIEW_ATTENDANCE,
+                subItems: [
+                    { label: 'Holiday Manager', path: '/attendance/holidays', icon: CalendarClock },
+                    { label: 'Face Kiosk', path: '/attendance/kiosk', icon: ShieldCheck },
+                ],
+            },
+            {
+                label: 'Salesman', path: '/salesman', icon: ShoppingBag, perm: null,
+                subItems: [
+                    { label: 'Client / Party List', path: '/salesman/clients', icon: Building2 },
+                ],
+            },
+
+            {
+                label: 'Production', path: '/production', icon: Factory, perm: PERMISSIONS.VIEW_PRODUCTION,
+                subItems: [
+                    { label: 'Rate Manager', path: '/production/rates', icon: IndianRupee },
+                    { label: 'Work Groups', path: '/production/workgroups', icon: Users },
+                    { label: 'Bulk Entry', path: '/production/bulk', icon: Upload },
+                ],
+            },
         ],
     },
     {
@@ -38,8 +59,41 @@ const NAV_GROUPS = [
             { label: 'Leaves', path: '/leaves', icon: CalendarClock, perm: PERMISSIONS.VIEW_LEAVES },
             { label: 'Loans', path: '/loans', icon: Wallet, perm: null },
             { label: 'Approvals', path: '/approvals', icon: UserCheck, perm: null },
-            { label: 'Payroll', path: '/payroll', icon: Banknote, perm: PERMISSIONS.VIEW_PAYROLL },
+            {
+                label: 'Payroll', path: '/payroll', icon: Banknote, perm: PERMISSIONS.VIEW_PAYROLL,
+                subItems: [
+                    { label: 'Payroll History', path: '/payroll/history', icon: BarChart2 },
+                    { label: 'Simulation', path: '/payroll/simulation', icon: FlaskConical },
+                ],
+            },
             { label: 'Expenses', path: '/expenses', icon: Wallet, perm: null },
+            { label: 'Finance Dashboard', path: '/finance/dashboard', icon: TrendingUp, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Advance Salary', path: '/finance/advance-salary', icon: IndianRupee, perm: null },
+            { label: 'Dept Finance', path: '/finance/department', icon: BarChart2, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Cost Centers', path: '/finance/cost-centers', icon: Scale, perm: PERMISSIONS.MANAGE_SETTINGS },
+        ],
+    },
+    {
+        label: 'Calculators',
+        items: [
+            { label: 'CTC Calculator', path: '/calculators/ctc', icon: Calculator, perm: null },
+            { label: 'TDS Calculator', path: '/calculators/tds', icon: Scale, perm: null },
+            { label: 'PF / ESI Calc', path: '/calculators/pfesi', icon: FlaskConical, perm: null },
+        ],
+    },
+    {
+        label: 'Reports',
+        items: [
+            { label: 'Report Builder', path: '/reports/builder', icon: BarChart2, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Custom Reports', path: '/reports/custom', icon: FileText, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Scheduled', path: '/reports/scheduled', icon: CalendarClock, perm: PERMISSIONS.MANAGE_SETTINGS },
+        ],
+    },
+    {
+        label: 'Statutory',
+        items: [
+            { label: 'Form 16', path: '/statutory/form16', icon: FileText, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Statutory Reports', path: '/statutory/reports', icon: ShieldCheck, perm: PERMISSIONS.MANAGE_SETTINGS },
         ],
     },
     {
@@ -47,10 +101,29 @@ const NAV_GROUPS = [
         items: [
             { label: 'Audit Logs', path: '/admin/audit-logs', icon: ShieldCheck, perm: PERMISSIONS.MANAGE_SETTINGS },
             { label: 'Database Backup', path: '/admin/backup', icon: Database, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Settings', path: '/settings', icon: Settings, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Bulk Import', path: '/admin/bulk-import', icon: Upload, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Trash', path: '/admin/trash', icon: Trash2, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Drafts', path: '/admin/drafts', icon: GitBranch, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Data Check', path: '/admin/consistency', icon: ShieldCheck, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Security Alerts', path: '/security/alerts', icon: ShieldAlert, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Help Center', path: '/help', icon: FileText, perm: null },
+            { label: 'Company', path: '/company/switcher', icon: Database, perm: PERMISSIONS.MANAGE_SETTINGS },
+            {
+                label: 'Settings', path: '/settings', icon: Settings, perm: PERMISSIONS.MANAGE_SETTINGS,
+                subItems: [
+                    { label: 'Configuration', path: '/configuration', icon: Settings },
+                    { label: 'Security', path: '/settings/security', icon: ShieldCheck },
+                    { label: 'Theme', path: '/settings/theme', icon: Settings },
+                    { label: 'Language', path: '/settings/language', icon: FileText },
+                    { label: 'Notifications', path: '/settings/notifications', icon: Settings },
+                    { label: 'Server Status', path: '/settings/server-status', icon: Database },
+                    { label: 'My Profile', path: '/settings/profile', icon: Users },
+                ],
+            },
         ],
     },
 ];
+
 
 // ── Mobile Bottom Nav (4 primary tabs + More) ──────────────────────────────
 const BOTTOM_NAV = [
@@ -91,6 +164,9 @@ const NAV_LABEL_KEYS: Record<string, string> = {
 const NAV_GROUP_KEYS: Record<string, string> = {
     'Main': 'nav.main',
     'Finance': 'nav.finance',
+    'Calculators': 'nav.calculators',
+    'Reports': 'nav.reports',
+    'Statutory': 'nav.statutory',
     'System': 'nav.system',
 };
 
@@ -104,6 +180,11 @@ export const DashboardLayout = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isMoreOpen, setIsMoreOpen] = useState(false);
     const { t } = useTranslation();
+    const [expandedItems, setExpandedItems] = useState<string[]>([]);
+
+    const toggleExpand = (path: string) => {
+        setExpandedItems(prev => prev.includes(path) ? prev.filter(p => p !== path) : [...prev, path]);
+    };
 
     useEffect(() => {
         if (user && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN')) {
@@ -154,37 +235,99 @@ export const DashboardLayout = () => {
                                 {t(NAV_GROUP_KEYS[group.label] || group.label)}
                             </p>
                             <div className="space-y-0.5">
-                                {visible.map(item => (
-                                    <NavLink
-                                        key={item.path}
-                                        to={item.path}
-                                        onClick={() => setIsMobileMenuOpen(false)}
-                                        className={({ isActive }) => cn(
-                                            'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative overflow-hidden',
-                                            isActive
-                                                ? 'bg-primary-500/20 text-dark-text shadow-sm border border-primary-500/20'
-                                                : 'text-dark-muted hover:text-dark-text hover:bg-dark-border/30'
-                                        )}
-                                    >
-                                        {({ isActive }) => (
-                                            <>
-                                                {isActive && (
-                                                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary-400 rounded-r-full" />
-                                                )}
-                                                <div className={cn(
-                                                    'w-8 h-8 rounded-lg flex items-center justify-center transition-all shrink-0',
-                                                    isActive
-                                                        ? 'bg-primary-500/20 text-primary-500'
-                                                        : 'bg-dark-border/30 text-dark-muted group-hover:bg-dark-border/50 group-hover:text-dark-text'
-                                                )}>
-                                                    <item.icon className="w-4 h-4" />
-                                                </div>
-                                                <span className="flex-1">{t(NAV_LABEL_KEYS[item.label] || item.label)}</span>
-                                                {isActive && <ChevronRight className="w-3.5 h-3.5 text-primary-400 shrink-0" />}
-                                            </>
-                                        )}
-                                    </NavLink>
-                                ))}
+                                {visible.map(item => {
+                                    const hasSubItems = 'subItems' in item && item.subItems && item.subItems.length > 0;
+                                    const isExpanded = expandedItems.includes(item.path);
+                                    const isSubActive = hasSubItems && item.subItems!.some(s => location.pathname.startsWith(s.path));
+
+                                    return (
+                                        <div key={item.path}>
+                                            {hasSubItems ? (
+                                                // Parent item with toggle
+                                                <>
+                                                    <button
+                                                        onClick={() => {
+                                                            navigate(item.path);
+                                                            toggleExpand(item.path);
+                                                            setIsMobileMenuOpen(false);
+                                                        }}
+                                                        className={cn(
+                                                            'group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative overflow-hidden',
+                                                            (location.pathname === item.path || isSubActive)
+                                                                ? 'bg-primary-500/20 text-dark-text border border-primary-500/20'
+                                                                : 'text-dark-muted hover:text-dark-text hover:bg-dark-border/30'
+                                                        )}
+                                                    >
+                                                        {(location.pathname === item.path || isSubActive) && (
+                                                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary-400 rounded-r-full" />
+                                                        )}
+                                                        <div className={cn(
+                                                            'w-8 h-8 rounded-lg flex items-center justify-center transition-all shrink-0',
+                                                            (location.pathname === item.path || isSubActive)
+                                                                ? 'bg-primary-500/20 text-primary-500'
+                                                                : 'bg-dark-border/30 text-dark-muted group-hover:bg-dark-border/50 group-hover:text-dark-text'
+                                                        )}>
+                                                            <item.icon className="w-4 h-4" />
+                                                        </div>
+                                                        <span className="flex-1 text-left">{t(NAV_LABEL_KEYS[item.label] || item.label)}</span>
+                                                        <ChevronRight className={cn('w-3.5 h-3.5 shrink-0 transition-transform', isExpanded ? 'rotate-90' : '')} />
+                                                    </button>
+                                                    {/* Sub-items */}
+                                                    {isExpanded && (
+                                                        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-dark-border/50 pl-2">
+                                                            {item.subItems!.map(sub => (
+                                                                <NavLink
+                                                                    key={sub.path}
+                                                                    to={sub.path}
+                                                                    onClick={() => setIsMobileMenuOpen(false)}
+                                                                    className={({ isActive }) => cn(
+                                                                        'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all',
+                                                                        isActive
+                                                                            ? 'bg-primary-500/15 text-primary-400'
+                                                                            : 'text-dark-muted hover:text-dark-text hover:bg-dark-border/30'
+                                                                    )}
+                                                                >
+                                                                    <sub.icon className="w-3.5 h-3.5 shrink-0" />
+                                                                    <span>{sub.label}</span>
+                                                                </NavLink>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                // Regular NavLink
+                                                <NavLink
+                                                    to={item.path}
+                                                    onClick={() => setIsMobileMenuOpen(false)}
+                                                    className={({ isActive }) => cn(
+                                                        'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative overflow-hidden',
+                                                        isActive
+                                                            ? 'bg-primary-500/20 text-dark-text shadow-sm border border-primary-500/20'
+                                                            : 'text-dark-muted hover:text-dark-text hover:bg-dark-border/30'
+                                                    )}
+                                                >
+                                                    {({ isActive }) => (
+                                                        <>
+                                                            {isActive && (
+                                                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary-400 rounded-r-full" />
+                                                            )}
+                                                            <div className={cn(
+                                                                'w-8 h-8 rounded-lg flex items-center justify-center transition-all shrink-0',
+                                                                isActive
+                                                                    ? 'bg-primary-500/20 text-primary-500'
+                                                                    : 'bg-dark-border/30 text-dark-muted group-hover:bg-dark-border/50 group-hover:text-dark-text'
+                                                            )}>
+                                                                <item.icon className="w-4 h-4" />
+                                                            </div>
+                                                            <span className="flex-1">{t(NAV_LABEL_KEYS[item.label] || item.label)}</span>
+                                                            {isActive && <ChevronRight className="w-3.5 h-3.5 text-primary-400 shrink-0" />}
+                                                        </>
+                                                    )}
+                                                </NavLink>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     );
