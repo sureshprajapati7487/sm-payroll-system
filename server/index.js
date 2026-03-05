@@ -414,33 +414,39 @@ app.use((err, req, res, _next) => {
 // ── Start Server ──────────────────────────────────────────────────────────────
 const HTTPS_PORT = 3443;
 
-app.listen(PORT, HOST, () => {
-    console.log(`\n✅ SM Payroll Backend (HTTP)  → http://${HOST}:${PORT}`);
-    console.log(`📊 Health:  http://localhost:${PORT}/api/health`);
-    startBackupScheduler();
-});
-
-// ── HTTPS Server (self-signed cert) ───────────────────────────────────────────
-try {
-    const https = require('https');
-    const fs = require('fs');
-    const { generateAndSaveCert, KEY_PATH, CERT_PATH } = require('./generate-ssl');
-
-    let key, cert;
-    if (fs.existsSync(KEY_PATH) && fs.existsSync(CERT_PATH)) {
-        key = fs.readFileSync(KEY_PATH, 'utf8');
-        cert = fs.readFileSync(CERT_PATH, 'utf8');
-    } else {
-        console.log('⚠️  No SSL certificates found. Generating new ones...');
-        const generated = generateAndSaveCert();
-        key = generated.key;
-        cert = generated.cert;
-    }
-    https.createServer({ key, cert }, app).listen(HTTPS_PORT, HOST, () => {
-        console.log(`🔒 SM Payroll Backend (HTTPS) → https://0.0.0.0:${HTTPS_PORT}`);
-        console.log(`📡 Phone access:  https://<your-pc-ip>:${HTTPS_PORT}/api/health`);
-        console.log(`📋 Routes:  https://localhost:${HTTPS_PORT}/api/status/routes\n`);
+initDB().then(() => {
+    app.listen(PORT, HOST, () => {
+        console.log(`\n✅ SM Payroll Backend (HTTP)  → http://${HOST}:${PORT}`);
+        console.log(`📊 Health:  http://localhost:${PORT}/api/health`);
+        startBackupScheduler();
     });
-} catch (e) {
-    console.warn('⚠️  HTTPS server not started:', e.message);
-}
+
+    // ── HTTPS Server (self-signed cert) ───────────────────────────────────────────
+    try {
+        const https = require('https');
+        const fs = require('fs');
+        const { generateAndSaveCert, KEY_PATH, CERT_PATH } = require('./generate-ssl');
+
+        let key, cert;
+        if (fs.existsSync(KEY_PATH) && fs.existsSync(CERT_PATH)) {
+            key = fs.readFileSync(KEY_PATH, 'utf8');
+            cert = fs.readFileSync(CERT_PATH, 'utf8');
+        } else {
+            console.log('⚠️  No SSL certificates found. Generating new ones...');
+            const generated = generateAndSaveCert();
+            key = generated.key;
+            cert = generated.cert;
+        }
+        https.createServer({ key, cert }, app).listen(HTTPS_PORT, HOST, () => {
+            console.log(`🔒 SM Payroll Backend (HTTPS) → https://0.0.0.0:${HTTPS_PORT}`);
+            console.log(`📡 Phone access:  https://<your-pc-ip>:${HTTPS_PORT}/api/health`);
+            console.log(`📋 Routes:  https://localhost:${HTTPS_PORT}/api/status/routes\n`);
+        });
+    } catch (e) {
+        console.warn('⚠️  HTTPS server not started:', e.message);
+    }
+
+}).catch(err => {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+});

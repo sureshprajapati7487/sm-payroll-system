@@ -364,7 +364,8 @@ const ClientVisit = sequelize.define('ClientVisit', {
 // ── Sync Database ─────────────────────────────────────────────────────────────
 const initDB = async () => {
     try {
-        await sequelize.sync({ alter: true }); // alter: true adds new columns without dropping data
+        const isPostgres = String(process.env.DATABASE_URL).startsWith('postgresql');
+        await sequelize.sync({ alter: isPostgres });
         console.log('Database synced successfully.');
 
         // Seed initial admin if database is empty (useful for fresh Render deployments)
