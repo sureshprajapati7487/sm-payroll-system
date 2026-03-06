@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { API_URL as API } from '@/lib/apiConfig';
 
 // Use relative path — Vite dev proxy handles /api → http://localhost:3000
 // This avoids ERR_SSL_PROTOCOL_ERROR when app is on HTTPS but backend is HTTP
-const API = (window as any).__API_URL__ || '';
 
 function authHeader(): Record<string, string> {
     try {
