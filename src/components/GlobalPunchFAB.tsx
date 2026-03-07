@@ -1,5 +1,6 @@
 // GlobalPunchFAB.tsx
-// Global floating Punch In / Punch Out button — visible on every page
+// DEPRECATED: Superseded by CameraPunchWidget.tsx which handles all the secure BSSID and GPS logic.
+// This file is no longer imported globally.
 // Shows:  🟢 Punch In   → employee ne punch in nahi kiya
 //         🔴 Punch Out  → punch in hua, punch out pending
 //         ✅ Done badge → shift complete (auto-hides after 5s)

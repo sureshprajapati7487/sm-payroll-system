@@ -66,7 +66,7 @@ import { MobileDashboard } from '@/pages/mobile/MobileDashboard';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary, PageErrorBoundary } from '@/components/ErrorBoundary';
 import { CameraPunchWidget } from '@/components/CameraPunchWidget';
-import { GlobalPunchFAB } from '@/components/GlobalPunchFAB';
+
 import { DialogProvider } from '@/components/DialogProvider';
 
 // New Reporting & Finance Pages
@@ -166,7 +166,7 @@ function App() {
                     <LoanApprovalModal />
                     <CommandPalette />
                     <CameraPunchWidget />
-                    <GlobalPunchFAB />
+
                     {showWarning && (
                         <SessionTimeoutModal
                             secondsLeft={secondsLeft}
