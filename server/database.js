@@ -554,8 +554,7 @@ const initDB = async () => {
     try {
         console.log('Syncing database...');
         // DANGEROUS on production: do not use { alter: true } as it locks tables and causes hangs
-        // Temporarily enabling to fix missing groupId column on live Postgres DB
-        await sequelize.sync({ alter: true });
+        await sequelize.sync();
         console.log('Database synced successfully.');
 
         // Seed initial admin if database is empty (useful for fresh Render deployments)
