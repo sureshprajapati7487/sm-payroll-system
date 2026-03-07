@@ -1,1 +1,5 @@
 taskkill /F /PID 17716; Start-Sleep 1; node index.js
+
+
+
+.\deploy.ps1 "new feature: Update Sales"
