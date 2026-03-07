@@ -5,7 +5,7 @@
 # ============================================================
 
 param(
-    [string]$message = ""
+    [string]$message = "production update"
 )
 
 $ErrorActionPreference = "Stop"
