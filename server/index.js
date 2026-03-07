@@ -382,11 +382,11 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
         clearFailedAttempts(attemptKey);
 
         // Session and Audit
-        const sessionId = `session-${Date.now()}-${uuidv4().substring(0, 8)}`;
+        const sessionId = uuidv4();
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
         const userAgent = req.headers['user-agent'] || 'Unknown';
         await UserSession.create({ id: sessionId, userId: employee.id, loginTime: new Date().toISOString(), lastActivity: new Date().toISOString(), ipAddress, userAgent, expiresAt, isActive: true });
-        await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN', userId: employee.id, userName: employee.name, userRole: employee.role, entityType: 'USER', entityName: employee.name, status: 'SUCCESS', ipAddress });
+        await AuditLog.create({ id: uuidv4(), timestamp: new Date().toISOString(), action: 'LOGIN', userId: employee.id, userName: employee.name, userRole: employee.role, entityType: 'USER', entityName: employee.name, status: 'SUCCESS', ipAddress });
 
         const payload = { id: employee.id, name: employee.name, role: employee.role || 'EMPLOYEE', email: employee.email, companyId: employee.companyId, sessionId };
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
@@ -439,7 +439,7 @@ app.post('/api/auth/logout', async (req, res) => {
             if (decoded.sessionId) await UserSession.update({ isActive: false }, { where: { id: decoded.sessionId } });
 
             const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
-            await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGOUT', userId: decoded.id, userName: decoded.name, userRole: decoded.role, entityType: 'USER', entityName: decoded.name, status: 'SUCCESS', ipAddress });
+            await AuditLog.create({ id: uuidv4(), timestamp: new Date().toISOString(), action: 'LOGOUT', userId: decoded.id, userName: decoded.name, userRole: decoded.role, entityType: 'USER', entityName: decoded.name, status: 'SUCCESS', ipAddress });
         } catch (e) { }
     }
     res.clearCookie('refresh_token', { path: '/' });
