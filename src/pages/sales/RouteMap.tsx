@@ -1,44 +1,18 @@
 /**
- * RouteMap.tsx — Lazily-loaded Leaflet map for Today's Route tab.
+ * RouteMap.tsx — Vanilla Leaflet map (no react-leaflet) for Today's Route.
  *
- * Separated into its own file so that React.lazy() can dynamically import it.
- * This prevents the react-leaflet "rendered is not a function" crash from
- * killing the entire Salesman Dashboard on load.
+ * react-leaflet@5 requires React 19. Since this project uses React 18,
+ * we use the raw leaflet library directly via useEffect + useRef.
+ * This avoids all "render2 is not a function" / context errors.
  */
 
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import * as L from 'leaflet';
-import { Clock } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { ClientVisitRecord, SalesClient } from '@/store/clientStore';
 
-// Fix Leaflet's default icon issue with Webpack/Vite
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+// Import leaflet types but use it as a module to avoid SSR issues
+let L: typeof import('leaflet') | null = null;
 
-// Custom icons
-const dotIcon = new L.DivIcon({
-    className: 'bg-transparent',
-    html: `<div class="w-3 h-3 bg-orange-500 rounded-full border-2 border-white shadow-md"></div>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 6],
-});
-const startIcon = new L.DivIcon({
-    className: 'bg-transparent',
-    html: `<div class="w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-md flex items-center justify-center"><div class="w-1.5 h-1.5 bg-white rounded-full"></div></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-});
-const endIcon = new L.DivIcon({
-    className: 'bg-transparent',
-    html: `<div class="w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-md flex items-center justify-center"><div class="w-1.5 h-1.5 bg-white rounded-full"></div></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-});
+const routeColors = ['#f97316', '#3b82f6', '#10b981', '#a855f7', '#ec4899'];
 
 interface RouteMapProps {
     visits: ClientVisitRecord[];
@@ -46,68 +20,107 @@ interface RouteMapProps {
     clients: SalesClient[];
 }
 
-const routeColors = ['#f97316', '#3b82f6', '#10b981', '#a855f7', '#ec4899'];
-
-const defaultCenter: [number, number] = [20.5937, 78.9629]; // Center of India
-
 export default function RouteMap({ visits, routesBySalesman, clients }: RouteMapProps) {
-    const center = visits.length > 0
-        ? [visits[0].checkInLat!, visits[0].checkInLng!] as [number, number]
-        : defaultCenter;
-    const zoom = visits.length > 0 ? 13 : 5;
+    const containerRef = useRef<HTMLDivElement>(null);
+    const mapRef = useRef<import('leaflet').Map | null>(null);
 
-    return (
-        <MapContainer
-            center={center}
-            zoom={zoom}
-            scrollWheelZoom={true}
-            className="w-full h-full bg-[#1a1c23]"
-        >
-            <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            />
+    useEffect(() => {
+        // Dynamically import leaflet to keep it out of the main bundle
+        import('leaflet').then((leaflet) => {
+            L = leaflet.default ?? leaflet;
 
-            {Object.entries(routesBySalesman).map(([sId, sVisits], idx) => {
+            // Ensure leaflet CSS is loaded
+            if (!document.getElementById('leaflet-css')) {
+                const link = document.createElement('link');
+                link.id = 'leaflet-css';
+                link.rel = 'stylesheet';
+                link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+                document.head.appendChild(link);
+            }
+
+            if (!containerRef.current || mapRef.current) return;
+
+            const defaultCenter: [number, number] = [20.5937, 78.9629];
+            const center = visits.length > 0
+                ? [visits[0].checkInLat!, visits[0].checkInLng!] as [number, number]
+                : defaultCenter;
+            const zoom = visits.length > 0 ? 13 : 5;
+
+            // Create map
+            const map = L!.map(containerRef.current, {
+                center,
+                zoom,
+                scrollWheelZoom: true,
+                zoomControl: true,
+            });
+            mapRef.current = map;
+
+            // Dark tile layer
+            L!.tileLayer(
+                'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>' }
+            ).addTo(map);
+
+            // Custom icons
+            const makeIcon = (color: string) => L!.divIcon({
+                className: '',
+                html: `<div style="width:14px;height:14px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>`,
+                iconSize: [14, 14],
+                iconAnchor: [7, 7],
+            });
+
+            const startIconObj = L!.divIcon({
+                className: '',
+                html: `<div style="width:16px;height:16px;background:#22c55e;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center"><div style="width:6px;height:6px;background:white;border-radius:50%"></div></div>`,
+                iconSize: [16, 16],
+                iconAnchor: [8, 8],
+            });
+
+            const endIconObj = L!.divIcon({
+                className: '',
+                html: `<div style="width:16px;height:16px;background:#ef4444;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center"><div style="width:6px;height:6px;background:white;border-radius:50%"></div></div>`,
+                iconSize: [16, 16],
+                iconAnchor: [8, 8],
+            });
+
+            // Draw each salesman route
+            Object.entries(routesBySalesman).forEach(([, sVisits], idx) => {
                 const color = routeColors[idx % routeColors.length];
                 const positions: [number, number][] = sVisits.map(v => [v.checkInLat!, v.checkInLng!]);
 
-                return (
-                    <div key={`route-${sId}`}>
-                        {positions.length > 1 && (
-                            <Polyline
-                                positions={positions}
-                                pathOptions={{ color, weight: 3, opacity: 0.8, dashArray: '5, 10' }}
-                            />
-                        )}
-                        <>
-                            {sVisits.map((v, i) => {
-                                const isStart = i === 0;
-                                const isEnd = i === sVisits.length - 1 && sVisits.length > 1;
-                                const icon = isStart ? startIcon : isEnd ? endIcon : dotIcon;
-                                const client = clients.find(c => c.id === v.clientId);
+                // Route line
+                if (positions.length > 1) {
+                    L!.polyline(positions, { color, weight: 3, opacity: 0.8, dashArray: '5, 10' }).addTo(map);
+                }
 
-                                return (
-                                    <Marker key={v.id} position={[v.checkInLat!, v.checkInLng!]} icon={icon}>
-                                        <Popup className="custom-popup">
-                                            <div className="p-1">
-                                                <p className="font-bold text-gray-800 text-sm">{client?.name || 'Unknown Client'}</p>
-                                                <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                                                    <Clock className="w-3 h-3" />
-                                                    {new Date(v.checkInAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                                                </p>
-                                                {v.outcome && (
-                                                    <p className="text-xs font-semibold text-blue-600 mt-1 uppercase">{v.outcome}</p>
-                                                )}
-                                            </div>
-                                        </Popup>
-                                    </Marker>
-                                );
-                            })}
-                        </>
-                    </div>
-                );
-            })}
-        </MapContainer>
-    );
+                // Markers
+                sVisits.forEach((v, i) => {
+                    const isStart = i === 0;
+                    const isEnd = i === sVisits.length - 1 && sVisits.length > 1;
+                    const icon = isStart ? startIconObj : isEnd ? endIconObj : makeIcon(color);
+                    const client = clients.find(c => c.id === v.clientId);
+                    const time = new Date(v.checkInAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+                    L!.marker([v.checkInLat!, v.checkInLng!], { icon })
+                        .addTo(map)
+                        .bindPopup(`
+                            <div style="padding:4px;min-width:140px">
+                                <p style="font-weight:bold;font-size:13px;margin:0 0 4px">${client?.name || 'Unknown Client'}</p>
+                                <p style="font-size:11px;color:#555;margin:0">⏰ ${time}</p>
+                                ${v.outcome ? `<p style="font-size:11px;font-weight:600;color:#2563eb;margin:4px 0 0;text-transform:uppercase">${v.outcome.replace(/_/g, ' ')}</p>` : ''}
+                            </div>
+                        `);
+                });
+            });
+        });
+
+        return () => {
+            if (mapRef.current) {
+                mapRef.current.remove();
+                mapRef.current = null;
+            }
+        };
+    }, []);  // Run once on mount — map is self-contained
+
+    return <div ref={containerRef} className="w-full h-full" />;
 }
