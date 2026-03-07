@@ -503,12 +503,13 @@ const financeRoute = require('./routes/finance');
 const analyticsRoute = require('./routes/analytics');
 const reportsRoute = require('./routes/reports');
 const uploadRoute = require('./routes/upload');
+const salesRoute = require('./routes/sales');
 
 // Inject shared dependencies into each route module
 const sharedModels = {
     Employee, Attendance, Production, Leave, Loan, SalarySlip,
     Expense, Biometric, AdvanceSalary, Holiday, AuditLog,
-    Client, ClientVisit, Company, sequelize,
+    Client, ClientVisit, SalesTask, Company, sequelize,
     addError, getErrorHint,
     doBackup, getBackupStatus, setAutoBackupEnabled,
     CustomReportTemplate, ScheduledReport, StatutoryRule,
@@ -527,14 +528,15 @@ const calculatorsRoutes = require('./routes/calculators.js');
 app.use('/api/employees', employeesRoute.router);
 app.use('/api/attendance', attendanceRoute.router);
 app.use('/api', payrollRoute.router);                   // /api/leaves, /api/loans, /api/payroll
-app.use('/api/clients', clientsRoute.router);                   // /api/clients/*
-app.use('/api/visits', clientsRoute.visitsRouter);             // /api/visits/* (frontend uses this path)
+app.use('/api/clients', clientsRoute.router);           // /api/clients/*
+app.use('/api/visits', clientsRoute.visitsRouter);      // /api/visits/*
 app.use('/api/finance', financeRoute);                  // /api/finance/advances
-app.use('/api', adminRoute.router);                     // /api/biometrics, /api/expenses, /api/advance-salary, /api/holidays, /api/audit-logs, /api/backup, /api/whatsapp
+app.use('/api', adminRoute.router);                     // /api/biometrics, /api/expenses, etc.
 app.use('/api/analytics', analyticsRoute.router);
 app.use('/api/reports', reportsRoute.router);
 app.use('/api/calculators', calculatorsRoutes);
 app.use('/api/upload', uploadRoute);
+app.use('/api/sales', salesRoute);                      // /api/sales/tasks
 
 app.use('/api/downloads', express.static(path.join(__dirname, 'public/downloads')));
 

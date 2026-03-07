@@ -1,10 +1,9 @@
 const express = require('express');
 const { SalesTask } = require('../database');
-const { auth } = require('../middleware/auth');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 
-router.use(auth);
+// Auth is handled globally in index.js via authMiddleware — no local import needed
 
 // GET /api/sales/tasks - get tasks for the current company
 router.get('/tasks', async (req, res) => {
