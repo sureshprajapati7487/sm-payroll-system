@@ -2,10 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { Production, ProductionItem, Employee } = require('../database');
 const { Op } = require('sequelize');
-const { verifyToken } = require('../middleware/auth');
 
-// All production routes require authentication
-router.use(verifyToken);
+// Auth handled globally by authMiddleware in server/index.js
 
 // Helper for error logging (using same pattern as other routes)
 const addError = (error, context) => {

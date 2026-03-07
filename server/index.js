@@ -504,6 +504,7 @@ const analyticsRoute = require('./routes/analytics');
 const reportsRoute = require('./routes/reports');
 const uploadRoute = require('./routes/upload');
 const salesRoute = require('./routes/sales');
+const productionRoute = require('./routes/production');
 
 // Inject shared dependencies into each route module
 const sharedModels = {
@@ -537,6 +538,7 @@ app.use('/api/reports', reportsRoute.router);
 app.use('/api/calculators', calculatorsRoutes);
 app.use('/api/upload', uploadRoute);
 app.use('/api/sales', salesRoute);                      // /api/sales/tasks
+app.use('/api/production', productionRoute);            // /api/production/*
 
 app.use('/api/downloads', express.static(path.join(__dirname, 'public/downloads')));
 
