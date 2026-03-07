@@ -1,17 +1,22 @@
 /**
- * apiConfig.ts — API URL resolution
+ * apiConfig.ts — Central API URL resolver
  *
- * Development: Vite proxy handles /api → http://localhost:3000
- * Production (Vercel): VITE_API_URL env var points to Render backend base URL
+ * TWO usage patterns exist in this codebase:
+ *  - authStore.ts:   ${API_URL}/auth/login          (no extra /api)
+ *  - clientStore.ts: ${API_URL}/api/clients          (has extra /api)
  *
- * IMPORTANT: Do NOT include /api in VITE_API_URL env var on Vercel.
- * Set it to: https://sm-payroll-system.onrender.com
- * All stores append /api/ themselves: `${API_URL}/api/employees`
+ * Therefore API_URL must always end with /api:
+ *  - Dev:  '/api'                  → Vite proxy forwards to http://localhost:3000
+ *  - Prod: 'https://....com/api'   → Direct call to Render backend
+ *
+ * IMPORTANT: Set VITE_API_URL in Vercel to: https://sm-payroll-system.onrender.com
+ * Do NOT include /api at the end — this file adds it automatically.
  */
 
-// Strip any trailing /api or / from env URL to avoid double /api/api bugs
-const rawEnv = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '').replace(/\/$/, '') || '';
+const rawEnv = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '').replace(/\/$/, '');
 
-export const API_URL: string = rawEnv || '';  // empty = use Vite proxy (/api passes through)
+// In dev (no VITE_API_URL): '/api'  → Vite proxy
+// In prod (VITE_API_URL set): 'https://sm-payroll-system.onrender.com/api'
+export const API_URL: string = rawEnv ? `${rawEnv}/api` : '/api';
 
 export const getApiUrl = () => API_URL;
