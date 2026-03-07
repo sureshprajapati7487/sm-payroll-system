@@ -1,6 +1,5 @@
 // Session Management & Auto Logout for Phase 15
 
-import { useAuditStore } from '@/store/auditStore';
 import { useAuthStore } from '@/store/authStore';
 
 export class SessionManager {
@@ -34,7 +33,6 @@ export class SessionManager {
 
         // Check session expiry
         setInterval(() => {
-            useAuditStore.getState().checkSessionExpiry();
             this.checkForExpiredSession();
         }, this.CHECK_INTERVAL);
     }
@@ -50,12 +48,6 @@ export class SessionManager {
         const user = useAuthStore.getState().user;
         if (!user) return;
 
-        // Update last activity
-        const session = useAuditStore.getState().getActiveSession(user.id);
-        if (session) {
-            useAuditStore.getState().updateSessionActivity(session.sessionId);
-        }
-
         // Set new timeout
         this.inactivityTimer = setTimeout(() => {
             this.handleInactivity();
@@ -68,27 +60,6 @@ export class SessionManager {
     private handleInactivity() {
         const user = useAuthStore.getState().user;
         if (!user) return;
-
-        console.log('⏰ Session expired due to inactivity');
-
-        // Log the auto-logout
-        useAuditStore.getState().addLog({
-            userId: user.id,
-            userName: user.name,
-            userRole: user.role,
-            action: 'LOGOUT',
-            entityType: 'USER',
-            details: { reason: 'AUTO_LOGOUT_INACTIVITY' },
-            ipAddress: this.getIPAddress(),
-            userAgent: navigator.userAgent,
-            status: 'SUCCESS'
-        });
-
-        // End session
-        const session = useAuditStore.getState().getActiveSession(user.id);
-        if (session) {
-            useAuditStore.getState().endSession(session.sessionId);
-        }
 
         // Logout user
         useAuthStore.getState().logout();
@@ -105,50 +76,9 @@ export class SessionManager {
      * Check if current session is expired
      */
     private checkForExpiredSession() {
-        const user = useAuthStore.getState().user;
-        if (!user) return;
-
-        const session = useAuditStore.getState().getActiveSession(user.id);
-        if (!session) return;
-
-        if (!session.isActive) {
-            console.log('⏰ Session no longer active');
-            useAuthStore.getState().logout();
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('session-expired', {
-                    detail: { message: 'Your session has expired. Please login again.' }
-                }));
-            }
-        }
+        // Backend tokens handle true expiry, this is just a fallback interval
     }
 
-    /**
-     * Get user's IP address (client-side approximation)
-     */
-    private getIPAddress(): string {
-        // In real app, fetch from backend
-        return 'CLIENT_IP';
-    }
-
-    /**
-     * Create new session on login
-     */
-    static createSession(userId: string) {
-        const ipAddress = 'CLIENT_IP'; // In real app, get from server
-        const userAgent = navigator.userAgent;
-
-        return useAuditStore.getState().createSession(userId, ipAddress, userAgent);
-    }
-
-    /**
-     * End session on logout
-     */
-    static endSession(userId: string) {
-        const session = useAuditStore.getState().getActiveSession(userId);
-        if (session) {
-            useAuditStore.getState().endSession(session.sessionId);
-        }
-    }
 }
 
 // Auto-initialize

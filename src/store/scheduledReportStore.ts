@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { apiGet, apiJson } from '@/lib/apiClient';
 
 export interface ScheduledReport {
     id: string;
@@ -20,88 +20,83 @@ interface ScheduledReportState {
     reports: ScheduledReport[];
 
     // Actions
-    createScheduledReport: (report: Omit<ScheduledReport, 'id' | 'createdAt' | 'lastRun' | 'nextRun'>) => void;
-    updateScheduledReport: (id: string, updates: Partial<ScheduledReport>) => void;
-    deleteScheduledReport: (id: string) => void;
-    toggleReportStatus: (id: string) => void;
-    markReportRun: (id: string) => void;
+    fetchReports: () => Promise<void>;
+    createScheduledReport: (report: Omit<ScheduledReport, 'id' | 'createdAt' | 'lastRun' | 'nextRun'>) => Promise<void>;
+    updateScheduledReport: (id: string, updates: Partial<ScheduledReport>) => Promise<void>;
+    deleteScheduledReport: (id: string) => Promise<void>;
+    toggleReportStatus: (id: string) => Promise<void>;
     getUpcomingReports: () => ScheduledReport[];
 }
 
 export const useScheduledReportStore = create<ScheduledReportState>()(
-    persist(
-        (set, get) => ({
-            reports: [],
+    (set, get) => ({
+        reports: [],
 
-            createScheduledReport: (report) => {
+        fetchReports: async () => {
+            try {
+                const data = await apiGet<ScheduledReport[]>('/reports/schedules');
+                set({ reports: data });
+            } catch (error) {
+                console.error('Failed to fetch scheduled reports:', error);
+            }
+        },
+
+        createScheduledReport: async (report) => {
+            try {
                 const nextRun = calculateNextRun(report.frequency, report.dayOfWeek, report.dayOfMonth);
+                const payload = { ...report, nextRun };
 
-                const newReport: ScheduledReport = {
-                    ...report,
-                    id: `sched-${Date.now()}`,
-                    createdAt: new Date().toISOString(),
-                    nextRun
-                };
+                const newReport = await apiJson<ScheduledReport>(
+                    'POST',
+                    '/reports/schedules',
+                    payload
+                );
 
                 set(state => ({
                     reports: [...state.reports, newReport]
                 }));
-            },
+            } catch (error) {
+                console.error('Failed to create scheduled report:', error);
+            }
+        },
 
-            updateScheduledReport: (id, updates) => {
-                set(state => ({
-                    reports: state.reports.map(r =>
-                        r.id === id ? { ...r, ...updates } : r
-                    )
-                }));
-            },
+        updateScheduledReport: async (_id, _updates) => {
+            console.warn('Backend updateScheduledReport not natively supported, defaulting to toggle or delete/recreate if needed.');
+        },
 
-            deleteScheduledReport: (id) => {
+        deleteScheduledReport: async (id) => {
+            try {
+                await apiJson('DELETE', `/reports/schedules/${id}`);
                 set(state => ({
                     reports: state.reports.filter(r => r.id !== id)
                 }));
-            },
-
-            toggleReportStatus: (id) => {
-                set(state => ({
-                    reports: state.reports.map(r =>
-                        r.id === id ? { ...r, enabled: !r.enabled } : r
-                    )
-                }));
-            },
-
-            markReportRun: (id) => {
-                const report = get().reports.find(r => r.id === id);
-                if (!report) return;
-
-                const nextRun = calculateNextRun(report.frequency, report.dayOfWeek, report.dayOfMonth);
-
-                set(state => ({
-                    reports: state.reports.map(r =>
-                        r.id === id
-                            ? {
-                                ...r,
-                                lastRun: new Date().toISOString(),
-                                nextRun
-                            }
-                            : r
-                    )
-                }));
-            },
-
-            getUpcomingReports: () => {
-                const now = new Date();
-                const next24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
-                return get().reports
-                    .filter(r => r.enabled && new Date(r.nextRun) <= next24Hours)
-                    .sort((a, b) => new Date(a.nextRun).getTime() - new Date(b.nextRun).getTime());
+            } catch (error) {
+                console.error('Failed to delete scheduled report:', error);
             }
-        }),
-        {
-            name: 'scheduled-report-store'
+        },
+
+        toggleReportStatus: async (id) => {
+            try {
+                const res = await apiJson<{ enabled: boolean }>('PATCH', `/reports/schedules/${id}/toggle`);
+                set(state => ({
+                    reports: state.reports.map(r =>
+                        r.id === id ? { ...r, enabled: res.enabled } : r
+                    )
+                }));
+            } catch (error) {
+                console.error('Failed to toggle scheduled report:', error);
+            }
+        },
+
+        getUpcomingReports: () => {
+            const now = new Date();
+            const next24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+            return get().reports
+                .filter(r => r.enabled && r.nextRun && new Date(r.nextRun) <= next24Hours)
+                .sort((a, b) => new Date(a.nextRun).getTime() - new Date(b.nextRun).getTime());
         }
-    )
+    })
 );
 
 function calculateNextRun(frequency: string, dayOfWeek?: number, dayOfMonth?: number): string {

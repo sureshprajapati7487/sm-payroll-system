@@ -45,7 +45,7 @@ export const useAdvanceSalaryStore = create<AdvanceSalaryState>((set, get) => ({
             const params = new URLSearchParams();
             if (companyId) params.append('companyId', companyId);
             if (employeeId) params.append('employeeId', employeeId);
-            const res = await apiFetch(`/advance-salary?${params}`);
+            const res = await apiFetch(`/finance/advances?${params}`);
             if (res.ok) {
                 const data: AdvanceSalaryRequest[] = await res.json();
                 set({ requests: data });
@@ -71,7 +71,7 @@ export const useAdvanceSalaryStore = create<AdvanceSalaryState>((set, get) => ({
         };
         set(s => ({ requests: [optimistic, ...s.requests] }));
         try {
-            const res = await apiFetch(`/advance-salary`, {
+            const res = await apiFetch(`/finance/advances`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(optimistic),
@@ -90,10 +90,10 @@ export const useAdvanceSalaryStore = create<AdvanceSalaryState>((set, get) => ({
     approveRequest: async (requestId, approvedBy = 'Admin') => {
         set(s => ({ requests: s.requests.map(r => r.id === requestId ? { ...r, status: 'approved' as const, approvedBy, approvedDate: new Date().toISOString() } : r) }));
         try {
-            await apiFetch(`/advance-salary/${requestId}/status`, {
+            await apiFetch(`/finance/advances/${requestId}/approve`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'approved', approvedBy }),
+                body: JSON.stringify({ approvedBy }),
             });
         } catch (e) {
             console.error('[AdvanceSalaryStore] approveRequest failed:', e);
@@ -105,10 +105,9 @@ export const useAdvanceSalaryStore = create<AdvanceSalaryState>((set, get) => ({
     rejectRequest: async (requestId) => {
         set(s => ({ requests: s.requests.map(r => r.id === requestId ? { ...r, status: 'rejected' as const, remainingBalance: 0 } : r) }));
         try {
-            await apiFetch(`/advance-salary/${requestId}/status`, {
+            await apiFetch(`/finance/advances/${requestId}/reject`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'rejected' }),
             });
         } catch (e) {
             console.error('[AdvanceSalaryStore] rejectRequest failed:', e);
@@ -143,7 +142,7 @@ export const useAdvanceSalaryStore = create<AdvanceSalaryState>((set, get) => ({
     deleteRequest: async (requestId) => {
         set(s => ({ requests: s.requests.filter(r => r.id !== requestId) }));
         try {
-            await apiFetch(`/advance-salary/${requestId}`, { method: 'DELETE' });
+            await apiFetch(`/finance/advances/${requestId}`, { method: 'DELETE' });
         } catch (e) {
             console.error('[AdvanceSalaryStore] deleteRequest failed:', e);
         }

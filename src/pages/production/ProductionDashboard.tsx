@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useProductionStore } from '@/store/productionStore';
 import { useEmployeeStore } from '@/store/employeeStore';
+import { useMultiCompanyStore } from '@/store/multiCompanyStore';
+import { apiFetch } from '@/lib/apiClient';
 import { PERMISSIONS } from '@/config/permissions';
 import { ProductionEntry } from '@/types';
 import {
@@ -47,7 +49,16 @@ type QuickRange = 'today' | 'week' | 'month' | 'custom';
 export const ProductionDashboard = () => {
     const { user, hasPermission } = useAuthStore();
     const { employees } = useEmployeeStore();
-    const { entries, addEntry, approveEntry, rejectEntry, updateEntry, deleteEntry } = useProductionStore();
+    const { entries, addEntry, approveEntry, rejectEntry, updateEntry, deleteEntry, fetchProductionEntries } = useProductionStore();
+    const { fetchItems } = useRateStore();
+    const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
+
+    // Initial Fetch
+    useEffect(() => {
+        if (!currentCompanyId) return;
+        fetchProductionEntries(currentCompanyId);
+        fetchItems(currentCompanyId);
+    }, [currentCompanyId, fetchProductionEntries, fetchItems]);
 
     // ── Edit / Delete State ────────────────────────────────────────────────────
     const [editEntry, setEditEntry] = useState<ProductionEntry | null>(null);
@@ -90,6 +101,7 @@ export const ProductionDashboard = () => {
     const [form, setForm] = useState({
         employeeId: user?.role === 'EMPLOYEE' ? user.id : '',
         date: today(),
+        itemId: '',
         item: '',
         qty: '',
         rate: '',
@@ -106,6 +118,24 @@ export const ProductionDashboard = () => {
         else if (range === 'week') { setStartDate(firstOfWeek()); setEndDate(today()); }
         else if (range === 'month') { setStartDate(firstOfMonth()); setEndDate(today()); }
     };
+
+    // ── Analytics State ───────────────────────────────────────────────────────
+    const [analytics, setAnalytics] = useState({
+        employeeSummary: [] as any[],
+        itemSummary: [] as any[],
+        chartData: [] as any[]
+    });
+
+    useEffect(() => {
+        if (!currentCompanyId) return;
+        const fetchAnalytics = async () => {
+            try {
+                const res = await apiFetch(`/production/analytics?companyId=${currentCompanyId}&startDate=${startDate}&endDate=${endDate}`);
+                if (res.ok) setAnalytics(await res.json());
+            } finally { }
+        };
+        fetchAnalytics();
+    }, [currentCompanyId, startDate, endDate]);
 
     // ── View & Other state ────────────────────────────────────────────────────
     const [viewMode, setViewMode] = useState<ViewMode>('daily');
@@ -143,34 +173,6 @@ export const ProductionDashboard = () => {
         return dateOk && empOk && searchOk && deptOk;
     }), [entries, startDate, endDate, searchTerm, isEmployee, user, employees, deptFilter]);
 
-    // ── Monthly Summary computation ───────────────────────────────────────────
-    const employeeSummary = useMemo(() => {
-        const map = new Map<string, {
-            empId: string; name: string; dept: string;
-            approved: number; pending: number; rejected: number;
-            totalQty: number; entries: number;
-        }>();
-        filteredEntries.forEach(e => {
-            const emp = employees.find(em => em.id === e.employeeId);
-            if (!map.has(e.employeeId)) {
-                map.set(e.employeeId, {
-                    empId: e.employeeId,
-                    name: emp?.name || 'Unknown',
-                    dept: emp?.department || '-',
-                    approved: 0, pending: 0, rejected: 0,
-                    totalQty: 0, entries: 0,
-                });
-            }
-            const row = map.get(e.employeeId)!;
-            row.totalQty += e.qty;
-            row.entries += 1;
-            if (e.status === 'APPROVED') row.approved += e.totalAmount;
-            else if (e.status === 'PENDING') row.pending += e.totalAmount;
-            else row.rejected += e.totalAmount;
-        });
-        return Array.from(map.values()).sort((a, b) => (b.approved + b.pending) - (a.approved + a.pending));
-    }, [filteredEntries, employees]);
-
     // ── Stats ─────────────────────────────────────────────────────────────────
     const totalApproved = filteredEntries.reduce((s, e) => e.status === 'APPROVED' ? s + e.totalAmount : s, 0);
     const totalPending = filteredEntries.reduce((s, e) => e.status === 'PENDING' ? s + e.totalAmount : s, 0);
@@ -192,65 +194,13 @@ export const ProductionDashboard = () => {
         }, 1200);
     };
 
-    // ── Item-wise Summary (depends on filteredEntries) ──────────────────────────
-    const itemSummary = useMemo(() => {
-        const map = new Map<string, {
-            item: string;
-            totalQty: number;
-            approved: number;
-            pending: number;
-            rejected: number;
-            entries: number;
-            topEmp: string;
-            topEmpQty: number;
-            empQtyMap: Map<string, number>;
-        }>();
-        filteredEntries.forEach(e => {
-            if (!map.has(e.item)) {
-                map.set(e.item, {
-                    item: e.item, totalQty: 0,
-                    approved: 0, pending: 0, rejected: 0,
-                    entries: 0, topEmp: '', topEmpQty: 0,
-                    empQtyMap: new Map(),
-                });
-            }
-            const row = map.get(e.item)!;
-            row.totalQty += e.qty;
-            row.entries += 1;
-            if (e.status === 'APPROVED') row.approved += e.totalAmount;
-            else if (e.status === 'PENDING') row.pending += e.totalAmount;
-            else row.rejected += e.totalAmount;
-            const prev = row.empQtyMap.get(e.employeeId) || 0;
-            const next = prev + e.qty;
-            row.empQtyMap.set(e.employeeId, next);
-            if (next > row.topEmpQty) {
-                row.topEmpQty = next;
-                row.topEmp = employees.find(em => em.id === e.employeeId)?.name || 'Unknown';
-            }
-        });
-        return Array.from(map.values()).sort((a, b) => (b.approved + b.pending) - (a.approved + a.pending));
-    }, [filteredEntries, employees]);
-
-    // ── Chart Data (daily aggregation) ───────────────────────────────────────────
-    const chartData = useMemo(() => {
-        const map = new Map<string, { date: string; qty: number; amount: number; approved: number; pending: number }>();
-        filteredEntries.forEach(e => {
-            if (!map.has(e.date)) {
-                map.set(e.date, { date: e.date, qty: 0, amount: 0, approved: 0, pending: 0 });
-            }
-            const d = map.get(e.date)!;
-            d.qty += e.qty;
-            d.amount += e.totalAmount;
-            if (e.status === 'APPROVED') d.approved += e.totalAmount;
-            else if (e.status === 'PENDING') d.pending += e.totalAmount;
-        });
-        return Array.from(map.values())
-            .sort((a, b) => a.date.localeCompare(b.date))
-            .map(d => ({ ...d, label: fmt(d.date) }));
-    }, [filteredEntries]);
+    // ── Aggregation mappings to Analytics payload ─────────────────────────────
+    const employeeSummary = analytics.employeeSummary;
+    const itemSummary = analytics.itemSummary;
+    const chartData = analytics.chartData.map(d => ({ ...d, label: fmt(d.date) }));
 
     // ── Form submit ───────────────────────────────────────────────────────────
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const missing: string[] = [];
         if (!form.employeeId) missing.push('employeeId');
@@ -259,8 +209,16 @@ export const ProductionDashboard = () => {
         if (!form.rate) missing.push('rate');
         if (!form.date) missing.push('date');
         if (missing.length > 0) { setErrors(missing); setStatus('ERROR'); setTimeout(() => { setStatus('IDLE'); setErrors([]); }, 3000); return; }
-        addEntry({ date: form.date, employeeId: form.employeeId, item: form.item, qty: Number(form.qty), rate: Number(form.rate) });
-        setForm(prev => ({ ...prev, item: '', qty: '', rate: '' }));
+        await addEntry({
+            companyId: currentCompanyId || undefined,
+            date: form.date,
+            employeeId: form.employeeId,
+            item: form.item,
+            itemId: isManual ? undefined : form.itemId,
+            qty: Number(form.qty),
+            rate: Number(form.rate)
+        });
+        setForm(prev => ({ ...prev, item: '', itemId: '', qty: '', rate: '' }));
         setErrors([]); setStatus('SUCCESS');
         setTimeout(() => setStatus('IDLE'), 2000);
     };
@@ -556,22 +514,22 @@ export const ProductionDashboard = () => {
                             <div>
                                 <div className="flex justify-between items-center mb-1">
                                     <label className="block text-[10px] text-dark-muted uppercase tracking-wider font-bold">Item / Work</label>
-                                    <button type="button" onClick={() => { setIsManual(!isManual); setForm(p => ({ ...p, item: '', rate: '' })); }}
+                                    <button type="button" onClick={() => { setIsManual(!isManual); setForm(p => ({ ...p, item: '', itemId: '', rate: '' })); }}
                                         className="text-[9px] text-primary-400 hover:text-primary-300 underline">
                                         {isManual ? 'Use Master List' : 'Manual Entry'}
                                     </button>
                                 </div>
                                 {isManual ? (
                                     <input type="text" placeholder="Type Item Name..."
-                                        value={form.item} onChange={e => setForm({ ...form, item: e.target.value })}
+                                        value={form.item} onChange={e => setForm({ ...form, item: e.target.value, itemId: '' })}
                                         className={clsx('w-full bg-dark-bg border rounded-md px-2 py-1.5 text-xs text-white focus:border-primary-500 outline-none',
                                             errors.includes('item') ? 'border-danger' : 'border-dark-border')} />
                                 ) : (
                                     <ItemSelect options={useRateStore.getState().items.map(i => ({ value: i.id, label: i.name, subLabel: `₹${i.rate}` }))}
-                                        value={form.item}
+                                        value={form.itemId || form.item}
                                         onChange={val => {
                                             const item = useRateStore.getState().getItem(val);
-                                            if (item) setForm(p => ({ ...p, item: item.name, rate: item.rate.toString() }));
+                                            if (item) setForm(p => ({ ...p, item: item.name, itemId: item.id, rate: item.rate.toString() }));
                                         }} placeholder="Select from Master..." />
                                 )}
                             </div>

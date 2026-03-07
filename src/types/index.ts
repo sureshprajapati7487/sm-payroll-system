@@ -201,6 +201,7 @@ export interface RegularizationRequest {
 
 export interface ProductionItem {
     id: string;
+    companyId?: string;
     name: string; // e.g. "Stitching Shirt"
     rate: number; // e.g. 15
     category: string; // e.g. "Stitching"
@@ -235,6 +236,7 @@ export interface ProductionEntry {
     date: string; // YYYY-MM-D
     employeeId: string;
     item: string; // e.g., "Stitching Shirt"
+    itemId?: string; // Linked backend master item ID
     qty: number;
     rate: number;
     totalAmount: number; // qty * rate
@@ -380,10 +382,7 @@ export interface Permission {
     label: string;
 }
 
-export enum PayrollStatus {
-    GENERATED = 'GENERATED',
-    PAID = 'PAID',
-}
+export type PayrollStatus = 'DRAFT' | 'SIMULATION' | 'FINAL_APPROVED' | 'LOCKED' | 'PAID' | 'GENERATED';
 
 export interface SalarySlip {
     id: string;

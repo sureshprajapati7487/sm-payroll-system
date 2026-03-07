@@ -9,9 +9,32 @@ import {
     MapPin, Phone, Clock, CheckSquare, LogIn, LogOut, Plus, Search,
     Upload, Trash2, Edit3, X, Check, AlertTriangle, TrendingUp,
     Eye, Navigation, Building2, User, Calendar, RefreshCw, Map, FileDown,
-    ChevronDown, IndianRupee, Radar, Zap, History
+    ChevronDown, IndianRupee, Radar, Zap, History, List
 } from 'lucide-react';
 import { useDialog } from '@/components/DialogProvider';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import * as L from 'leaflet';
+
+// Fix Leaflet's default icon issue with Webpack/Vite
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Custom Pins
+const activePin = new L.DivIcon({
+    className: 'bg-transparent',
+    html: `<div class="w-5 h-5 bg-green-500 rounded-full border-2 border-white shadow-md flex items-center justify-center"><div class="w-2 h-2 bg-white rounded-full"></div></div>`,
+    iconSize: [20, 20], iconAnchor: [10, 10]
+});
+const inactivePin = new L.DivIcon({
+    className: 'bg-transparent',
+    html: `<div class="w-5 h-5 bg-slate-500 rounded-full border-2 border-white shadow-md flex items-center justify-center"><div class="w-2 h-2 bg-white rounded-full"></div></div>`,
+    iconSize: [20, 20], iconAnchor: [10, 10]
+});
 
 // ── Excel Download helper — Blob approach (works on HTTPS + LAN IP) ──────────
 function downloadExcel(headers: string[], rows: (string | number | undefined | null | boolean)[][], filename: string, sheetName = 'Sheet1') {
@@ -666,6 +689,7 @@ export const ClientListPage = () => {
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('ALL');
     const [filterAssigned, setFilterAssigned] = useState('');
+    const [viewMode, setViewMode] = useState<'LIST' | 'MAP'>('LIST');
     const [modalClient, setModalClient] = useState<SalesClient | null | false>(false); // false=closed, null=new
     const [historyClient, setHistoryClient] = useState<SalesClient | null>(null);
     const [checkOutVisit, setCheckOutVisit] = useState<ClientVisitRecord | null>(null);
@@ -887,155 +911,213 @@ export const ClientListPage = () => {
                 <div className="px-5 py-3 border-b border-dark-border flex items-center justify-between">
                     <p className="text-white font-semibold text-sm">{filtered.length} Clients</p>
                     {filtered.length > 0 && (
-                        <button onClick={() => exportClientsToExcel(clients, { companyId: currentCompanyId || undefined, assignedTo: filterAssigned || undefined, status: filterStatus })} className="flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 font-semibold transition-colors">
-                            <FileDown className="w-3.5 h-3.5" /> Export {filtered.length} to Excel
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button onClick={() => exportClientsToExcel(clients, { companyId: currentCompanyId || undefined, assignedTo: filterAssigned || undefined, status: filterStatus })} className="flex items-center gap-1.5 text-xs text-green-400 hover:text-green-300 font-semibold transition-colors">
+                                <FileDown className="w-3.5 h-3.5" /> Export
+                            </button>
+                            <div className="flex bg-dark-bg rounded-lg p-0.5 border border-dark-border">
+                                <button onClick={() => setViewMode('LIST')} className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold transition-all ${viewMode === 'LIST' ? 'bg-dark-border text-white' : 'text-dark-muted hover:text-gray-300'}`}>
+                                    <List className="w-3.5 h-3.5" /> List
+                                </button>
+                                <button onClick={() => setViewMode('MAP')} className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold transition-all ${viewMode === 'MAP' ? 'bg-blue-500/20 text-blue-400' : 'text-dark-muted hover:text-gray-300'}`}>
+                                    <Map className="w-3.5 h-3.5" /> Map
+                                </button>
+                            </div>
+                        </div>
                     )}
                 </div>
                 {loading && <div className="p-12 text-center text-dark-muted">Loading clients...</div>}
-                {!loading && filtered.length === 0 && (
+
+                {!loading && viewMode === 'MAP' && (() => {
+                    const mappedClients = filtered.filter(c => c.latitude != null && c.longitude != null);
+                    const defaultCenter: [number, number] = [20.5937, 78.9629];
+                    const center: [number, number] = mappedClients.length > 0 ? [mappedClients[0].latitude!, mappedClients[0].longitude!] : defaultCenter;
+                    const zoom = mappedClients.length > 0 ? 12 : 5;
+
+                    return (
+                        <div className="w-full h-[600px] relative z-0 bg-[#1a1c23]">
+                            <MapContainer center={center} zoom={zoom} scrollWheelZoom={true} className="w-full h-full">
+                                <TileLayer
+                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                                />
+                                <>
+                                    {mappedClients.map(c => (
+                                        <Marker
+                                            key={c.id}
+                                            position={[c.latitude!, c.longitude!]}
+                                            icon={c.status === 'ACTIVE' ? activePin : inactivePin}
+                                        >
+                                            <Popup className="custom-popup">
+                                                <div className="p-2 space-y-1">
+                                                    <p className="font-bold text-gray-800 text-sm">{c.name}</p>
+                                                    {c.shopName && <p className="text-xs text-gray-500">{c.shopName}</p>}
+                                                    <p className="text-xs text-blue-600 font-semibold">{c.status}</p>
+                                                    <p className="text-xs text-gray-600 truncate max-w-[200px]">{c.address || c.city}</p>
+                                                </div>
+                                            </Popup>
+                                        </Marker>
+                                    ))}
+                                </>
+                            </MapContainer>
+                            {mappedClients.length === 0 && (
+                                <div className="absolute inset-0 z-[1000] bg-dark-bg/80 backdrop-blur-sm flex items-center justify-center">
+                                    <div className="text-center">
+                                        <MapPin className="w-12 h-12 text-dark-muted mx-auto mb-3 opacity-50" />
+                                        <h3 className="text-white font-medium">No Mapped Clients</h3>
+                                        <p className="text-sm text-dark-muted">None of the filtered clients have GPS coordinates set.</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
+
+                {!loading && viewMode === 'LIST' && filtered.length === 0 && (
                     <div className="p-16 text-center space-y-3">
                         <Building2 className="w-12 h-12 mx-auto text-dark-muted opacity-30" />
                         <p className="text-dark-muted">Koi client nahi mila</p>
                         <button onClick={() => setModalClient(null)} className="px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg text-sm font-semibold transition-colors">+ Add First Client</button>
                     </div>
                 )}
-                <div className="divide-y divide-dark-border/30 max-h-[600px] overflow-y-auto">
-                    {filtered.map(client => {
-                        const isActive = client.id === activeClientId;
-                        const ds = daysSince(client.lastVisitAt);
-                        const isOverdue = client.nextVisitDate && client.nextVisitDate < today;
-                        return (
-                            <div key={client.id} className={`px-5 py-4 hover:bg-white/5 transition-colors group ${isActive ? 'bg-green-500/5 border-l-2 border-green-500' : ''}`}>
-                                <div className="flex items-start gap-4">
-                                    {/* Left: Info */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                                            <p className="text-white font-semibold text-sm">{client.name}</p>
-                                            {client.shopName && <span className="text-xs text-dark-muted">• {client.shopName}</span>}
-                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border ${client.status === 'ACTIVE' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                                                client.status === 'PROSPECT' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                                                    client.status === 'BLOCKED' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                                                        'bg-slate-500/20 text-slate-400 border-slate-500/30'
-                                                }`}>{client.status}</span>
-                                            {isOverdue && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 font-bold">⚠️ Overdue</span>}
-                                            {isActive && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 font-bold animate-pulse">🟢 Active Visit</span>}
-                                        </div>
-                                        <div className="flex items-center gap-3 text-xs text-dark-muted flex-wrap">
-                                            {client.code && <span className="font-mono">{client.code}</span>}
-                                            {client.type && <span className="capitalize">{client.type.toLowerCase()}</span>}
-                                            {client.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{client.phone}</span>}
-                                            {client.city && <span>📍 {client.city}</span>}
-                                            {client.assignedToName && <span className="flex items-center gap-1"><User className="w-3 h-3" />{client.assignedToName}</span>}
-                                        </div>
-                                        <div className="flex items-center gap-3 text-[11px] mt-1.5 flex-wrap">
-                                            <span className={`flex items-center gap-1 ${client.latitude ? 'text-green-400' : 'text-yellow-400'}`}>
-                                                <MapPin className="w-3 h-3" />
-                                                {client.latitude ? '✅ GPS Set' : '⚠️ GPS Pending'}
-                                            </span>
-                                            <span className="text-dark-muted flex items-center gap-1"><TrendingUp className="w-3 h-3" />{client.totalVisits || 0} visits</span>
-                                            {client.avgVisitMins > 0 && <span className="text-dark-muted flex items-center gap-1"><Clock className="w-3 h-3" />avg {fmtDuration(client.avgVisitMins)}</span>}
-                                            {ds != null && <span className={`flex items-center gap-1 ${ds > 30 ? 'text-red-400' : ds > 14 ? 'text-yellow-400' : 'text-dark-muted'}`}><Calendar className="w-3 h-3" />{ds === 0 ? 'Today' : `${ds}d ago`}</span>}
-                                            {/* Update 4 — Outstanding Amount Color Warning */}
-                                            {(client.outstandingAmount || 0) > 0 && (() => {
-                                                const outstanding = client.outstandingAmount || 0;
-                                                const limit = client.creditLimit || 0;
-                                                const overLimit = limit > 0 && outstanding >= limit;
-                                                const halfLimit = limit > 0 && outstanding >= limit * 0.5;
-                                                const colorClass = overLimit ? 'text-red-400' : halfLimit ? 'text-yellow-400' : 'text-orange-400';
-                                                return (
-                                                    <span className={`flex items-center gap-1 font-semibold ${colorClass}`}>
-                                                        <IndianRupee className="w-3 h-3" />
-                                                        {outstanding.toLocaleString('en-IN')} due
-                                                        {overLimit && (
-                                                            <span className="text-[9px] px-1 py-0.5 rounded bg-red-500/20 border border-red-500/30 font-bold">⛔ Over Limit</span>
-                                                        )}
-                                                    </span>
-                                                );
-                                            })()}
-                                        </div>
-                                    </div>
-
-                                    {/* Right: Action Buttons — always visible */}
-                                    <div className="flex items-center gap-1 shrink-0">
-                                        {/* View History */}
-                                        <button onClick={() => setHistoryClient(client)} title="Visit History" className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-white transition-colors">
-                                            <Eye className="w-3.5 h-3.5" />
-                                        </button>
-                                        {/* Set GPS */}
-                                        <button onClick={() => handleSetLocation(client.id)} disabled={gpsLoading === client.id} title={client.latitude ? 'Update GPS Location' : 'Set GPS Location'} className={`p-1.5 rounded-lg transition-colors ${client.latitude ? 'hover:bg-dark-border/50 text-dark-muted hover:text-green-400' : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'}`}>
-                                            {gpsLoading === client.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Navigation className="w-3.5 h-3.5" />}
-                                        </button>
-                                        {/* Check In / Google Maps */}
-                                        {client.latitude && (
-                                            <a href={`https://maps.google.com/?q=${client.latitude},${client.longitude}`} target="_blank" rel="noreferrer" title="Open in Google Maps" className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-blue-400 transition-colors">
-                                                <Map className="w-3.5 h-3.5" />
-                                            </a>
-                                        )}
-                                        {/* Update 3 — Check In with Purpose Chooser */}
-                                        {!isActiveVisit && (
-                                            <div className="relative">
-                                                {checkingIn?.clientId === client.id ? (
-                                                    <button disabled className="px-2 py-1 rounded-lg bg-primary-500/20 text-primary-400 text-xs font-semibold flex items-center gap-1">
-                                                        <RefreshCw className="w-3 h-3 animate-spin" /> Checking in...
-                                                    </button>
-                                                ) : purposePickerFor === client.id ? (
-                                                    <div className="absolute right-0 bottom-full mb-1 z-20 glass rounded-xl border border-dark-border shadow-2xl p-2 min-w-[160px]">
-                                                        <p className="text-[10px] text-dark-muted font-semibold uppercase px-2 mb-1">Visit Purpose</p>
-                                                        {[
-                                                            { key: 'SALES', label: '🛒 Sales' },
-                                                            { key: 'COLLECTION', label: '💰 Collection' },
-                                                            { key: 'DEMO', label: '🎯 Demo' },
-                                                            { key: 'COMPLAINT', label: '⚠️ Complaint' },
-                                                            { key: 'FOLLOWUP', label: '🔄 Follow-up' },
-                                                            { key: 'OTHER', label: '📝 Other' },
-                                                        ].map(({ key, label }) => (
-                                                            <button
-                                                                key={key}
-                                                                onClick={() => handleCheckIn(client, key)}
-                                                                className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-primary-500/20 text-white text-xs transition-colors"
-                                                            >
-                                                                {label}
-                                                            </button>
-                                                        ))}
-                                                        <button onClick={() => setPurposePickerFor(null)} className="w-full text-center text-[10px] text-dark-muted hover:text-white mt-1 transition-colors">Cancel</button>
-                                                    </div>
-                                                ) : null}
-                                                {purposePickerFor !== client.id && checkingIn?.clientId !== client.id && (
-                                                    <button
-                                                        onClick={() => setPurposePickerFor(client.id)}
-                                                        title="Select Purpose & Check In"
-                                                        className="px-2 py-1 rounded-lg bg-primary-500/20 hover:bg-primary-500/30 text-primary-400 text-xs font-semibold transition-colors flex items-center gap-1"
-                                                    >
-                                                        <LogIn className="w-3 h-3" /> Visit <ChevronDown className="w-2.5 h-2.5" />
-                                                    </button>
-                                                )}
+                {!loading && viewMode === 'LIST' && filtered.length > 0 && (
+                    <div className="divide-y divide-dark-border/30 max-h-[600px] overflow-y-auto">
+                        {filtered.map(client => {
+                            const isActive = client.id === activeClientId;
+                            const ds = daysSince(client.lastVisitAt);
+                            const isOverdue = client.nextVisitDate && client.nextVisitDate < today;
+                            return (
+                                <div key={client.id} className={`px-5 py-4 hover:bg-white/5 transition-colors group ${isActive ? 'bg-green-500/5 border-l-2 border-green-500' : ''}`}>
+                                    <div className="flex items-start gap-4">
+                                        {/* Left: Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                <p className="text-white font-semibold text-sm">{client.name}</p>
+                                                {client.shopName && <span className="text-xs text-dark-muted">• {client.shopName}</span>}
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold border ${client.status === 'ACTIVE' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                                                    client.status === 'PROSPECT' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                                                        client.status === 'BLOCKED' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                                                            'bg-slate-500/20 text-slate-400 border-slate-500/30'
+                                                    }`}>{client.status}</span>
+                                                {isOverdue && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 font-bold">⚠️ Overdue</span>}
+                                                {isActive && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 font-bold animate-pulse">🟢 Active Visit</span>}
                                             </div>
-                                        )}
-                                        {isActive && (
-                                            <button onClick={() => setCheckOutVisit(activeVisit!.visit)} className="px-2 py-1 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-400 text-xs font-semibold transition-colors flex items-center gap-1">
-                                                <LogOut className="w-3 h-3" /> Out
-                                            </button>
-                                        )}
-                                        {/* Edit */}
-                                        <button onClick={() => setModalClient(client)} className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-white transition-colors">
-                                            <Edit3 className="w-3.5 h-3.5" />
-                                        </button>
-                                        {/* Delete */}
-                                        <button
-                                            onClick={() => setDeleteConfirm(client)}
-                                            title="Party Delete Karo"
-                                            className="p-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/30 text-red-400 hover:text-red-300 transition-colors"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+                                            <div className="flex items-center gap-3 text-xs text-dark-muted flex-wrap">
+                                                {client.code && <span className="font-mono">{client.code}</span>}
+                                                {client.type && <span className="capitalize">{client.type.toLowerCase()}</span>}
+                                                {client.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{client.phone}</span>}
+                                                {client.city && <span>📍 {client.city}</span>}
+                                                {client.assignedToName && <span className="flex items-center gap-1"><User className="w-3 h-3" />{client.assignedToName}</span>}
+                                            </div>
+                                            <div className="flex items-center gap-3 text-[11px] mt-1.5 flex-wrap">
+                                                <span className={`flex items-center gap-1 ${client.latitude ? 'text-green-400' : 'text-yellow-400'}`}>
+                                                    <MapPin className="w-3 h-3" />
+                                                    {client.latitude ? '✅ GPS Set' : '⚠️ GPS Pending'}
+                                                </span>
+                                                <span className="text-dark-muted flex items-center gap-1"><TrendingUp className="w-3 h-3" />{client.totalVisits || 0} visits</span>
+                                                {client.avgVisitMins > 0 && <span className="text-dark-muted flex items-center gap-1"><Clock className="w-3 h-3" />avg {fmtDuration(client.avgVisitMins)}</span>}
+                                                {ds != null && <span className={`flex items-center gap-1 ${ds > 30 ? 'text-red-400' : ds > 14 ? 'text-yellow-400' : 'text-dark-muted'}`}><Calendar className="w-3 h-3" />{ds === 0 ? 'Today' : `${ds}d ago`}</span>}
+                                                {/* Update 4 — Outstanding Amount Color Warning */}
+                                                {(client.outstandingAmount || 0) > 0 && (() => {
+                                                    const outstanding = client.outstandingAmount || 0;
+                                                    const limit = client.creditLimit || 0;
+                                                    const overLimit = limit > 0 && outstanding >= limit;
+                                                    const halfLimit = limit > 0 && outstanding >= limit * 0.5;
+                                                    const colorClass = overLimit ? 'text-red-400' : halfLimit ? 'text-yellow-400' : 'text-orange-400';
+                                                    return (
+                                                        <span className={`flex items-center gap-1 font-semibold ${colorClass}`}>
+                                                            <IndianRupee className="w-3 h-3" />
+                                                            {outstanding.toLocaleString('en-IN')} due
+                                                            {overLimit && (
+                                                                <span className="text-[9px] px-1 py-0.5 rounded bg-red-500/20 border border-red-500/30 font-bold">⛔ Over Limit</span>
+                                                            )}
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </div>
+                                        </div>
 
+                                        {/* Right: Action Buttons — always visible */}
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            {/* View History */}
+                                            <button onClick={() => setHistoryClient(client)} title="Visit History" className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-white transition-colors">
+                                                <Eye className="w-3.5 h-3.5" />
+                                            </button>
+                                            {/* Set GPS */}
+                                            <button onClick={() => handleSetLocation(client.id)} disabled={gpsLoading === client.id} title={client.latitude ? 'Update GPS Location' : 'Set GPS Location'} className={`p-1.5 rounded-lg transition-colors ${client.latitude ? 'hover:bg-dark-border/50 text-dark-muted hover:text-green-400' : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'}`}>
+                                                {gpsLoading === client.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Navigation className="w-3.5 h-3.5" />}
+                                            </button>
+                                            {/* Check In / Google Maps */}
+                                            {client.latitude && (
+                                                <a href={`https://maps.google.com/?q=${client.latitude},${client.longitude}`} target="_blank" rel="noreferrer" title="Open in Google Maps" className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-blue-400 transition-colors">
+                                                    <Map className="w-3.5 h-3.5" />
+                                                </a>
+                                            )}
+                                            {/* Update 3 — Check In with Purpose Chooser */}
+                                            {!isActiveVisit && (
+                                                <div className="relative">
+                                                    {checkingIn?.clientId === client.id ? (
+                                                        <button disabled className="px-2 py-1 rounded-lg bg-primary-500/20 text-primary-400 text-xs font-semibold flex items-center gap-1">
+                                                            <RefreshCw className="w-3 h-3 animate-spin" /> Checking in...
+                                                        </button>
+                                                    ) : purposePickerFor === client.id ? (
+                                                        <div className="absolute right-0 bottom-full mb-1 z-20 glass rounded-xl border border-dark-border shadow-2xl p-2 min-w-[160px]">
+                                                            <p className="text-[10px] text-dark-muted font-semibold uppercase px-2 mb-1">Visit Purpose</p>
+                                                            {[
+                                                                { key: 'SALES', label: '🛒 Sales' },
+                                                                { key: 'COLLECTION', label: '💰 Collection' },
+                                                                { key: 'DEMO', label: '🎯 Demo' },
+                                                                { key: 'COMPLAINT', label: '⚠️ Complaint' },
+                                                                { key: 'FOLLOWUP', label: '🔄 Follow-up' },
+                                                                { key: 'OTHER', label: '📝 Other' },
+                                                            ].map(({ key, label }) => (
+                                                                <button
+                                                                    key={key}
+                                                                    onClick={() => handleCheckIn(client, key)}
+                                                                    className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-primary-500/20 text-white text-xs transition-colors"
+                                                                >
+                                                                    {label}
+                                                                </button>
+                                                            ))}
+                                                            <button onClick={() => setPurposePickerFor(null)} className="w-full text-center text-[10px] text-dark-muted hover:text-white mt-1 transition-colors">Cancel</button>
+                                                        </div>
+                                                    ) : null}
+                                                    {purposePickerFor !== client.id && checkingIn?.clientId !== client.id && (
+                                                        <button
+                                                            onClick={() => setPurposePickerFor(client.id)}
+                                                            title="Select Purpose & Check In"
+                                                            className="px-2 py-1 rounded-lg bg-primary-500/20 hover:bg-primary-500/30 text-primary-400 text-xs font-semibold transition-colors flex items-center gap-1"
+                                                        >
+                                                            <LogIn className="w-3 h-3" /> Visit <ChevronDown className="w-2.5 h-2.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {isActive && (
+                                                <button onClick={() => setCheckOutVisit(activeVisit!.visit)} className="px-2 py-1 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-400 text-xs font-semibold transition-colors flex items-center gap-1">
+                                                    <LogOut className="w-3 h-3" /> Out
+                                                </button>
+                                            )}
+                                            {/* Edit */}
+                                            <button onClick={() => setModalClient(client)} className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-white transition-colors">
+                                                <Edit3 className="w-3.5 h-3.5" />
+                                            </button>
+                                            {/* Delete */}
+                                            <button
+                                                onClick={() => setDeleteConfirm(client)}
+                                                title="Party Delete Karo"
+                                                className="p-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/30 text-red-400 hover:text-red-300 transition-colors"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             {/* Modals */}

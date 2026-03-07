@@ -7,16 +7,18 @@ import { motion } from 'framer-motion';
 import {
     Users, Clock, TrendingUp, Wallet, CalendarClock,
     Banknote, Factory, CheckCircle, AlertCircle, ArrowRight,
-    LogIn, LogOut, ShoppingBag, ChevronRight, Bell, MapPin, Zap
+    LogIn, LogOut, ShoppingBag, ChevronRight, Bell, MapPin, Zap,
+    Wifi, WifiOff
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAttendanceStore } from '@/store/attendanceStore';
 import { usePayrollStore } from '@/store/payrollStore';
-import { useLeaveStore } from '@/store/leaveStore';
 import { useLoanStore } from '@/store/loanStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { useProductionStore } from '@/store/productionStore';
+import { useAnalyticsStore } from '@/store/analyticsStore';
+import { getBSSID } from '@/hooks/useBSSID';
 
 // ── Live Clock ────────────────────────────────────────────────────────────────
 const LiveClock = () => {
@@ -77,18 +79,52 @@ export const MobileDashboard = () => {
     const { employees } = useEmployeeStore();
     const { records } = useAttendanceStore();
     const { slips } = usePayrollStore();
-    const { requests: leaveRequests } = useLeaveStore();
     const { loans } = useLoanStore();
     const { currentCompanyId } = useMultiCompanyStore();
     const { entries } = useProductionStore();
+    const { stats, fetchDashboardStats } = useAnalyticsStore();
 
     const today = new Date().toISOString().split('T')[0];
     const currentMonth = new Date().toISOString().slice(0, 7);
+
+    // ── Offline detection ────────────────────────────────────────────────
+    const [isOffline, setIsOffline] = useState(!navigator.onLine);
+    useEffect(() => {
+        const setOnline = () => setIsOffline(false);
+        const setOfflineMode = () => setIsOffline(true);
+        window.addEventListener('online', setOnline);
+        window.addEventListener('offline', setOfflineMode);
+        return () => {
+            window.removeEventListener('online', setOnline);
+            window.removeEventListener('offline', setOfflineMode);
+        };
+    }, []);
+
+    // ── BSSID Wi-Fi status (Android only) ───────────────────────────────
+    const [bssidLabel, setBssidLabel] = useState<string | null>(null);
+    const [bssidOk, setBssidOk] = useState<boolean | null>(null);
+    useEffect(() => {
+        const { bssid, isAndroidApp } = getBSSID();
+        if (!isAndroidApp) { setBssidLabel(null); return; }
+        if (bssid) {
+            setBssidOk(true);
+            setBssidLabel(`Wi-Fi: ${bssid}`);
+        } else {
+            setBssidOk(false);
+            setBssidLabel('Office Wi-Fi nahi mili');
+        }
+    }, []);
 
     // Clear 'prefer-full-dashboard' so future sessions redirect normally
     useEffect(() => {
         sessionStorage.removeItem('prefer-full-dashboard');
     }, []);
+
+    useEffect(() => {
+        if (user?.role !== 'EMPLOYEE' && currentCompanyId) {
+            fetchDashboardStats(currentCompanyId, currentMonth);
+        }
+    }, [user, currentCompanyId, currentMonth]);
 
     const companyEmployees = currentCompanyId
         ? employees.filter(e => e.companyId === currentCompanyId)
@@ -107,13 +143,13 @@ export const MobileDashboard = () => {
         : 0;
 
     // ── Admin stats ─────────────────────────────────────────────────────────
-    const empIds = new Set(companyEmployees.map(e => e.id));
-    const activeEmps = companyEmployees.filter(e => e.status === 'ACTIVE').length;
-    const todayPresent = records.filter(r => r.date === today && empIds.has(r.employeeId) && ['PRESENT', 'LATE', 'HALF_DAY'].includes(r.status)).length;
-    const attPct = activeEmps > 0 ? Math.round((todayPresent / activeEmps) * 100) : 0;
-    const pendingLeaves = leaveRequests.filter(r => r.status === 'PENDING').length;
-    const pendingLoans = loans.filter(l => l.status === 'REQUESTED').length;
-    const netPayroll = slips.filter(s => s.month === currentMonth).reduce((sum, s) => sum + s.netSalary, 0);
+    const activeEmps = stats?.activeStaff || 0;
+    const totalEmps = stats?.totalStaff || 0;
+    const todayPresent = stats?.presentedCount || 0;
+    const attPct = stats?.attendancePercentage || 0;
+    const pendingLeaves = stats?.pendingLeaves || 0;
+    const pendingLoans = stats?.pendingLoans || 0;
+    const netPayroll = stats?.netPayrollThisMonth || 0;
 
     // ── Punch status ────────────────────────────────────────────────────────
     const punchStatus = myRecord?.checkIn && myRecord?.checkOut
@@ -132,6 +168,20 @@ export const MobileDashboard = () => {
 
     return (
         <div className="space-y-4 max-w-lg mx-auto">
+
+            {/* ── Offline Banner ────────────────────────────────────────── */}
+            {isOffline && (
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-3 bg-orange-500/15 border border-orange-500/30 rounded-2xl px-4 py-3"
+                >
+                    <WifiOff className="w-5 h-5 text-orange-400 shrink-0" />
+                    <div>
+                        <p className="text-orange-300 font-bold text-sm">Aap Offline Hain</p>
+                        <p className="text-orange-400/70 text-xs">Punch aur data sync network ke baad hoga.</p>
+                    </div>
+                </motion.div>
+            )}
 
             {/* ── Hero card: Clock + greeting ──────────────────────────────── */}
             <motion.div
@@ -153,6 +203,12 @@ export const MobileDashboard = () => {
                             Namaste, {user?.name?.split(' ')[0]} 👋
                         </p>
                         <p className="text-white/50 text-xs mt-1">{user?.role?.replace(/_/g, ' ')}</p>
+                        {bssidLabel !== null && (
+                            <div className={`mt-2 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border w-fit ${bssidOk ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-red-500/20 text-red-300 border-red-500/30'}`}>
+                                {bssidOk ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                                {bssidLabel}
+                            </div>
+                        )}
                     </div>
                     <LiveClock />
                 </div>
@@ -229,7 +285,7 @@ export const MobileDashboard = () => {
                 <div className="grid grid-cols-2 gap-3">
                     {[
                         { label: "Today's Attendance", value: `${attPct}%`, sub: `${todayPresent}/${activeEmps} present`, icon: Clock, color: 'text-primary-400', bg: 'bg-primary-500/15' },
-                        { label: 'Active Staff', value: activeEmps, sub: `${companyEmployees.length} total`, icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-500/15' },
+                        { label: 'Active Staff', value: activeEmps, sub: `${totalEmps} total`, icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-500/15' },
                         { label: 'Net Payroll', value: `₹${(netPayroll / 1000).toFixed(0)}k`, sub: currentMonth, icon: Banknote, color: 'text-yellow-400', bg: 'bg-yellow-500/15' },
                         { label: 'Pending Items', value: pendingLeaves + pendingLoans, sub: `${pendingLeaves} leaves, ${pendingLoans} loans`, icon: Bell, color: 'text-red-400', bg: 'bg-red-500/15' },
                     ].map((stat, i) => (
@@ -265,10 +321,16 @@ export const MobileDashboard = () => {
                     )}
                     {isEmployee && (
                         <>
-                            <QuickTile icon={MapPin} label="Check In" sublabel="Mark attendance" path="/mobile/checkin" color="bg-emerald-600/80 border-emerald-500/30" />
-                            <QuickTile icon={CalendarClock} label="My Leaves" sublabel="Apply / view" path="/leaves" color="bg-blue-600/80 border-blue-500/30" />
+                            <QuickTile
+                                icon={punchStatus === 'in' ? LogOut : punchStatus === 'done' ? CheckCircle : LogIn}
+                                label={punchStatus === 'in' ? 'Punch Out' : punchStatus === 'done' ? 'Shift Done' : 'Punch In'}
+                                sublabel={punchStatus === 'in' ? 'Check Out karo' : punchStatus === 'done' ? 'Aaj ka kaam complete' : 'Attendance mark karo'}
+                                path="/mobile/checkin"
+                                color={punchStatus === 'in' ? 'bg-blue-600/80 border-blue-500/30' : punchStatus === 'done' ? 'bg-slate-600/80 border-slate-500/30' : 'bg-emerald-600/80 border-emerald-500/30'}
+                            />
+                            <QuickTile icon={CalendarClock} label="My Leaves" sublabel="Apply / view" path="/leaves" color="bg-violet-600/80 border-violet-500/30" />
                             <QuickTile icon={Wallet} label="My Loans" sublabel="Loan status" path="/loans" color="bg-orange-600/80 border-orange-500/30" />
-                            <QuickTile icon={Banknote} label="My Payslip" sublabel={currentMonth} path="/payroll" color="bg-violet-600/80 border-violet-500/30" />
+                            <QuickTile icon={Banknote} label="My Payslip" sublabel={currentMonth} path="/payroll" color="bg-teal-600/80 border-teal-500/30" />
                         </>
                     )}
                 </div>

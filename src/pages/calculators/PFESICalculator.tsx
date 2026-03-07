@@ -1,18 +1,41 @@
 import { useState } from 'react';
-import { Shield, AlertTriangle } from 'lucide-react';
-import { StatutoryCalculator } from '@/utils/statutoryCalculator';
+import { Shield, AlertTriangle, Loader2 } from 'lucide-react';
+import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 
 export const PFESICalculator = () => {
+    const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
     const [basicSalary, setBasicSalary] = useState<number>(15000);
     const [grossSalary, setGrossSalary] = useState<number>(25000);
     const [pfResult, setPfResult] = useState<any>(null);
     const [esiResult, setEsiResult] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
 
-    const handleCalculate = () => {
-        const pf = StatutoryCalculator.calculatePF(basicSalary);
-        const esi = StatutoryCalculator.calculateESI(grossSalary);
-        setPfResult(pf);
-        setEsiResult(esi);
+    const handleCalculate = async () => {
+        setIsLoading(true);
+        setError('');
+        try {
+            const response = await fetch('/api/calculators/pf-esi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                body: JSON.stringify({
+                    companyId: currentCompanyId,
+                    basicSalary,
+                    grossSalary,
+                    date: new Date().toISOString()
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to compute calculation');
+            const data = await response.json();
+
+            setPfResult(data.pf);
+            setEsiResult(data.esi);
+        } catch (err: any) {
+            setError(err.message || 'Verification Error');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const formatCurrency = (amount: number) => {
@@ -67,11 +90,23 @@ export const PFESICalculator = () => {
                         <p className="text-xs text-dark-muted mt-1">For ESI calculation</p>
                     </div>
 
+                    {error && (
+                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2 text-sm text-red-400">
+                            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                            {error}
+                        </div>
+                    )}
+
                     <button
                         onClick={handleCalculate}
-                        className="w-full bg-gradient-to-r from-primary-600 to-blue-600 hover:from-primary-500 hover:to-blue-500 text-white px-6 py-3 rounded-xl font-medium transition-all"
+                        disabled={isLoading}
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary-600 to-blue-600 hover:from-primary-500 hover:to-blue-500 text-white px-6 py-3 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Calculate PF & ESI
+                        {isLoading ? (
+                            <><Loader2 className="w-5 h-5 animate-spin" /> Calculating...</>
+                        ) : (
+                            'Calculate PF & ESI'
+                        )}
                     </button>
 
                     {/* Info Cards */}

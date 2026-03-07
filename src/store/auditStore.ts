@@ -33,16 +33,13 @@ interface AuditState {
     clearOldLogs: (daysToKeep: number) => void;
 
     // Session Management
-    createSession: (userId: string, ipAddress: string, userAgent: string) => SessionInfo;
-    updateSessionActivity: (sessionId: string) => void;
-    endSession: (sessionId: string) => void;
-    getActiveSession: (userId: string) => SessionInfo | undefined;
-    checkSessionExpiry: () => void;
+    fetchSessions: () => Promise<void>;
+    revokeSession: (sessionId: string) => Promise<void>;
 
     // IP Restrictions
-    addIPRestriction: (restriction: Omit<IPRestriction, 'id' | 'createdAt'>) => void;
-    removeIPRestriction: (id: string) => void;
-    isIPAllowed: (ipAddress: string) => boolean;
+    fetchIPRestrictions: () => Promise<void>;
+    addIPRestriction: (restriction: Omit<IPRestriction, 'id' | 'createdAt'>) => Promise<void>;
+    removeIPRestriction: (id: string) => Promise<void>;
 }
 
 export const useAuditStore = create<AuditState>()(
@@ -138,110 +135,57 @@ export const useAuditStore = create<AuditState>()(
             },
 
             // ========== SESSION MANAGEMENT ==========
-            createSession: (userId, ipAddress, userAgent) => {
-                const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                const now = new Date();
-                const expiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000); // 8 hours
-
-                const newSession: SessionInfo = {
-                    sessionId,
-                    userId,
-                    loginTime: now.toISOString(),
-                    lastActivity: now.toISOString(),
-                    ipAddress,
-                    userAgent,
-                    expiresAt: expiresAt.toISOString(),
-                    isActive: true
-                };
-
-                set(state => ({
-                    sessions: [...state.sessions, newSession]
-                }));
-
-                return newSession;
+            fetchSessions: async () => {
+                try {
+                    const res = await apiFetch('/sessions');
+                    if (res.ok) set({ sessions: await res.json() });
+                } catch (e) { console.error('Failed to fetch sessions', e); }
             },
 
-            updateSessionActivity: (sessionId) => {
-                set(state => ({
-                    sessions: state.sessions.map(s =>
-                        s.sessionId === sessionId
-                            ? { ...s, lastActivity: new Date().toISOString() }
-                            : s
-                    )
-                }));
-            },
-
-            endSession: (sessionId) => {
-                set(state => ({
-                    sessions: state.sessions.map(s =>
-                        s.sessionId === sessionId
-                            ? { ...s, isActive: false }
-                            : s
-                    )
-                }));
-            },
-
-            getActiveSession: (userId) => {
-                return get().sessions.find(s => s.userId === userId && s.isActive);
-            },
-
-            checkSessionExpiry: () => {
-                const now = new Date().toISOString();
-                set(state => ({
-                    sessions: state.sessions.map(s =>
-                        s.expiresAt < now && s.isActive
-                            ? { ...s, isActive: false }
-                            : s
-                    )
-                }));
+            revokeSession: async (sessionId) => {
+                try {
+                    const res = await apiFetch(`/sessions/${sessionId}`, { method: 'DELETE' });
+                    if (res.ok) {
+                        set(state => ({ sessions: state.sessions.filter(s => s.id !== sessionId) }));
+                    }
+                } catch (e) { console.error('Failed to revoke session', e); }
             },
 
             // ========== IP RESTRICTIONS ==========
-            addIPRestriction: (restriction) => {
-                const newRestriction: IPRestriction = {
-                    ...restriction,
-                    id: `ip-${Date.now()}`,
-                    createdAt: new Date().toISOString()
-                };
-
-                set(state => ({
-                    ipRestrictions: [...state.ipRestrictions, newRestriction]
-                }));
+            fetchIPRestrictions: async () => {
+                try {
+                    const res = await apiFetch('/ip-restrictions');
+                    if (res.ok) set({ ipRestrictions: await res.json() });
+                } catch (e) { console.error('Failed to fetch IPs', e); }
             },
 
-            removeIPRestriction: (id) => {
-                set(state => ({
-                    ipRestrictions: state.ipRestrictions.filter(r => r.id !== id)
-                }));
-            },
-
-            isIPAllowed: (ipAddress) => {
-                const restrictions = get().ipRestrictions;
-
-                // If no restrictions, allow all
-                if (restrictions.length === 0) return true;
-
-                // Check whitelist
-                const whitelisted = restrictions.filter(r => r.isWhitelisted);
-                if (whitelisted.length === 0) return true; // No whitelist = allow all
-
-                // Check if IP is in whitelist
-                return whitelisted.some(r => {
-                    if (r.ipAddress === ipAddress) return true;
-                    if (r.ipRange) {
-                        // Simple range check (can be enhanced with proper CIDR matching)
-                        return ipAddress.startsWith(r.ipRange.split('/')[0].substring(0, r.ipRange.lastIndexOf('.')));
+            addIPRestriction: async (restriction) => {
+                try {
+                    const res = await apiFetch('/ip-restrictions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(restriction)
+                    });
+                    if (res.ok) {
+                        const newRestriction = await res.json();
+                        set(state => ({ ipRestrictions: [...state.ipRestrictions, newRestriction] }));
                     }
-                    return false;
-                });
+                } catch (e) { console.error('Failed to add IP restriction', e); }
+            },
+
+            removeIPRestriction: async (id) => {
+                try {
+                    const res = await apiFetch(`/ip-restrictions/${id}`, { method: 'DELETE' });
+                    if (res.ok) {
+                        set(state => ({ ipRestrictions: state.ipRestrictions.filter(r => r.id !== id) }));
+                    }
+                } catch (e) { console.error('Failed to remove IP restriction', e); }
             }
         }),
         {
             name: 'audit-store',
             partialize: (state) => ({
-                logs: state.logs.slice(0, 5000), // Persist max 5k logs
-                sessions: state.sessions.filter(s => s.isActive), // Only active sessions
-                ipRestrictions: state.ipRestrictions
+                logs: state.logs.slice(0, 5000) // Persist max 5k logs
             })
         }
     )

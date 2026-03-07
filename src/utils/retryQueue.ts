@@ -75,7 +75,7 @@ export class RetryQueue {
                     console.error(`Failed after ${item.maxRetries} retries:`, error);
                 } else {
                     // Wait before retry
-                    console.log(`Retry ${item.retryCount}/${item.maxRetries} for action ${item.id}`);
+
                     await this.delay(this.RETRY_DELAY * item.retryCount); // Exponential backoff
                 }
             }

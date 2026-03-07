@@ -58,11 +58,18 @@ export class TDSCalculator {
             nps?: number; // Max 50000
             homeLoanInterest?: number; // Max 200000
             other?: number;
-        } = {}
+        } = {},
+        customSlabs?: {
+            NEW_REGIME?: { from: number, to: number, rate: number }[],
+            OLD_REGIME?: { from: number, to: number, rate: number }[]
+        }
     ): TDSCalculation {
+        const newSlabs = customSlabs?.NEW_REGIME || this.NEW_REGIME_SLABS;
+        const oldSlabs = customSlabs?.OLD_REGIME || this.OLD_REGIME_SLABS;
+
         // NEW REGIME CALCULATION (No deductions except standard)
         const newRegimeTaxableIncome = annualGrossSalary;
-        let newRegimeTax = this.calculateTaxBySlab(newRegimeTaxableIncome, this.NEW_REGIME_SLABS);
+        let newRegimeTax = this.calculateTaxBySlab(newRegimeTaxableIncome, newSlabs);
 
         // 87A Rebate for new regime
         if (newRegimeTaxableIncome <= this.REBATE_87A_LIMIT) {
@@ -83,7 +90,7 @@ export class TDSCalculator {
         const totalOldRegimeDeductions = standardDeduction + section80C + section80D + nps + homeLoanInterest + otherDeductions;
         const oldRegimeTaxableIncome = Math.max(0, annualGrossSalary - totalOldRegimeDeductions);
 
-        let oldRegimeTax = this.calculateTaxBySlab(oldRegimeTaxableIncome, this.OLD_REGIME_SLABS);
+        let oldRegimeTax = this.calculateTaxBySlab(oldRegimeTaxableIncome, oldSlabs);
 
         // 87A Rebate for old regime
         if (oldRegimeTaxableIncome <= 500000) {
@@ -115,17 +122,18 @@ export class TDSCalculator {
     /**
      * Calculate monthly TDS
      */
-    static calculateMonthlyTDS(monthlyGross: number, deductions = {}): number {
+    static calculateMonthlyTDS(monthlyGross: number, deductions = {}, customSlabs?: any): number {
         const annualGross = monthlyGross * 12;
-        const tds = this.calculateTDS(annualGross, deductions);
+        const tds = this.calculateTDS(annualGross, deductions, customSlabs);
         return tds.monthlyTDS;
     }
 
     /**
      * Get tax breakdown by slab
      */
-    static getTaxBreakdown(taxableIncome: number, regime: 'OLD' | 'NEW' = 'NEW') {
-        const slabs = regime === 'NEW' ? this.NEW_REGIME_SLABS : this.OLD_REGIME_SLABS;
+    static getTaxBreakdown(taxableIncome: number, regime: 'OLD' | 'NEW' = 'NEW', customSlabs?: any) {
+        const defaultSlabs = regime === 'NEW' ? this.NEW_REGIME_SLABS : this.OLD_REGIME_SLABS;
+        const slabs = customSlabs && customSlabs[`${regime}_REGIME`] ? customSlabs[`${regime}_REGIME`] : defaultSlabs;
         const breakdown: { slab: string; tax: number }[] = [];
 
         for (const slab of slabs) {

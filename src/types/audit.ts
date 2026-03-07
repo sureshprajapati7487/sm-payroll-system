@@ -48,7 +48,7 @@ export interface AuditLog {
 }
 
 export interface SessionInfo {
-    sessionId: string;
+    id: string;
     userId: string;
     loginTime: string;
     lastActivity: string;

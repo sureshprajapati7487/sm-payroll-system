@@ -111,7 +111,7 @@ function doBackup(label = 'scheduled') {
 /**
  * Start the backup scheduler.
  * - Runs a backup immediately on start
- * - Schedules daily backup at midnight (or every BACKUP_INTERVAL_MS)
+ * - Schedules daily backup precisely at midnight
  */
 function startBackupScheduler() {
     console.log('🔄 Backup scheduler starting...');
@@ -119,28 +119,25 @@ function startBackupScheduler() {
     // 1. Immediate backup on start
     doBackup('startup');
 
-    // 2. Calculate ms until next midnight
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setHours(0, 0, 0, 0);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const msUntilMidnight = tomorrow - now;
-    nextBackupTime = tomorrow.toISOString();
+    // Recursive precise scheduler
+    function scheduleNext() {
+        const now = new Date();
+        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1); // Exact next midnight
+        const msUntilMidnight = tomorrow.getTime() - now.getTime();
 
-    // 3. At midnight, run daily backup, then repeat every 24h
-    setTimeout(() => {
-        if (autoBackupEnabled) doBackup('daily-midnight');
-        backupTimer = setInterval(() => {
-            if (autoBackupEnabled) doBackup('daily-midnight');
-            // Update nextBackupTime for next tick
-            const next = new Date();
-            next.setHours(0, 0, 0, 0);
-            next.setDate(next.getDate() + 1);
-            nextBackupTime = next.toISOString();
-        }, BACKUP_INTERVAL_MS);
-    }, msUntilMidnight);
+        nextBackupTime = tomorrow.toISOString();
 
-    console.log(`⏰ Next scheduled backup: ${tomorrow.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} (in ${Math.round(msUntilMidnight / 60000)} min)`);
+        console.log(`⏰ Next scheduled backup: ${tomorrow.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} (in ${Math.round(msUntilMidnight / 60000)} min)`);
+
+        backupTimer = setTimeout(() => {
+            if (autoBackupEnabled) {
+                doBackup('daily-midnight');
+            }
+            scheduleNext(); // Re-schedule for next midnight to prevent timer drift
+        }, msUntilMidnight);
+    }
+
+    scheduleNext();
 }
 
 /**

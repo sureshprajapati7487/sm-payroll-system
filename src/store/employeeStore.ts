@@ -1,11 +1,16 @@
 import { create } from 'zustand';
-import { Employee } from '@/types';
+import { Employee, EmployeeStatus } from '@/types';
 import { useMultiCompanyStore } from './multiCompanyStore';
 import { audit } from '@/lib/auditLogger';
 
 interface EmployeeState {
     employees: Employee[];
     isLoading: boolean;
+
+    // Pagination Metadata
+    totalCount: number;
+    currentPage: number;
+    totalPages: number;
 
     // Actions
     addEmployee: (employee: Omit<Employee, 'id'>, companyIdOverride?: string) => void;
@@ -14,7 +19,10 @@ interface EmployeeState {
     getEmployeeById: (id: string) => Employee | undefined;
     toggleLeaveBlock: (id: string) => void;
     generateNextCode: () => string;
-    fetchEmployees: () => Promise<void>;
+    fetchEmployees: (params?: {
+        page?: number; limit?: number; search?: string;
+        status?: string; department?: string; shift?: string;
+    }) => Promise<void>;
 
     // Internal (for migration/debug)
     _rawEmployees: Employee[];
@@ -29,18 +37,44 @@ const useInternalEmployeeStore = create<EmployeeState>((set, get) => ({
     employees: [],
     _rawEmployees: [],
     isLoading: false,
+    totalCount: 0,
+    currentPage: 1,
+    totalPages: 1,
 
     // NEW: Fetch Action
-    fetchEmployees: async () => {
+    fetchEmployees: async (params = {}) => {
+        const { page = 1, limit = 50, search = '', status, department, shift } = params;
         set({ isLoading: true });
         try {
-            const res = await apiFetch(`/employees`);
+            const queryParams = new URLSearchParams();
+            if (page) queryParams.append('page', page.toString());
+            if (limit) queryParams.append('limit', limit.toString());
+            if (search) queryParams.append('search', search);
+            if (status) queryParams.append('status', status);
+            if (department) queryParams.append('department', department);
+            if (shift) queryParams.append('shift', shift);
+
+            const res = await apiFetch(`/employees?${queryParams.toString()}`);
             const data = await res.json();
-            set({
-                _rawEmployees: data,
-                employees: data, // Keep consistent
-                isLoading: false
-            });
+
+            if (data && data.data) {
+                // Paginated response
+                set({
+                    _rawEmployees: data.data,
+                    employees: data.data,
+                    totalCount: data.total,
+                    currentPage: data.page,
+                    totalPages: data.totalPages,
+                    isLoading: false
+                });
+            } else {
+                // Backward compatibility if backend doesn't return paginated structure
+                set({
+                    _rawEmployees: Array.isArray(data) ? data : [],
+                    employees: Array.isArray(data) ? data : [],
+                    isLoading: false
+                });
+            }
         } catch (error) {
             console.error('Failed to fetch employees:', error);
             set({ isLoading: false });
@@ -143,10 +177,12 @@ const useInternalEmployeeStore = create<EmployeeState>((set, get) => ({
 
     deleteEmployee: async (id) => {
         const emp = get()._rawEmployees.find(e => e.id === id);
-        // Optimistic update first
+        // Optimistic update first: set status to INACTIVE instead of filtering out
         set((state) => {
-            const updated = state._rawEmployees.filter((emp) => emp.id !== id);
-            return { _rawEmployees: updated, employees: updated };
+            const updated = state._rawEmployees.map((e) =>
+                e.id === id ? { ...e, status: EmployeeStatus.INACTIVE } : e
+            );
+            return { _rawEmployees: updated };
         });
         try {
             await apiFetch(`/employees/${id}`, { method: 'DELETE' });

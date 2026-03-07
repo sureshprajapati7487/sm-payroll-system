@@ -1,21 +1,25 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRateStore } from '@/store/rateStore';
+import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { Plus, Trash2, Edit2, Save, X } from 'lucide-react';
 
 export const RateManager = ({ onClose }: { onClose?: () => void }) => {
     const navigate = useNavigate();
     const handleClose = () => onClose ? onClose() : navigate(-1);
     const { items, addItem, updateItem, removeItem } = useRateStore();
+    const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
+
     const [newItem, setNewItem] = useState({ name: '', rate: '', category: 'Stitching' });
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState({ name: '', rate: '', category: '' });
 
-    const handleAdd = (e: React.FormEvent) => {
+    const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newItem.name || !newItem.rate) return;
+        if (!newItem.name || !newItem.rate || !currentCompanyId) return;
 
-        addItem({
+        await addItem({
+            companyId: currentCompanyId,
             name: newItem.name,
             rate: parseFloat(newItem.rate),
             category: newItem.category
@@ -28,9 +32,9 @@ export const RateManager = ({ onClose }: { onClose?: () => void }) => {
         setEditForm({ name: item.name, rate: item.rate.toString(), category: item.category });
     };
 
-    const saveEdit = () => {
+    const saveEdit = async () => {
         if (editingId) {
-            updateItem(editingId, {
+            await updateItem(editingId, {
                 name: editForm.name,
                 rate: parseFloat(editForm.rate),
                 category: editForm.category

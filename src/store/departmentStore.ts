@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { useMultiCompanyStore } from './multiCompanyStore';
+import { apiFetch } from '@/lib/apiClient';
 
 export type DeptSalaryBasis =
     | 'FIXED'          // Monthly fixed salary (HR, Accounts, Security)
@@ -22,42 +22,90 @@ export interface Department {
 
 interface DepartmentState {
     departments: Department[];
-    addDepartment: (dept: Omit<Department, 'id' | 'companyId'>) => void;
-    updateDepartment: (id: string, updates: Partial<Omit<Department, 'companyId'>>) => void;
-    deleteDepartment: (id: string) => void;
+    isLoading: boolean;
+    fetchDepartments: (companyId: string) => Promise<void>;
+    addDepartment: (dept: Omit<Department, 'id' | 'companyId'>) => Promise<void>;
+    updateDepartment: (id: string, updates: Partial<Omit<Department, 'companyId'>>) => Promise<void>;
+    deleteDepartment: (id: string) => Promise<void>;
 }
 
-const useInternalDepartmentStore = create<DepartmentState>()(
-    persist(
-        (set) => ({
-            departments: [],
-            addDepartment: (dept) => {
-                const currentCompanyId = useMultiCompanyStore.getState().currentCompanyId;
-                if (!currentCompanyId) return;
+export const useInternalDepartmentStore = create<DepartmentState>((set) => ({
+    departments: [],
+    isLoading: false,
 
-                const newDept: Department = {
-                    ...dept,
-                    id: Math.random().toString(36).substr(2, 9),
-                    companyId: currentCompanyId
-                };
-                set((state) => ({ departments: [...state.departments, newDept] }));
-            },
-            updateDepartment: (id, updates) => {
-                set((state) => ({
-                    departments: state.departments.map((d) => (d.id === id ? { ...d, ...updates } : d))
-                }));
-            },
-            deleteDepartment: (id) => {
-                set((state) => ({
-                    departments: state.departments.filter((d) => d.id !== id)
+    fetchDepartments: async (companyId) => {
+        if (!companyId) return;
+        set({ isLoading: true });
+        try {
+            const res = await apiFetch(`/departments?companyId=${companyId}`);
+            if (res.ok) {
+                const data = await res.json();
+                set({ departments: data });
+            }
+        } catch (error) {
+            console.error('Failed to fetch departments:', error);
+        } finally {
+            set({ isLoading: false });
+        }
+    },
+
+    addDepartment: async (dept) => {
+        const currentCompanyId = useMultiCompanyStore.getState().currentCompanyId;
+        if (!currentCompanyId) return;
+
+        try {
+            const newDept = { ...dept, companyId: currentCompanyId };
+            // Optimistic Update
+            const tempId = `temp-${Date.now()}`;
+            set(state => ({ departments: [...state.departments, { ...newDept, id: tempId } as Department] }));
+
+            const res = await apiFetch(`/departments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...newDept, id: Math.random().toString(36).substr(2, 9) })
+            });
+
+            if (res.ok) {
+                const saved = await res.json();
+                set(state => ({
+                    departments: state.departments.map(d => d.id === tempId ? saved : d)
                 }));
             }
-        }),
-        {
-            name: 'department-storage'
+        } catch (error) {
+            console.error('Failed to add department', error);
         }
-    )
-);
+    },
+
+    updateDepartment: async (id, updates) => {
+        // Optimistic update
+        set((state) => ({
+            departments: state.departments.map((d) => (d.id === id ? { ...d, ...updates } : d))
+        }));
+
+        try {
+            await apiFetch(`/departments/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates)
+            });
+        } catch (error) {
+            console.error('Failed to update department:', error);
+        }
+    },
+
+    deleteDepartment: async (id) => {
+        // Optimistic delete
+        set((state) => ({
+            departments: state.departments.filter((d) => d.id !== id)
+        }));
+
+        try {
+            await apiFetch(`/departments/${id}`, { method: 'DELETE' });
+        } catch (error) {
+            console.error('Failed to delete department:', error);
+        }
+    }
+}));
 
 export const useDepartmentStore = () => {
     const store = useInternalDepartmentStore();

@@ -12,18 +12,7 @@ interface RegularizationState {
 }
 
 export const useRegularizationStore = create<RegularizationState>((set, get) => ({
-    requests: [
-        // Mock Data
-        {
-            id: '1',
-            employeeId: 'emp_1', // Assuming this exists or will match check below
-            date: new Date().toISOString().split('T')[0],
-            type: 'MISSED_PUNCH',
-            reason: 'Forgot to punch out yesterday due to rush.',
-            status: 'PENDING',
-            createdAt: new Date().toISOString()
-        }
-    ],
+    requests: [],
 
     addRequest: (req) => {
         const newRequest: RegularizationRequest = {

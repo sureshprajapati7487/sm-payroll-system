@@ -7,8 +7,9 @@ interface ProductionState {
     isLoading: boolean;
 
     // Actions
-    fetchProductionEntries: () => Promise<void>;
+    fetchProductionEntries: (companyId: string) => Promise<void>;
     addEntry: (entry: Omit<ProductionEntry, 'id' | 'status' | 'totalAmount'>) => Promise<void>;
+    addBulkEntries: (entries: Omit<ProductionEntry, 'id' | 'status' | 'totalAmount'>[]) => Promise<{ successCount: number; failedCount: number; errors: any[] }>;
     updateEntry: (id: string, updates: Partial<ProductionEntry>) => Promise<void>;
     approveEntry: (id: string) => Promise<void>;
     rejectEntry: (id: string) => Promise<void>;
@@ -20,10 +21,10 @@ export const useProductionStore = create<ProductionState>((set, get) => ({
     entries: [],
     isLoading: false,
 
-    fetchProductionEntries: async () => {
+    fetchProductionEntries: async (companyId) => {
         set({ isLoading: true });
         try {
-            const res = await apiFetch(`/production`);
+            const res = await apiFetch(`/production?companyId=${companyId}`);
             if (res.ok) set({ entries: await res.json() });
         } catch (err) {
             console.error('Failed to fetch production entries:', err);
@@ -54,6 +55,31 @@ export const useProductionStore = create<ProductionState>((set, get) => ({
             }
         } catch (err) {
             console.error('Failed to save production entry:', err);
+        }
+    },
+
+    addBulkEntries: async (entries) => {
+        try {
+            const res = await apiFetch(`/production/bulk`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ entries }),
+            });
+
+            if (res.status === 207 || res.ok) {
+                const result = await res.json();
+                // Append successful entries to state
+                if (result.successful && result.successful.length > 0) {
+                    set(state => ({ entries: [...result.successful, ...state.entries] }));
+                }
+                return result;
+            } else {
+                const err = await res.json();
+                throw new Error(err.error || 'Failed to bulk add');
+            }
+        } catch (err: any) {
+            console.error('Failed to save bulk production entries:', err);
+            return { successCount: 0, failedCount: entries.length, errors: [{ error: err.message }] };
         }
     },
 

@@ -47,6 +47,167 @@ const Company = sequelize.define('Company', {
     createdAt: { type: DataTypes.DATE, defaultValue: Sequelize.NOW }
 });
 
+// ── 1.5 Department ────────────────────────────────────────────────────────────
+const Department = sequelize.define('Department', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    name: { type: DataTypes.STRING, allowNull: false },
+    description: { type: DataTypes.STRING },
+    salaryBasis: { type: DataTypes.STRING },
+    defaultSalaryType: { type: DataTypes.STRING },
+    headCount: { type: DataTypes.INTEGER },
+    costCenter: { type: DataTypes.STRING },
+});
+
+// ── 1.6 Shift ─────────────────────────────────────────────────────────────────
+const Shift = sequelize.define('Shift', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    name: { type: DataTypes.STRING, allowNull: false },
+    startTime: { type: DataTypes.STRING, allowNull: false }, // "09:00"
+    endTime: { type: DataTypes.STRING, allowNull: false },   // "18:00"
+    graceTimeMinutes: { type: DataTypes.INTEGER, defaultValue: 15 },
+});
+
+// ── 1.7 Work Group ────────────────────────────────────────────────────────────
+const WorkGroup = sequelize.define('WorkGroup', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    name: { type: DataTypes.STRING, allowNull: false },
+    department: { type: DataTypes.STRING, allowNull: false },
+    color: { type: DataTypes.STRING, defaultValue: 'blue' },
+    icon: { type: DataTypes.STRING }
+});
+
+// ── 1.8 Salary Type ───────────────────────────────────────────────────────────
+const SalaryType = sequelize.define('SalaryType', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    key: { type: DataTypes.STRING, allowNull: false },
+    label: { type: DataTypes.STRING, allowNull: false },
+    description: { type: DataTypes.STRING },
+    basis: { type: DataTypes.STRING, defaultValue: 'MONTHLY' } // MONTHLY | DAILY | PER_UNIT | WEEKLY | OTHER
+});
+
+// ── 1.9 Attendance Action ─────────────────────────────────────────────────────
+const AttendanceAction = sequelize.define('AttendanceAction', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    key: { type: DataTypes.STRING, allowNull: false },
+    label: { type: DataTypes.STRING, allowNull: false },
+    icon: { type: DataTypes.STRING },
+    color: { type: DataTypes.STRING, defaultValue: 'slate' },
+    enabled: { type: DataTypes.BOOLEAN, defaultValue: true },
+    isDefault: { type: DataTypes.BOOLEAN, defaultValue: false }
+});
+
+// ── 1.10 Punch Location ────────────────────────────────────────────────────────
+const PunchLocation = sequelize.define('PunchLocation', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    name: { type: DataTypes.STRING, allowNull: false },
+    lat: { type: DataTypes.FLOAT, allowNull: false },
+    lng: { type: DataTypes.FLOAT, allowNull: false },
+    radiusMeters: { type: DataTypes.INTEGER, defaultValue: 100 },
+    enabled: { type: DataTypes.BOOLEAN, defaultValue: true },
+    // Wi-Fi BSSID binding: MAC addresses of allowed routers for this zone.
+    // Empty array = no BSSID restriction. Only enforced on Android WebView.
+    allowedBSSIDs: { type: DataTypes.JSON, defaultValue: [] }
+});
+
+// ── 1.11 System Setting ────────────────────────────────────────────────────────
+const SystemSetting = sequelize.define('SystemSetting', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    key: { type: DataTypes.STRING, allowNull: false },
+    value: { type: DataTypes.TEXT } // JSON stringified payload
+});
+
+// ── 1.12 System Key (Super Admin) ──────────────────────────────────────────
+const SystemKey = sequelize.define('SystemKey', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    key: { type: DataTypes.STRING, allowNull: false },
+    label: { type: DataTypes.STRING, allowNull: false },
+    value: { type: DataTypes.STRING, allowNull: false },
+    category: {
+        type: DataTypes.ENUM('PAYROLL', 'ATTENDANCE', 'LEAVES', 'GENERAL', 'SECURITY'),
+        allowNull: false
+    },
+    description: { type: DataTypes.STRING },
+    isSecret: { type: DataTypes.BOOLEAN, defaultValue: false }
+});
+
+// ── 1.13 Security Models (Phase 9) ──────────────────────────────────────────
+const UserSession = sequelize.define('UserSession', {
+    id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
+    userId: { type: DataTypes.STRING },
+    loginTime: { type: DataTypes.DATE },
+    lastActivity: { type: DataTypes.DATE },
+    ipAddress: { type: DataTypes.STRING },
+    userAgent: { type: DataTypes.STRING },
+    expiresAt: { type: DataTypes.DATE },
+    isActive: { type: DataTypes.BOOLEAN, defaultValue: true }
+});
+
+const IPRestriction = sequelize.define('IPRestriction', {
+    id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
+    ipAddress: { type: DataTypes.STRING, unique: true },
+    description: { type: DataTypes.STRING },
+    isWhitelisted: { type: DataTypes.BOOLEAN, defaultValue: true },
+    createdBy: { type: DataTypes.STRING }
+});
+
+// ── 1.14 Reporting Models ─────────────────────────────────────────────────────
+const CustomReportTemplate = sequelize.define('CustomReportTemplate', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    name: { type: DataTypes.STRING, allowNull: false },
+    description: { type: DataTypes.STRING },
+    columns: { type: DataTypes.TEXT }, // Stored as JSON string
+    filters: { type: DataTypes.TEXT }  // Stored as JSON string
+});
+
+const StatutoryRule = sequelize.define('StatutoryRule', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    effectiveDate: { type: DataTypes.STRING, allowNull: false }, // YYYY-MM-DD
+    pfRate: { type: DataTypes.FLOAT, defaultValue: 12.0 },
+    pfCappedAmount: { type: DataTypes.FLOAT, defaultValue: 1800 },
+    esicRate: { type: DataTypes.FLOAT, defaultValue: 0.75 },
+    esicThreshold: { type: DataTypes.FLOAT, defaultValue: 21000 },
+    ptSlabs: { type: DataTypes.JSON, defaultValue: [] } // e.g. [{ min: 0, max: 7500, tax: 0 }, { min: 7501, max: 10000, tax: 150 }]
+});
+
+const ScheduledReport = sequelize.define('ScheduledReport', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    name: { type: DataTypes.STRING, allowNull: false },
+    reportType: { type: DataTypes.STRING }, // payslip, attendance, statutory, custom
+    frequency: { type: DataTypes.STRING }, // daily, weekly, monthly
+    dayOfWeek: { type: DataTypes.INTEGER },
+    dayOfMonth: { type: DataTypes.INTEGER },
+    recipients: { type: DataTypes.TEXT }, // Stored as JSON string array
+    enabled: { type: DataTypes.BOOLEAN, defaultValue: true },
+    lastRun: { type: DataTypes.DATE },
+    nextRun: { type: DataTypes.DATE },
+    createdBy: { type: DataTypes.STRING }
+});
+
+const ReportJob = sequelize.define('ReportJob', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    requestedBy: { type: DataTypes.STRING }, // employee ID of requestor
+    reportType: { type: DataTypes.STRING, allowNull: false },
+    format: { type: DataTypes.STRING, defaultValue: 'csv' }, // csv, pdf
+    status: {
+        type: DataTypes.ENUM('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'),
+        defaultValue: 'PENDING'
+    },
+    progress: { type: DataTypes.INTEGER, defaultValue: 0 },
+    downloadUrl: { type: DataTypes.STRING }, // path to generated file
+    error: { type: DataTypes.TEXT },
+    payload: { type: DataTypes.TEXT } // JSON stringified filters/columns
+});
+
 // ── 2. Employee ───────────────────────────────────────────────────────────────
 const Employee = sequelize.define('Employee', {
     id: { type: DataTypes.STRING, primaryKey: true },
@@ -67,6 +228,7 @@ const Employee = sequelize.define('Employee', {
         defaultValue: 'ACTIVE'
     },
     shift: { type: DataTypes.STRING, defaultValue: 'GENERAL' },
+    groupId: { type: DataTypes.STRING }, // maps to WorkGroup.id
     salaryType: { type: DataTypes.STRING, defaultValue: 'MONTHLY' },
     basicSalary: { type: DataTypes.FLOAT, defaultValue: 0 },
     paymentRate: { type: DataTypes.FLOAT, defaultValue: 0 },
@@ -123,6 +285,7 @@ const Production = sequelize.define('Production', {
     employeeId: { type: DataTypes.STRING, allowNull: false },
     date: { type: DataTypes.STRING, allowNull: false },
     item: { type: DataTypes.STRING },
+    itemId: { type: DataTypes.STRING },
     qty: { type: DataTypes.FLOAT, defaultValue: 0 },
     rate: { type: DataTypes.FLOAT, defaultValue: 0 },
     totalAmount: { type: DataTypes.FLOAT, defaultValue: 0 },
@@ -131,6 +294,14 @@ const Production = sequelize.define('Production', {
         defaultValue: 'PENDING'
     },
     remarks: { type: DataTypes.STRING }
+});
+
+const ProductionItem = sequelize.define('ProductionItem', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING },
+    name: { type: DataTypes.STRING, allowNull: false },
+    rate: { type: DataTypes.FLOAT, defaultValue: 0 },
+    category: { type: DataTypes.STRING }
 });
 
 // ── 5. Leave Request ──────────────────────────────────────────────────────────
@@ -152,6 +323,8 @@ const Leave = sequelize.define('Leave', {
         defaultValue: 'PENDING'
     },
     appliedOn: { type: DataTypes.STRING }
+}, {
+    version: true // Optimistic Locking
 });
 
 // ── 6. Loan Record ────────────────────────────────────────────────────────────
@@ -201,8 +374,8 @@ const SalarySlip = sequelize.define('SalarySlip', {
     totalDeductions: { type: DataTypes.FLOAT, defaultValue: 0 },
     netSalary: { type: DataTypes.FLOAT, defaultValue: 0 },
     status: {
-        type: DataTypes.ENUM('GENERATED', 'PAID'),
-        defaultValue: 'GENERATED'
+        type: DataTypes.ENUM('DRAFT', 'SIMULATION', 'FINAL_APPROVED', 'LOCKED'),
+        defaultValue: 'DRAFT'
     },
     generatedOn: { type: DataTypes.STRING },
     generatedBy: { type: DataTypes.STRING }
@@ -221,6 +394,7 @@ const Expense = sequelize.define('Expense', {
     description: { type: DataTypes.STRING },
     paidTo: { type: DataTypes.STRING },
     addedBy: { type: DataTypes.STRING },
+    receiptUrl: { type: DataTypes.STRING }, // S3 Public URL
     status: {
         type: DataTypes.ENUM('PENDING', 'APPROVED', 'REJECTED', 'PAID'),
         defaultValue: 'PENDING'
@@ -360,6 +534,20 @@ const ClientVisit = sequelize.define('ClientVisit', {
         { fields: ['companyId', 'checkInAt'] }
     ]
 });
+// ── 15. Sales Task ─────────────────────────────────────────────────────────────
+const SalesTask = sequelize.define('SalesTask', {
+    id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    salesmanId: { type: DataTypes.STRING, allowNull: false },
+    title: { type: DataTypes.STRING, allowNull: false },
+    description: { type: DataTypes.TEXT },
+    dueDate: { type: DataTypes.STRING }, // YYYY-MM-DD
+    priority: { type: DataTypes.ENUM('high', 'medium', 'low'), defaultValue: 'medium' },
+    status: { type: DataTypes.ENUM('todo', 'in-progress', 'done', 'canceled'), defaultValue: 'todo' },
+    completedAt: { type: DataTypes.STRING },
+}, {
+    indexes: [{ fields: ['companyId'] }, { fields: ['salesmanId'] }]
+});
 
 // ── Sync Database ─────────────────────────────────────────────────────────────
 const initDB = async () => {
@@ -388,7 +576,8 @@ const initDB = async () => {
             console.log('✅ Admin ACLLP-01 created with default password.');
         }
     } catch (err) {
-        console.error('❌ Failed to sync database:', err);
+        console.error('Initial DB Sync Error:', err);
     }
 };
-module.exports = { sequelize, Company, Employee, Attendance, Production, Leave, Loan, SalarySlip, Expense, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, initDB };
+
+module.exports = { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, SalarySlip, Expense, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB };

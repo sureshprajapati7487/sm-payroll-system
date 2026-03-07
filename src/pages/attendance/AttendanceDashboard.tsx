@@ -26,9 +26,9 @@ import {
     UserPlus,
     ScanFace
 } from 'lucide-react';
-import { OFFICE_LOCATION, calculateDistance } from '@/utils/location';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
+import { apiFetch } from '@/lib/apiClient';
 
 // --- Helper Components ---
 
@@ -131,35 +131,48 @@ export const AttendanceDashboard = () => {
         setSelectedDate(date.toISOString().split('T')[0]);
     };
 
-    const verifyLocation = (): Promise<boolean> => {
-        return new Promise((resolve) => {
-            setLocationStatus('FETCHING');
+    const verifyLocation = async (): Promise<boolean> => {
+        setLocationStatus('FETCHING');
+        try {
             if (!navigator.geolocation) {
                 setLocationError("Geolocation not supported.");
                 setLocationStatus('ERROR');
-                resolve(false);
-                return;
+                return false;
             }
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const { latitude, longitude } = position.coords;
-                    const dist = calculateDistance(latitude, longitude, OFFICE_LOCATION.latitude, OFFICE_LOCATION.longitude);
-                    if (dist <= OFFICE_LOCATION.radius) {
-                        setLocationStatus('SUCCESS');
-                        resolve(true);
-                    } else {
-                        setLocationError(`You are ${Math.round(dist)}m away. Must be within ${OFFICE_LOCATION.radius}m.`);
-                        setLocationStatus('ERROR');
-                        resolve(false);
-                    }
-                },
-                () => {
-                    setLocationError("Unable to retrieve location.");
-                    setLocationStatus('ERROR');
-                    resolve(false);
-                }
-            );
-        });
+
+            const position = await new Promise<GeolocationPosition>((res, rej) => {
+                navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000 });
+            });
+
+            const { latitude, longitude } = position.coords;
+            const res = await apiFetch('/attendance/verify-location', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ companyId: user?.companyId, lat: latitude, lng: longitude }),
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setLocationError(data.message || 'Location verification failed');
+                setLocationStatus('ERROR');
+                return false;
+            }
+
+            const data = await res.json();
+            if (data.valid) {
+                setLocationStatus('SUCCESS');
+                return true;
+            } else {
+                setLocationError(data.message || `You are ${data.distance}m away. Must be within allowed zone.`);
+                setLocationStatus('ERROR');
+                return false;
+            }
+        } catch (err: any) {
+            console.error('Location error:', err);
+            setLocationError(err.message && err.message.includes('User denied') ? "Location access denied." : "Unable to verify location.");
+            setLocationStatus('ERROR');
+            return false;
+        }
     };
 
     const handleScanSuccess = async (imageSrc: string) => {

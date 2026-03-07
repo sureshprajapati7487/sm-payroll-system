@@ -3,7 +3,7 @@ import { useEmployeeStore } from '@/store/employeeStore';
 import { useLoanStore } from '@/store/loanStore';
 import { useAttendanceStore } from '@/store/attendanceStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
-import { useProductionStore } from '@/store/productionStore';
+
 import { useAuthStore } from '@/store/authStore';
 
 /**
@@ -35,7 +35,6 @@ export const useDataSync = (_intervalMs = 30000) => {
                     useLoanStore.getState().fetchLoans?.(),
                     useAttendanceStore.getState().fetchAttendance?.(),
                     fetchCompanies(),
-                    useProductionStore.getState().fetchProductionEntries?.(),
                 ]);
             } catch (error) {
                 console.error('[DataSync] Initial load failed:', error);

@@ -119,8 +119,12 @@ export const FaceKioskPage = () => {
     const activeEmployees = employees.filter(e => e.status === 'ACTIVE');
     const enrolledCount = activeEmployees.filter(e => biometricStore.isFaceRegistered(e.id)).length;
 
-    // ── Load models ───────────────────────────────────────────────────────────
-    useEffect(() => { loadModels(); }, []);
+    // ── Load models & sync biometrics ─────────────────────────────────────────
+    useEffect(() => {
+        loadModels().then((loaded) => {
+            if (loaded) biometricStore.syncAllFaces();
+        });
+    }, [loadModels]);
 
     // ── Camera ────────────────────────────────────────────────────────────────
     const startCamera = useCallback(async () => {
@@ -188,15 +192,14 @@ export const FaceKioskPage = () => {
     }, [stopAllLoops]);
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // LIVE DETECTION LOOP
+    // LIVE DETECTION LOOP (OFFLINE + LIVENESS)
     // ═══════════════════════════════════════════════════════════════════════════
     const startLiveLoop = useCallback(() => {
         if (!modelsLoaded) return;
-        const enrolled = activeEmployees
-            .map(e => ({ emp: e, desc: biometricStore.getFaceDescriptor(e.id) }))
-            .filter(x => x.desc !== null) as { emp: typeof activeEmployees[0]; desc: Float32Array }[];
-        if (enrolled.length === 0) { setScanMsg('Pehle employees ko enroll karo!'); return; }
         setLiveState('scanning'); setScanMsg('Camera ke samne aao...');
+
+        let recentBoxes: { x: number, y: number }[] = [];
+        const LIVENESS_FRAMES = 3;
 
         const loop = async () => {
             if (!videoRef.current || videoRef.current.readyState < 2) {
@@ -206,39 +209,87 @@ export const FaceKioskPage = () => {
             if (!result) { setScanMsg('Camera ke samne aao...'); liveLoopRef.current = setTimeout(loop, SCAN_INTERVAL_MS); return; }
             if (result.faceSize < 80) { setScanMsg('Thoda paas aao...'); liveLoopRef.current = setTimeout(loop, SCAN_INTERVAL_MS); return; }
 
-            let bestDist = Infinity, bestEmp: typeof activeEmployees[0] | null = null;
-            const THRESHOLD = 0.52;
-            for (const { emp, desc } of enrolled) {
-                let sum = 0;
-                for (let i = 0; i < desc.length; i++) sum += (desc[i] - result.descriptor[i]) ** 2;
-                const dist = Math.sqrt(sum);
-                if (dist < bestDist) { bestDist = dist; bestEmp = emp; }
+            // ── LIVENESS CHECK (Motion Variance) ──
+            const box = result.box || result;
+            recentBoxes.push({ x: box.x, y: box.y });
+            if (recentBoxes.length > LIVENESS_FRAMES) recentBoxes.shift();
+            if (recentBoxes.length === LIVENESS_FRAMES) {
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                recentBoxes.forEach(b => {
+                    if (b.x < minX) minX = b.x;
+                    if (b.x > maxX) maxX = b.x;
+                    if (b.y < minY) minY = b.y;
+                    if (b.y > maxY) maxY = b.y;
+                });
+                const dx = maxX - minX;
+                const dy = maxY - minY;
+
+                // Static photos usually have dx/dy < 1.0 depending on camera noise. Check for micro-movements.
+                if (dx <= 0.8 && dy <= 0.8) {
+                    setScanMsg('Anti-Spoof: Zara hiliye / Blink karein...');
+                    liveLoopRef.current = setTimeout(loop, 300);
+                    return;
+                }
+            } else {
+                setScanMsg('Liveness detect ho raha hai...');
+                liveLoopRef.current = setTimeout(loop, 300);
+                return;
             }
 
-            if (bestDist < THRESHOLD && bestEmp) {
-                const lastPunch = cooldowns.current[bestEmp.id] || 0;
-                if (Date.now() - lastPunch < COOLDOWN_MS) {
-                    setScanMsg(`${bestEmp.name} — please wait...`);
-                    liveLoopRef.current = setTimeout(loop, SCAN_INTERVAL_MS); return;
+            // ── OFFLINE 1:N MATCHING ──
+            try {
+                let bestMatchId: string | null = null;
+                let minDistance = Infinity;
+                const MATCH_THRESHOLD = 0.52; // Same as backend threshold
+
+                // Match against all cached descriptors
+                for (const emp of activeEmployees) {
+                    const storedDesc = biometricStore.getFaceDescriptor(emp.id);
+                    if (storedDesc && storedDesc.length === result.descriptor.length) {
+                        let sum = 0;
+                        for (let i = 0; i < storedDesc.length; i++) {
+                            sum += (result.descriptor[i] - storedDesc[i]) ** 2;
+                        }
+                        const dist = Math.sqrt(sum);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            bestMatchId = emp.id;
+                        }
+                    }
                 }
-                const rec = records.find(r => r.employeeId === bestEmp!.id && r.date === today);
-                const punchType: 'IN' | 'OUT' | 'DONE' = !rec?.checkIn ? 'IN' : !rec.checkOut ? 'OUT' : 'DONE';
-                const conf = Math.max(0, Math.round(((THRESHOLD - bestDist) / THRESHOLD) * 100));
 
-                stopAllLoops();
-                setLiveState('matched');
-                setMatchResult({ empId: bestEmp.id, confidence: conf, punchType });
+                if (bestMatchId && minDistance <= MATCH_THRESHOLD) {
+                    const bestEmp = activeEmployees.find(e => e.id === bestMatchId);
+                    if (!bestEmp) throw new Error('Matched employee not active');
 
-                // Brief 'matched' flash → go to 'confirm'
-                setTimeout(() => {
-                    setLiveState('confirm');
-                    setCountdown(CONFIRM_SECONDS);
-                    if (punchType === 'IN') speak(`${bestEmp!.name}, Punch In confirm karo.`);
-                    else if (punchType === 'OUT') speak(`${bestEmp!.name}, Punch Out confirm karo.`);
-                    else speak(`${bestEmp!.name}, aaj ka shift already complete hai.`);
-                }, 800);
-            } else {
-                setScanMsg('Face scan ho raha hai...');
+                    const lastPunch = cooldowns.current[bestEmp.id] || 0;
+                    if (Date.now() - lastPunch < COOLDOWN_MS) {
+                        setScanMsg(`${bestEmp.name} — please wait...`);
+                        liveLoopRef.current = setTimeout(loop, SCAN_INTERVAL_MS); return;
+                    }
+                    const rec = records.find(r => r.employeeId === bestEmp.id && r.date === today);
+                    const punchType: 'IN' | 'OUT' | 'DONE' = !rec?.checkIn ? 'IN' : !rec.checkOut ? 'OUT' : 'DONE';
+                    const conf = Math.max(0, Math.round(((MATCH_THRESHOLD - minDistance) / MATCH_THRESHOLD) * 100));
+
+                    stopAllLoops();
+                    setLiveState('matched');
+                    setMatchResult({ empId: bestEmp.id, confidence: conf, punchType });
+
+                    // Brief 'matched' flash → go to 'confirm'
+                    setTimeout(() => {
+                        setLiveState('confirm');
+                        setCountdown(CONFIRM_SECONDS);
+                        if (punchType === 'IN') speak(`${bestEmp.name}, Punch In confirm karo.`);
+                        else if (punchType === 'OUT') speak(`${bestEmp.name}, Punch Out confirm karo.`);
+                        else speak(`${bestEmp.name}, aaj ka shift already complete hai.`);
+                    }, 800);
+                } else {
+                    setScanMsg('Face scan ho raha hai... (Not Matched)');
+                    liveLoopRef.current = setTimeout(loop, SCAN_INTERVAL_MS);
+                }
+            } catch (err) {
+                console.error("Match error:", err);
+                setScanMsg('Match error! Retrying...');
                 liveLoopRef.current = setTimeout(loop, SCAN_INTERVAL_MS);
             }
         };

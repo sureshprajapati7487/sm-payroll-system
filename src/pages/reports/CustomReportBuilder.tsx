@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { FileBarChart, Save, Download, GripVertical, Eye, EyeOff } from 'lucide-react';
 import { useCustomReportStore, ReportColumn } from '@/store/customReportStore';
-import { useEmployeeStore } from '@/store/employeeStore';
+import { apiJson, apiFetch } from '@/lib/apiClient';
 import { useDialog } from '@/components/DialogProvider';
 
 export const CustomReportBuilder = () => {
     const { availableColumns, saveTemplate, templates } = useCustomReportStore();
-    const { employees } = useEmployeeStore();
     const { toast } = useDialog();
 
     // State for builder
@@ -14,6 +13,8 @@ export const CustomReportBuilder = () => {
     const [selectedColumns, setSelectedColumns] = useState<ReportColumn[]>(availableColumns);
     const [activeTab, setActiveTab] = useState<'build' | 'preview'>('build');
     const [previewData, setPreviewData] = useState<any[]>([]);
+
+    const [isExporting, setIsExporting] = useState(false);
 
     const toggleColumn = (id: string) => {
         setSelectedColumns(cols => cols.map(c =>
@@ -35,27 +36,93 @@ export const CustomReportBuilder = () => {
         setReportName('');
     };
 
-    const generatePreview = () => {
-        // Mock data merging logic - in production, this would join actual data tables
+    const generatePreview = async () => {
         const visibleCols = selectedColumns.filter(c => c.visible);
-
-        const data = employees.slice(0, 5).map(emp => {
-            const row: Record<string, any> = {};
-            visibleCols.forEach(col => {
-                // Determine source based on category (simplified mock logic)
-                if (col.category === 'employee') {
-                    row[col.label] = (emp as any)[col.field] || '-';
-                } else if (col.category === 'payroll') {
-                    row[col.label] = col.field === 'basicSalary' ? `₹${(emp as any).salary?.toLocaleString() || '0'}` : '₹0';
-                } else {
-                    row[col.label] = '-';
-                }
+        try {
+            const res = await apiJson<{ data: string[][] }>('POST', '/reports/generate', {
+                columns: visibleCols,
+                format: 'preview'
             });
-            return row;
-        });
 
-        setPreviewData(data);
-        setActiveTab('preview');
+            if (res.data && res.data.length > 0) {
+                const headers = res.data[0];
+                const rows = res.data.slice(1).map(rowArray => {
+                    const rowObj: Record<string, string> = {};
+                    headers.forEach((h, i) => rowObj[h] = rowArray[i]);
+                    return rowObj;
+                });
+                setPreviewData(rows);
+            } else {
+                setPreviewData([]);
+            }
+            setActiveTab('preview');
+        } catch (error) {
+            toast('Failed to generate preview from server', 'error');
+        }
+    };
+
+    const pollJobStatus = async (jobId: string) => {
+        const pollInterval = setInterval(async () => {
+            try {
+                const res = await apiFetch(`/reports/jobs/${jobId}`);
+                if (res.ok) {
+                    const job = await res.json();
+                    if (job.status === 'COMPLETED') {
+                        clearInterval(pollInterval);
+                        setIsExporting(false);
+
+                        // Download the actual file via authenticated fetch
+                        const fileRes = await apiFetch(job.downloadUrl);
+                        const blob = await fileRes.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${reportName || 'Custom_Report'}_${new Date().toISOString().split('T')[0]}.csv`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+
+                        toast('Report downloaded successfully!', 'success');
+                    } else if (job.status === 'FAILED') {
+                        clearInterval(pollInterval);
+                        setIsExporting(false);
+                        toast(`Report generation failed: ${job.error || 'Unknown error'}`, 'error');
+                    }
+                }
+            } catch (e) {
+                clearInterval(pollInterval);
+                setIsExporting(false);
+                toast('Network error while checking report status', 'error');
+            }
+        }, 2000);
+    };
+
+    const exportToCSV = async () => {
+        const visibleCols = selectedColumns.filter(c => c.visible);
+        setIsExporting(true);
+        try {
+            const response = await apiFetch('/reports/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    columns: visibleCols,
+                    format: 'csv'
+                })
+            });
+
+            if (!response.ok) throw new Error('Export failed');
+
+            const data = await response.json();
+            if (data.jobId) {
+                toast('Report generation started in background...', 'success');
+                pollJobStatus(data.jobId);
+            } else {
+                setIsExporting(false);
+                toast('Failed to start report generation', 'error');
+            }
+        } catch (error) {
+            setIsExporting(false);
+            toast('Failed to request report', 'error');
+        }
     };
 
     return (
@@ -186,9 +253,13 @@ export const CustomReportBuilder = () => {
                 <div className="glass rounded-2xl overflow-hidden animate-slide-up">
                     <div className="p-6 border-b border-dark-border flex items-center justify-between">
                         <h3 className="text-lg font-semibold text-white">Report Preview (First 5 Rows)</h3>
-                        <button className="flex items-center gap-2 bg-primary-500/20 text-primary-400 px-4 py-2 rounded-lg hover:bg-primary-500/30 transition-all">
+                        <button
+                            onClick={exportToCSV}
+                            disabled={isExporting}
+                            className="flex items-center gap-2 bg-primary-500/20 text-primary-400 px-4 py-2 rounded-lg hover:bg-primary-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
                             <Download className="w-4 h-4" />
-                            Export Data
+                            {isExporting ? 'Generating...' : 'Export Data'}
                         </button>
                     </div>
 

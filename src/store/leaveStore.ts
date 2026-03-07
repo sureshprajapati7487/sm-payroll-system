@@ -73,7 +73,7 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
         }
     },
 
-    // ── Approve → PUT /api/leaves/:id ────────────────────────────────────────
+    // ── Approve → PATCH /api/leaves/:id/approve ──────────────────────────────
     approveLeave: async (id) => {
         // Optimistic update
         set(state => ({
@@ -83,10 +83,8 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
         }));
 
         try {
-            await apiFetch(`/leaves/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: LeaveStatus.APPROVED }),
+            await apiFetch(`/leaves/${id}/approve`, {
+                method: 'PATCH',
             });
         } catch (e) {
             console.error('[LeaveStore] approveLeave failed:', e);
@@ -99,7 +97,7 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
         }
     },
 
-    // ── Reject → PUT /api/leaves/:id ─────────────────────────────────────────
+    // ── Reject → PATCH /api/leaves/:id/reject ───────────────────────────────
     rejectLeave: async (id) => {
         // Optimistic update
         set(state => ({
@@ -109,10 +107,8 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
         }));
 
         try {
-            await apiFetch(`/leaves/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: LeaveStatus.REJECTED }),
+            await apiFetch(`/leaves/${id}/reject`, {
+                method: 'PATCH',
             });
         } catch (e) {
             console.error('[LeaveStore] rejectLeave failed:', e);

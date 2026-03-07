@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Zap, X, IndianRupee } from 'lucide-react';
 import { useLoanStore } from '@/store/loanStore';
 import { useDialog } from '@/components/DialogProvider';
+import { useAuthStore } from '@/store/authStore';
 
 interface EarlySettlementModalProps {
     loanId: string;
@@ -9,15 +10,16 @@ interface EarlySettlementModalProps {
 }
 
 export const EarlySettlementModal = ({ loanId, onClose }: EarlySettlementModalProps) => {
-    const { requestEarlySettlement, approveSettlement, processSettlement, loans } = useLoanStore();
+    const { requestEarlySettlement, approveSettlement, rejectSettlement, processSettlement, loans } = useLoanStore();
     const [discount, setDiscount] = useState(0);
     const { toast } = useDialog();
+    const { user } = useAuthStore();
 
     const loan = loans.find(l => l.id === loanId);
     if (!loan) return null;
 
     const hasRequest = loan.settlementRequest;
-    const isAdmin = true; // TODO: Get from auth store
+    const isAdmin = ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN'].includes(user?.role || '');
 
     const handleRequestSettlement = () => {
         requestEarlySettlement(loanId);
@@ -31,6 +33,11 @@ export const EarlySettlementModal = ({ loanId, onClose }: EarlySettlementModalPr
         }
         approveSettlement(loanId, discount);
         toast('Settlement approved! Employee pay kar sakta hai.', 'success');
+    };
+
+    const handleReject = () => {
+        rejectSettlement(loanId);
+        toast('Settlement request rejected.', 'error');
     };
 
     const handleProcessPayment = () => {
@@ -122,7 +129,7 @@ export const EarlySettlementModal = ({ loanId, onClose }: EarlySettlementModalPr
 
                         <div className="flex gap-3">
                             <button
-                                onClick={() => { }}
+                                onClick={handleReject}
                                 className="flex-1 bg-dark-surface hover:bg-white/5 text-white px-4 py-3 rounded-xl font-medium transition-all border border-dark-border"
                             >
                                 Reject

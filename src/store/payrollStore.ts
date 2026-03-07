@@ -1,12 +1,9 @@
 import { create } from 'zustand';
-import { SalarySlip, PayrollStatus } from '@/types';
-import { calculateSalary } from '@/utils/salaryCalculator';
+import { SalarySlip } from '@/types';
 import { useEmployeeStore } from './employeeStore';
-import { useAttendanceStore } from './attendanceStore';
-import { useProductionStore } from './productionStore';
 import { useLoanStore } from './loanStore';
-import { useHolidayStore } from './holidayStore';
 import { useAdvanceSalaryStore } from './advanceSalaryStore';
+import { useMultiCompanyStore } from './multiCompanyStore';
 import { apiFetch } from '@/lib/apiClient';
 import { audit } from '@/lib/auditLogger';
 
@@ -19,8 +16,9 @@ interface PayrollState {
     // Actions
     fetchPayroll: (month?: string) => Promise<void>;
     generateMonthlyPayroll: (month: string, generatedBy?: string) => Promise<void>;
-    markAsPaid: (slipId: string) => Promise<void>;
+    advanceState: (slipId: string, action: 'simulate' | 'approve' | 'lock') => Promise<void>;
     getSlipsByMonth: (month: string) => SalarySlip[];
+    markAsPaid: (slipId: string) => Promise<void>;
 }
 
 export const usePayrollStore = create<PayrollState>((set, get) => ({
@@ -59,114 +57,92 @@ export const usePayrollStore = create<PayrollState>((set, get) => ({
     },
 
     // ── Generate Monthly Payroll + Save to Server ──────────────────────────────
+    // ── Generate Monthly Payroll + Save to Server ──────────────────────────────
     generateMonthlyPayroll: async (month, generatedBy) => {
         set({ isSaving: true });
 
         try {
-            // Fetch raw data from other stores
-            const employees = useEmployeeStore.getState()._rawEmployees
-                .filter(e => e.status === 'ACTIVE');
-            const attendance = useAttendanceStore.getState().records;
-            const production = useProductionStore.getState().entries;
-            const loans = useLoanStore.getState()._rawLoans;
-            const holidays = useHolidayStore.getState().getHolidaysForMonth(month);
-
-            const newSlips: SalarySlip[] = employees.map(emp => {
-                const empLoans = loans.filter(l => l.employeeId === emp.id && l.status === 'ACTIVE');
-
-                // ── Advance salary monthly deduction for this employee ──────────
-                const advanceMonthlyDeduction = useAdvanceSalaryStore.getState().getEmployeeBalance(emp.id) > 0
-                    ? useAdvanceSalaryStore.getState().requests
-                        .filter(r => r.employeeId === emp.id && r.status === 'approved' && r.remainingBalance > 0)
-                        .reduce((sum, r) => sum + Math.min(r.monthlyDeduction, r.remainingBalance), 0)
-                    : 0;
-
-                const slip = calculateSalary(
-                    emp,
-                    month,
-                    attendance.filter(r => r.employeeId === emp.id),
-                    production.filter(p => p.employeeId === emp.id),
-                    empLoans,
-                    holidays,
-                    advanceMonthlyDeduction  // ← pass advance deduction
-                );
-                return { ...slip, generatedBy: generatedBy || 'System' };
+            const companyId = useMultiCompanyStore.getState().currentCompanyId;
+            const res = await apiFetch(`/payroll/run`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ companyId, month, generatedBy: generatedBy || 'System' }),
             });
 
-            // 1. Update local state immediately
-            const filteredSlips = get().slips.filter(s => s.month !== month);
-            set(state => ({
-                slips: [...filteredSlips, ...newSlips],
-                monthsGenerated: Array.from(new Set([...state.monthsGenerated, month]))
-            }));
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.why || errData.error || 'Failed to generate payroll');
+            }
 
-            // 2. Save all slips to server (upsert — server uses SalarySlip.upsert)
-            const savePromises = newSlips.map(slip =>
-                apiFetch(`/payroll`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(slip),
-                }).catch(err => console.error(`Failed to save slip for ${slip.employeeId}:`, err))
-            );
-
-            await Promise.allSettled(savePromises);
+            // Immediately re-fetch the month's slips
+            await get().fetchPayroll(month);
 
             // Audit payroll generation
+            const slipsCount = get().slips.filter(s => s.month === month).length;
+            const totalNetPay = get().slips.filter(s => s.month === month).reduce((s, sl) => s + sl.netSalary, 0);
+
             audit({
                 action: 'GENERATE_PAYROLL',
                 entityType: 'PAYROLL',
-                details: { month, employeeCount: newSlips.length, totalNetPay: newSlips.reduce((s, sl) => s + sl.netSalary, 0) },
+                details: { month, employeeCount: slipsCount, totalNetPay },
                 status: 'SUCCESS',
             });
 
         } catch (err) {
             console.error('Failed to generate payroll:', err);
+            throw err;
         } finally {
             set({ isSaving: false });
         }
     },
 
-    // ── Mark Slip as Paid + Update on Server ──────────────────────────────────
-    markAsPaid: async (slipId) => {
+    // ── Advance Slip State (State Machine) ────────────────────────────────────
+    advanceState: async (slipId: string, action: 'simulate' | 'approve' | 'lock') => {
         const targetSlip = get().slips.find(s => s.id === slipId);
-        if (!targetSlip || targetSlip.status === PayrollStatus.PAID) return;
+        if (!targetSlip || targetSlip.status === 'LOCKED') return;
 
-        // 1. AUTO-DEDUCT LOAN EMIs
-        const empLoans = useLoanStore.getState()._rawLoans.filter(
-            l => l.employeeId === targetSlip.employeeId && l.status === 'ACTIVE'
-        );
+        let nextStatus: 'DRAFT' | 'SIMULATION' | 'FINAL_APPROVED' | 'LOCKED' | 'PAID' | 'GENERATED';
+        if (action === 'simulate') nextStatus = 'SIMULATION';
+        else if (action === 'approve') nextStatus = 'FINAL_APPROVED';
+        else nextStatus = 'LOCKED';
 
-        let remainingDeduction = targetSlip.loanDeduction;
-        if (remainingDeduction > 0) {
-            empLoans.forEach(loan => {
-                if (remainingDeduction <= 0) return;
-                const customDeduction = Math.min(loan.emiAmount, loan.balance, remainingDeduction);
-                if (customDeduction > 0) {
-                    useLoanStore.getState().payEMI(loan.id, customDeduction);
-                    remainingDeduction -= customDeduction;
-                }
-            });
+        // Auto deduct loans only on LOCK
+        if (action === 'lock') {
+            const empLoans = useLoanStore.getState()._rawLoans.filter(
+                l => l.employeeId === targetSlip.employeeId && l.status === 'ACTIVE'
+            );
+
+            let remainingDeduction = targetSlip.loanDeduction;
+            if (remainingDeduction > 0) {
+                empLoans.forEach(loan => {
+                    if (remainingDeduction <= 0) return;
+                    const customDeduction = Math.min(loan.emiAmount, loan.balance, remainingDeduction);
+                    if (customDeduction > 0) {
+                        useLoanStore.getState().payEMI(loan.id, customDeduction);
+                        remainingDeduction -= customDeduction;
+                    }
+                });
+            }
+
+            if ((targetSlip.advanceDeduction ?? 0) > 0) {
+                useAdvanceSalaryStore.getState().processMonthlyDeduction(targetSlip.employeeId);
+            }
         }
 
-        // 2. AUTO-DEDUCT ADVANCE SALARY EMIs
-        if ((targetSlip.advanceDeduction ?? 0) > 0) {
-            useAdvanceSalaryStore.getState().processMonthlyDeduction(targetSlip.employeeId);
-        }
-
-        // 2. Optimistic local update
+        // Optimistic update
+        const prevStatus = targetSlip.status;
         set(state => ({
             slips: state.slips.map(s =>
-                s.id === slipId ? { ...s, status: PayrollStatus.PAID } : s
+                s.id === slipId ? { ...s, status: nextStatus } : s
             )
         }));
 
-        // 3. Update status on server
         try {
-            await apiFetch(`/payroll/${slipId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: PayrollStatus.PAID }),
+            const res = await apiFetch(`/payroll/${slipId}/${action}`, {
+                method: 'PATCH',
             });
+            if (!res.ok) throw new Error('Failed to update state');
+
             // Audit
             const slipEmp = useEmployeeStore.getState()._rawEmployees.find(e => e.id === targetSlip.employeeId);
             audit({
@@ -174,15 +150,15 @@ export const usePayrollStore = create<PayrollState>((set, get) => ({
                 entityType: 'PAYROLL',
                 entityId: slipId,
                 entityName: slipEmp?.name ?? targetSlip.employeeId,
-                details: { month: targetSlip.month, netSalary: targetSlip.netSalary, action: 'MARK_PAID' },
+                details: { month: targetSlip.month, netSalary: targetSlip.netSalary, action: action.toUpperCase() },
                 status: 'SUCCESS',
             });
         } catch (err) {
-            console.error('Failed to update payroll status on server:', err);
-            // Revert on failure
+            console.error('Failed to advance payroll state:', err);
+            // Revert
             set(state => ({
                 slips: state.slips.map(s =>
-                    s.id === slipId ? { ...s, status: PayrollStatus.GENERATED } : s
+                    s.id === slipId ? { ...s, status: prevStatus } : s
                 )
             }));
         }
@@ -191,5 +167,30 @@ export const usePayrollStore = create<PayrollState>((set, get) => ({
     // ── Get Slips by Month ─────────────────────────────────────────────────────
     getSlipsByMonth: (month) => {
         return get().slips.filter(s => s.month === month);
+    },
+
+    // ── Pay Salary ─────────────────────────────────────────────────────────────
+    markAsPaid: async (slipId) => {
+        const targetSlip = get().slips.find(s => s.id === slipId);
+        if (!targetSlip || targetSlip.status !== 'LOCKED') return; // Can only pay locked slips
+
+        const prevStatus = targetSlip.status;
+        set(state => ({
+            slips: state.slips.map(s =>
+                s.id === slipId ? { ...s, status: 'PAID' } : s
+            )
+        }));
+
+        try {
+            const res = await apiFetch(`/payroll/${slipId}/paid`, { method: 'PATCH' });
+            if (!res.ok) throw new Error('Failed to mark payroll as paid');
+        } catch (err) {
+            console.error('Failed to mark as paid:', err);
+            set(state => ({
+                slips: state.slips.map(s =>
+                    s.id === slipId ? { ...s, status: prevStatus } : s
+                )
+            }));
+        }
     },
 }));

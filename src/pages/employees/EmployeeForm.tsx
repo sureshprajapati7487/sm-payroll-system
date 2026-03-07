@@ -9,6 +9,8 @@ import { Employee, EmployeeStatus, Roles, SalaryType, ShiftType, StatutoryConfig
 import { ArrowLeft, Save, User, Briefcase, CreditCard, Upload, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { PasswordStrengthInput, isPasswordValid } from '@/components/ui/PasswordStrengthInput';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { useAuthStore } from '@/store/authStore';
+import { PERMISSIONS } from '@/config/permissions';
 
 const DEFAULT_STATUTORY: StatutoryConfig = {
     pfApplicable: true,
@@ -118,6 +120,7 @@ export const EmployeeForm = () => {
     const { shifts } = useShiftStore();
     const { currentCompanyId } = useMultiCompanyStore();
     const { groups: workGroups, assignments: workAssignments, assignEmployee, unassignEmployee } = useWorkGroupStore();
+    const { hasPermission } = useAuthStore();
     const isEditMode = !!id;
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
@@ -238,6 +241,7 @@ export const EmployeeForm = () => {
 
     const sc = formData.statutoryConfig!;
 
+    const canManageFinancials = hasPermission(PERMISSIONS.VIEW_SALARY);
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 pb-20">
@@ -388,312 +392,326 @@ export const EmployeeForm = () => {
                     </div>
                 </AccordionSection>
 
-                {/* 3. Financial & Bank Details */}
-                <AccordionSection icon={<CreditCard className="w-5 h-5 text-success" />} title="Financial & Bank Details">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-1">
-                            <label className="text-xs text-dark-muted uppercase">Salary Type</label>
-                            <select value={formData.salaryType} onChange={e => handleChange('salaryType', e.target.value)} className={inputCls}>
-                                <option value={SalaryType.MONTHLY}>Monthly Fixed</option>
-                                <option value={SalaryType.DAILY}>Daily Wage</option>
-                                <option value={SalaryType.HOURLY}>Hourly Basis</option>
-                                <option value={SalaryType.PRODUCTION}>Production / Quantity Basis</option>
-                            </select>
-                        </div>
-                        <div className="space-y-1">
-                            <InfoTip
-                                id="basicSalary"
-                                label={formData.salaryType === SalaryType.MONTHLY ? 'Monthly Salary' :
-                                    formData.salaryType === SalaryType.DAILY ? 'Daily Rate' :
-                                        formData.salaryType === SalaryType.PRODUCTION ? 'Min. Guarantee (Optional)' : 'Hourly Rate'}
-                            />
-                            <input type="number" value={formData.basicSalary}
-                                onChange={e => handleChange('basicSalary', Number(e.target.value))} className={inputCls} />
-                        </div>
-                        <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-dark-border/50">
-                            <div className="space-y-1">
-                                <label className="text-xs text-dark-muted uppercase">Bank Name</label>
-                                <input type="text" value={formData.bankDetails?.bankName} onChange={e => handleBankChange('bankName', e.target.value)}
-                                    className={inputCls} placeholder="e.g. HDFC Bank" />
-                            </div>
-                            <div className="space-y-1">
-                                <InfoTip id="bankAccountNo" label="Account Number" />
-                                <input type="text" value={formData.bankDetails?.accountNumber} onChange={e => handleBankChange('accountNumber', e.target.value)} className={inputCls} />
-                            </div>
-                            <div className="space-y-1">
-                                <InfoTip id="ifscCode" label="IFSC Code" />
-                                <input type="text" value={formData.bankDetails?.ifscCode} onChange={e => handleBankChange('ifscCode', e.target.value)} className={inputCls} />
-                            </div>
-                        </div>
-                        {/* KYC */}
-                        <div className="col-span-1 md:col-span-2 pt-4 border-t border-dark-border/50">
-                            <h3 className="text-sm font-bold text-white mb-4">KYC & Identity Documents</h3>
+                {canManageFinancials ? (
+                    <>
+                        {/* 3. Financial & Bank Details */}
+                        <AccordionSection icon={<CreditCard className="w-5 h-5 text-success" />} title="Financial & Bank Details">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs text-dark-muted uppercase">Salary Type</label>
+                                    <select value={formData.salaryType} onChange={e => handleChange('salaryType', e.target.value)} className={inputCls}>
+                                        <option value={SalaryType.MONTHLY}>Monthly Fixed</option>
+                                        <option value={SalaryType.DAILY}>Daily Wage</option>
+                                        <option value={SalaryType.HOURLY}>Hourly Basis</option>
+                                        <option value={SalaryType.PRODUCTION}>Production / Quantity Basis</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <InfoTip
+                                        id="basicSalary"
+                                        label={formData.salaryType === SalaryType.MONTHLY ? 'Monthly Salary' :
+                                            formData.salaryType === SalaryType.DAILY ? 'Daily Rate' :
+                                                formData.salaryType === SalaryType.PRODUCTION ? 'Min. Guarantee (Optional)' : 'Hourly Rate'}
+                                    />
+                                    <input type="number" value={formData.basicSalary}
+                                        onChange={e => handleChange('basicSalary', Number(e.target.value))} className={inputCls} />
+                                </div>
+                                <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-dark-border/50">
                                     <div className="space-y-1">
-                                        <label className="text-xs text-dark-muted uppercase">PAN Card Number</label>
-                                        <input type="text" value={formData.bankDetails?.panCard} onChange={e => handleBankChange('panCard', e.target.value)}
-                                            className={inputCls + ' uppercase'} placeholder="ABCDE1234F" maxLength={10} />
+                                        <label className="text-xs text-dark-muted uppercase">Bank Name</label>
+                                        <input type="text" value={formData.bankDetails?.bankName} onChange={e => handleBankChange('bankName', e.target.value)}
+                                            className={inputCls} placeholder="e.g. HDFC Bank" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-xs text-dark-muted uppercase">Upload PAN Photo</label>
-                                        <div className="border border-dashed border-dark-border rounded-lg p-4 text-center hover:bg-white/5 transition-colors relative">
-                                            <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleFileChange(e, 'panUrl')} />
-                                            {formData.documents?.panUrl ? (
-                                                <div className="relative h-32 w-full">
-                                                    <img src={formData.documents.panUrl} alt="PAN" className="h-full w-full object-contain mb-2" />
-                                                    <p className="text-xs text-success">✓ Uploaded</p>
+                                        <InfoTip id="bankAccountNo" label="Account Number" />
+                                        <input type="text" value={formData.bankDetails?.accountNumber} onChange={e => handleBankChange('accountNumber', e.target.value)} className={inputCls} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <InfoTip id="ifscCode" label="IFSC Code" />
+                                        <input type="text" value={formData.bankDetails?.ifscCode} onChange={e => handleBankChange('ifscCode', e.target.value)} className={inputCls} />
+                                    </div>
+                                </div>
+                                {/* KYC */}
+                                <div className="col-span-1 md:col-span-2 pt-4 border-t border-dark-border/50">
+                                    <h3 className="text-sm font-bold text-white mb-4">KYC & Identity Documents</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-4">
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-dark-muted uppercase">PAN Card Number</label>
+                                                <input type="text" value={formData.bankDetails?.panCard} onChange={e => handleBankChange('panCard', e.target.value)}
+                                                    className={inputCls + ' uppercase'} placeholder="ABCDE1234F" maxLength={10} />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-dark-muted uppercase">Upload PAN Photo</label>
+                                                <div className="border border-dashed border-dark-border rounded-lg p-4 text-center hover:bg-white/5 transition-colors relative">
+                                                    <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleFileChange(e, 'panUrl')} />
+                                                    {formData.documents?.panUrl ? (
+                                                        <div className="relative h-32 w-full">
+                                                            <img src={formData.documents.panUrl} alt="PAN" className="h-full w-full object-contain mb-2" />
+                                                            <p className="text-xs text-success">✓ Uploaded</p>
+                                                        </div>
+                                                    ) : (<div className="flex flex-col items-center gap-2 py-4"><Upload className="w-8 h-8 text-dark-muted" /><p className="text-xs text-dark-muted">Upload PAN</p></div>)}
                                                 </div>
-                                            ) : (<div className="flex flex-col items-center gap-2 py-4"><Upload className="w-8 h-8 text-dark-muted" /><p className="text-xs text-dark-muted">Upload PAN</p></div>)}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-dark-muted uppercase">Aadhar Number</label>
+                                                <input type="text" value={formData.bankDetails?.aadharNumber} onChange={e => handleBankChange('aadharNumber', e.target.value)}
+                                                    className={inputCls} placeholder="1234 5678 9012" maxLength={12} />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-dark-muted uppercase">Upload Aadhar Photo</label>
+                                                <div className="border border-dashed border-dark-border rounded-lg p-4 text-center hover:bg-white/5 transition-colors relative">
+                                                    <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleFileChange(e, 'aadharUrl')} />
+                                                    {formData.documents?.aadharUrl ? (
+                                                        <div className="relative h-32 w-full">
+                                                            <img src={formData.documents.aadharUrl} alt="Aadhar" className="h-full w-full object-contain mb-2" />
+                                                            <p className="text-xs text-success">✓ Uploaded</p>
+                                                        </div>
+                                                    ) : (<div className="flex flex-col items-center gap-2 py-4"><Upload className="w-8 h-8 text-dark-muted" /><p className="text-xs text-dark-muted">Upload Aadhar</p></div>)}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="space-y-4">
+                            </div>
+                        </AccordionSection>
+
+                        {/* 4. Relative / Emergency Contact */}
+                        <AccordionSection icon={<span className="text-xl">👨‍👩‍👧</span>} title="Relative / Emergency Contact">
+
+                            {/* Basic Info */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                                <div className="space-y-1">
+                                    <label className="text-xs text-dark-muted uppercase">Relative Name</label>
+                                    <input type="text" value={formData.relativeInfo?.name || ''}
+                                        onChange={e => handleRelativeChange('name', e.target.value)}
+                                        className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
+                                        placeholder="e.g. Ramesh Kumar" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-dark-muted uppercase">Relation</label>
+                                    <select value={formData.relativeInfo?.relation || ''}
+                                        onChange={e => handleRelativeChange('relation', e.target.value)}
+                                        className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none">
+                                        <option value="">Select Relation</option>
+                                        {['Father', 'Mother', 'Spouse', 'Son', 'Daughter', 'Brother', 'Sister', 'Uncle', 'Aunt', 'Friend', 'Other'].map(r => (
+                                            <option key={r} value={r}>{r}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-dark-muted uppercase">Phone Number</label>
+                                    <input type="tel" value={formData.relativeInfo?.phone || ''}
+                                        onChange={e => handleRelativeChange('phone', e.target.value)}
+                                        className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
+                                        placeholder="+91 98765 43210" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-dark-muted uppercase">Date of Birth</label>
+                                    <input type="date" value={formData.relativeInfo?.dateOfBirth || ''}
+                                        onChange={e => handleRelativeChange('dateOfBirth', e.target.value)}
+                                        className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs text-dark-muted uppercase">Occupation</label>
+                                    <input type="text" value={formData.relativeInfo?.occupation || ''}
+                                        onChange={e => handleRelativeChange('occupation', e.target.value)}
+                                        className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
+                                        placeholder="e.g. Farmer, Business" />
+                                </div>
+                                <div className="space-y-1 md:col-span-1">
+                                    <label className="text-xs text-dark-muted uppercase">Address</label>
+                                    <input type="text" value={formData.relativeInfo?.address || ''}
+                                        onChange={e => handleRelativeChange('address', e.target.value)}
+                                        className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
+                                        placeholder="Village / City, State" />
+                                </div>
+                            </div>
+
+                            {/* KYC & Documents */}
+                            <div className="border-t border-dark-border/50 pt-6">
+                                <h3 className="text-sm font-bold text-white mb-4">📄 KYC Documents of Relative</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                     <div className="space-y-1">
                                         <label className="text-xs text-dark-muted uppercase">Aadhar Number</label>
-                                        <input type="text" value={formData.bankDetails?.aadharNumber} onChange={e => handleBankChange('aadharNumber', e.target.value)}
-                                            className={inputCls} placeholder="1234 5678 9012" maxLength={12} />
+                                        <input type="text" value={formData.relativeInfo?.aadharNumber || ''}
+                                            onChange={e => handleRelativeChange('aadharNumber', e.target.value)}
+                                            className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
+                                            placeholder="1234 5678 9012" maxLength={12} />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-xs text-dark-muted uppercase">Upload Aadhar Photo</label>
-                                        <div className="border border-dashed border-dark-border rounded-lg p-4 text-center hover:bg-white/5 transition-colors relative">
-                                            <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleFileChange(e, 'aadharUrl')} />
-                                            {formData.documents?.aadharUrl ? (
-                                                <div className="relative h-32 w-full">
-                                                    <img src={formData.documents.aadharUrl} alt="Aadhar" className="h-full w-full object-contain mb-2" />
-                                                    <p className="text-xs text-success">✓ Uploaded</p>
-                                                </div>
-                                            ) : (<div className="flex flex-col items-center gap-2 py-4"><Upload className="w-8 h-8 text-dark-muted" /><p className="text-xs text-dark-muted">Upload Aadhar</p></div>)}
-                                        </div>
+                                        <label className="text-xs text-dark-muted uppercase">PAN Number</label>
+                                        <input type="text" value={formData.relativeInfo?.panNumber || ''}
+                                            onChange={e => handleRelativeChange('panNumber', e.target.value.toUpperCase())}
+                                            className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none uppercase"
+                                            placeholder="ABCDE1234F" maxLength={10} />
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </AccordionSection>
 
-                {/* 4. Relative / Emergency Contact */}
-                <AccordionSection icon={<span className="text-xl">👨‍👩‍👧</span>} title="Relative / Emergency Contact">
-
-                    {/* Basic Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div className="space-y-1">
-                            <label className="text-xs text-dark-muted uppercase">Relative Name</label>
-                            <input type="text" value={formData.relativeInfo?.name || ''}
-                                onChange={e => handleRelativeChange('name', e.target.value)}
-                                className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
-                                placeholder="e.g. Ramesh Kumar" />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs text-dark-muted uppercase">Relation</label>
-                            <select value={formData.relativeInfo?.relation || ''}
-                                onChange={e => handleRelativeChange('relation', e.target.value)}
-                                className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none">
-                                <option value="">Select Relation</option>
-                                {['Father', 'Mother', 'Spouse', 'Son', 'Daughter', 'Brother', 'Sister', 'Uncle', 'Aunt', 'Friend', 'Other'].map(r => (
-                                    <option key={r} value={r}>{r}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs text-dark-muted uppercase">Phone Number</label>
-                            <input type="tel" value={formData.relativeInfo?.phone || ''}
-                                onChange={e => handleRelativeChange('phone', e.target.value)}
-                                className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
-                                placeholder="+91 98765 43210" />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs text-dark-muted uppercase">Date of Birth</label>
-                            <input type="date" value={formData.relativeInfo?.dateOfBirth || ''}
-                                onChange={e => handleRelativeChange('dateOfBirth', e.target.value)}
-                                className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none" />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs text-dark-muted uppercase">Occupation</label>
-                            <input type="text" value={formData.relativeInfo?.occupation || ''}
-                                onChange={e => handleRelativeChange('occupation', e.target.value)}
-                                className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
-                                placeholder="e.g. Farmer, Business" />
-                        </div>
-                        <div className="space-y-1 md:col-span-1">
-                            <label className="text-xs text-dark-muted uppercase">Address</label>
-                            <input type="text" value={formData.relativeInfo?.address || ''}
-                                onChange={e => handleRelativeChange('address', e.target.value)}
-                                className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
-                                placeholder="Village / City, State" />
-                        </div>
-                    </div>
-
-                    {/* KYC & Documents */}
-                    <div className="border-t border-dark-border/50 pt-6">
-                        <h3 className="text-sm font-bold text-white mb-4">📄 KYC Documents of Relative</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                            <div className="space-y-1">
-                                <label className="text-xs text-dark-muted uppercase">Aadhar Number</label>
-                                <input type="text" value={formData.relativeInfo?.aadharNumber || ''}
-                                    onChange={e => handleRelativeChange('aadharNumber', e.target.value)}
-                                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
-                                    placeholder="1234 5678 9012" maxLength={12} />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-xs text-dark-muted uppercase">PAN Number</label>
-                                <input type="text" value={formData.relativeInfo?.panNumber || ''}
-                                    onChange={e => handleRelativeChange('panNumber', e.target.value.toUpperCase())}
-                                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none uppercase"
-                                    placeholder="ABCDE1234F" maxLength={10} />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* Photo Upload */}
-                            {([
-                                { key: 'photoUrl', label: '🧑 Relative Photo', hint: 'Passport-size photo' },
-                                { key: 'aadharUrl', label: '🪪 Aadhar Card', hint: 'Front side of Aadhar' },
-                                { key: 'panUrl', label: '💳 PAN Card', hint: 'Front side of PAN' },
-                            ] as { key: 'photoUrl' | 'aadharUrl' | 'panUrl'; label: string; hint: string }[]).map(({ key, label, hint }) => (
-                                <div key={key} className="space-y-1">
-                                    <label className="text-xs text-dark-muted uppercase">{label}</label>
-                                    <div className="border border-dashed border-dark-border rounded-lg p-4 text-center hover:bg-white/5 transition-colors relative">
-                                        <input type="file" accept="image/*"
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                            onChange={e => handleRelativeFileChange(e, key)} />
-                                        {formData.relativeInfo?.[key] ? (
-                                            <div className="relative h-32 w-full">
-                                                <img src={formData.relativeInfo[key]} alt={label} className="h-full w-full object-contain" />
-                                                <p className="text-xs text-success mt-1">✓ Uploaded</p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {/* Photo Upload */}
+                                    {([
+                                        { key: 'photoUrl', label: '🧑 Relative Photo', hint: 'Passport-size photo' },
+                                        { key: 'aadharUrl', label: '🪪 Aadhar Card', hint: 'Front side of Aadhar' },
+                                        { key: 'panUrl', label: '💳 PAN Card', hint: 'Front side of PAN' },
+                                    ] as { key: 'photoUrl' | 'aadharUrl' | 'panUrl'; label: string; hint: string }[]).map(({ key, label, hint }) => (
+                                        <div key={key} className="space-y-1">
+                                            <label className="text-xs text-dark-muted uppercase">{label}</label>
+                                            <div className="border border-dashed border-dark-border rounded-lg p-4 text-center hover:bg-white/5 transition-colors relative">
+                                                <input type="file" accept="image/*"
+                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                    onChange={e => handleRelativeFileChange(e, key)} />
+                                                {formData.relativeInfo?.[key] ? (
+                                                    <div className="relative h-32 w-full">
+                                                        <img src={formData.relativeInfo[key]} alt={label} className="h-full w-full object-contain" />
+                                                        <p className="text-xs text-success mt-1">✓ Uploaded</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-center gap-2 py-4">
+                                                        <Upload className="w-7 h-7 text-dark-muted" />
+                                                        <p className="text-xs text-dark-muted">{hint}</p>
+                                                    </div>
+                                                )}
                                             </div>
-                                        ) : (
-                                            <div className="flex flex-col items-center gap-2 py-4">
-                                                <Upload className="w-7 h-7 text-dark-muted" />
-                                                <p className="text-xs text-dark-muted">{hint}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </AccordionSection>
+
+                        {/* 5. Govt Statutory Deductions */}
+                        <AccordionSection icon={<ShieldCheck className="w-5 h-5 text-blue-400" />} title="Govt. Statutory Deductions">
+                            <p className="text-sm text-dark-muted mb-6">Enable deductions applicable to this employee. These will be auto-calculated in salary slips.</p>
+
+                            <div className="space-y-4">
+
+                                {/* PF */}
+                                <StatutoryCard color="blue" icon="🏦" title="PF — Provident Fund"
+                                    subtitle={sc.pfApplicable ? `${sc.pfRate ?? 12}% of Basic${sc.pfCapped ? ' (max ₹1,800)' : ' (uncapped)'}` : 'Not applicable'}
+                                    enabled={sc.pfApplicable} onToggle={v => handleStatutoryChange('pfApplicable', v)}>
+                                    <div className="space-y-4">
+                                        {sc.pfApplicable && (
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-dark-muted uppercase">UAN Number</label>
+                                                    <input type="text" value={sc.pfNumber || ''} onChange={e => handleStatutoryChange('pfNumber', e.target.value)}
+                                                        className={inputCls} placeholder="100XXXXXXXXX" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <InfoTip id="pfContribution" label="Rate (%)" />
+                                                    <input type="number" min="0" max="20" value={sc.pfRate ?? 12} onChange={e => handleStatutoryChange('pfRate', Number(e.target.value))}
+                                                        className={inputCls} />
+                                                </div>
+                                                <div className="flex flex-col justify-end">
+                                                    <Toggle checked={sc.pfCapped ?? true} onChange={v => handleStatutoryChange('pfCapped', v)} label="Cap at ₹1,800" desc="Standard statutory limit" />
+                                                </div>
                                             </div>
                                         )}
                                     </div>
-                                </div>
-                            ))}
+                                </StatutoryCard>
+
+                                {/* ESIC */}
+                                <StatutoryCard color="green" icon="🏥" title="ESIC — Employee State Insurance"
+                                    subtitle={sc.esicApplicable ? `${sc.esicRate ?? 0.75}% of Gross (only if gross ≤ ₹21,000)` : 'Not applicable'}
+                                    enabled={sc.esicApplicable} onToggle={v => handleStatutoryChange('esicApplicable', v)}>
+                                    <div className="space-y-4">
+                                        {sc.esicApplicable && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-dark-muted uppercase">ESIC IP Number</label>
+                                                    <input type="text" value={sc.esicNumber || ''} onChange={e => handleStatutoryChange('esicNumber', e.target.value)}
+                                                        className={inputCls} placeholder="ESIC IP Number" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <InfoTip id="esiContribution" label="Rate (%) — Default 0.75" />
+                                                    <input type="number" min="0" max="5" step="0.01" value={sc.esicRate ?? 0.75} onChange={e => handleStatutoryChange('esicRate', Number(e.target.value))}
+                                                        className={inputCls} />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </StatutoryCard>
+
+                                {/* PT */}
+                                <StatutoryCard color="yellow" icon="🏛️" title="PT — Professional Tax"
+                                    subtitle={sc.ptApplicable ? `₹${sc.ptAmount ?? 'Auto-slab'}/month (${sc.ptState || 'State slab'})` : 'Not applicable'}
+                                    enabled={sc.ptApplicable} onToggle={v => handleStatutoryChange('ptApplicable', v)}>
+                                    <div className="space-y-4">
+                                        {sc.ptApplicable && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-dark-muted uppercase">State</label>
+                                                    <select value={sc.ptState || ''} onChange={e => handleStatutoryChange('ptState', e.target.value)} className={inputCls}>
+                                                        <option value="">Auto-slab</option>
+                                                        {['Andhra Pradesh', 'Gujarat', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Odisha', 'Tamil Nadu', 'Telangana', 'West Bengal'].map(s => (
+                                                            <option key={s} value={s}>{s}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-dark-muted uppercase">Custom Monthly Amount (₹)</label>
+                                                    <input type="number" min="0" max="2500" value={sc.ptAmount ?? ''} onChange={e => handleStatutoryChange('ptAmount', e.target.value === '' ? undefined : Number(e.target.value))}
+                                                        className={inputCls} placeholder="Leave blank for auto-slab" />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </StatutoryCard>
+
+                                {/* TDS */}
+                                <StatutoryCard color="red" icon="📋" title="TDS — Tax Deducted at Source"
+                                    subtitle={sc.tdsApplicable ? (sc.tdsPercentage !== undefined ? `${sc.tdsPercentage}% flat override` : 'Auto income-tax slab calculation') : 'Not applicable'}
+                                    enabled={sc.tdsApplicable} onToggle={v => handleStatutoryChange('tdsApplicable', v)}>
+                                    <div className="space-y-4">
+                                        {sc.tdsApplicable && (
+                                            <div className="space-y-4">
+                                                <Toggle checked={sc.tdsPanLinked ?? true} onChange={v => handleStatutoryChange('tdsPanLinked', v)} label="PAN is linked" desc="If unlinked, flat 20% TDS is deducted" />
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="space-y-1">
+                                                        <label className="text-xs text-dark-muted uppercase">Declared 80C Investments (₹/year)</label>
+                                                        <input type="number" min="0" max="150000" value={sc.tdsDeclaredInvestment ?? 0} onChange={e => handleStatutoryChange('tdsDeclaredInvestment', Number(e.target.value))}
+                                                            className={inputCls} placeholder="e.g. 100000" />
+                                                        <p className="text-xs text-dark-muted">Max ₹1,50,000 under 80C (PPF, LIC, ELSS etc.)</p>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="text-xs text-dark-muted uppercase">Manual TDS % Override (optional)</label>
+                                                        <input type="number" min="0" max="30" value={sc.tdsPercentage ?? ''} onChange={e => handleStatutoryChange('tdsPercentage', e.target.value === '' ? undefined : Number(e.target.value))}
+                                                            className={inputCls} placeholder="Leave blank for auto-slab" />
+                                                        <p className="text-xs text-dark-muted">Overrides auto-calculation if filled</p>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                                                    <p className="text-xs text-blue-300 font-medium">ℹ️ New Regime Slabs (FY 2024-25)</p>
+                                                    <div className="grid grid-cols-2 gap-x-6 mt-2 text-xs text-dark-muted">
+                                                        <span>₹0 – ₹3L → Nil</span><span>₹3L – ₹6L → 5%</span>
+                                                        <span>₹6L – ₹9L → 10%</span><span>₹9L – ₹12L → 15%</span>
+                                                        <span>₹12L – ₹15L → 20%</span><span>Above ₹15L → 30%</span>
+                                                    </div>
+                                                    <p className="text-xs text-dark-muted mt-1">+ 4% Health &amp; Education Cess | Standard Deduction ₹50,000</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </StatutoryCard>
+
+                            </div>
+                        </AccordionSection>
+                    </>
+                ) : (
+                    <div className="glass p-6 rounded-2xl border border-dark-border flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-dark-bg/80 flex items-center justify-center">
+                                <ShieldCheck className="w-6 h-6 text-dark-muted" />
+                            </div>
+                            <div>
+                                <h3 className="text-white font-medium text-sm">Financials Access Restricted</h3>
+                                <p className="text-xs text-dark-muted">Aapke paas financial details view ya change karne ka permission nahi hai.</p>
+                            </div>
                         </div>
                     </div>
-                </AccordionSection>
-
-                {/* 5. Govt Statutory Deductions */}
-                <AccordionSection icon={<ShieldCheck className="w-5 h-5 text-blue-400" />} title="Govt. Statutory Deductions">
-                    <p className="text-sm text-dark-muted mb-6">Enable deductions applicable to this employee. These will be auto-calculated in salary slips.</p>
-
-                    <div className="space-y-4">
-
-                        {/* PF */}
-                        <StatutoryCard color="blue" icon="🏦" title="PF — Provident Fund"
-                            subtitle={sc.pfApplicable ? `${sc.pfRate ?? 12}% of Basic${sc.pfCapped ? ' (max ₹1,800)' : ' (uncapped)'}` : 'Not applicable'}
-                            enabled={sc.pfApplicable} onToggle={v => handleStatutoryChange('pfApplicable', v)}>
-                            <div className="space-y-4">
-                                {sc.pfApplicable && (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-dark-muted uppercase">UAN Number</label>
-                                            <input type="text" value={sc.pfNumber || ''} onChange={e => handleStatutoryChange('pfNumber', e.target.value)}
-                                                className={inputCls} placeholder="100XXXXXXXXX" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <InfoTip id="pfContribution" label="Rate (%)" />
-                                            <input type="number" min="0" max="20" value={sc.pfRate ?? 12} onChange={e => handleStatutoryChange('pfRate', Number(e.target.value))}
-                                                className={inputCls} />
-                                        </div>
-                                        <div className="flex flex-col justify-end">
-                                            <Toggle checked={sc.pfCapped ?? true} onChange={v => handleStatutoryChange('pfCapped', v)} label="Cap at ₹1,800" desc="Standard statutory limit" />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </StatutoryCard>
-
-                        {/* ESIC */}
-                        <StatutoryCard color="green" icon="🏥" title="ESIC — Employee State Insurance"
-                            subtitle={sc.esicApplicable ? `${sc.esicRate ?? 0.75}% of Gross (only if gross ≤ ₹21,000)` : 'Not applicable'}
-                            enabled={sc.esicApplicable} onToggle={v => handleStatutoryChange('esicApplicable', v)}>
-                            <div className="space-y-4">
-                                {sc.esicApplicable && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-dark-muted uppercase">ESIC IP Number</label>
-                                            <input type="text" value={sc.esicNumber || ''} onChange={e => handleStatutoryChange('esicNumber', e.target.value)}
-                                                className={inputCls} placeholder="ESIC IP Number" />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <InfoTip id="esiContribution" label="Rate (%) — Default 0.75" />
-                                            <input type="number" min="0" max="5" step="0.01" value={sc.esicRate ?? 0.75} onChange={e => handleStatutoryChange('esicRate', Number(e.target.value))}
-                                                className={inputCls} />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </StatutoryCard>
-
-                        {/* PT */}
-                        <StatutoryCard color="yellow" icon="🏛️" title="PT — Professional Tax"
-                            subtitle={sc.ptApplicable ? `₹${sc.ptAmount ?? 'Auto-slab'}/month (${sc.ptState || 'State slab'})` : 'Not applicable'}
-                            enabled={sc.ptApplicable} onToggle={v => handleStatutoryChange('ptApplicable', v)}>
-                            <div className="space-y-4">
-                                {sc.ptApplicable && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-dark-muted uppercase">State</label>
-                                            <select value={sc.ptState || ''} onChange={e => handleStatutoryChange('ptState', e.target.value)} className={inputCls}>
-                                                <option value="">Auto-slab</option>
-                                                {['Andhra Pradesh', 'Gujarat', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Odisha', 'Tamil Nadu', 'Telangana', 'West Bengal'].map(s => (
-                                                    <option key={s} value={s}>{s}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs text-dark-muted uppercase">Custom Monthly Amount (₹)</label>
-                                            <input type="number" min="0" max="2500" value={sc.ptAmount ?? ''} onChange={e => handleStatutoryChange('ptAmount', e.target.value === '' ? undefined : Number(e.target.value))}
-                                                className={inputCls} placeholder="Leave blank for auto-slab" />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </StatutoryCard>
-
-                        {/* TDS */}
-                        <StatutoryCard color="red" icon="📋" title="TDS — Tax Deducted at Source"
-                            subtitle={sc.tdsApplicable ? (sc.tdsPercentage !== undefined ? `${sc.tdsPercentage}% flat override` : 'Auto income-tax slab calculation') : 'Not applicable'}
-                            enabled={sc.tdsApplicable} onToggle={v => handleStatutoryChange('tdsApplicable', v)}>
-                            <div className="space-y-4">
-                                {sc.tdsApplicable && (
-                                    <div className="space-y-4">
-                                        <Toggle checked={sc.tdsPanLinked ?? true} onChange={v => handleStatutoryChange('tdsPanLinked', v)} label="PAN is linked" desc="If unlinked, flat 20% TDS is deducted" />
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                <label className="text-xs text-dark-muted uppercase">Declared 80C Investments (₹/year)</label>
-                                                <input type="number" min="0" max="150000" value={sc.tdsDeclaredInvestment ?? 0} onChange={e => handleStatutoryChange('tdsDeclaredInvestment', Number(e.target.value))}
-                                                    className={inputCls} placeholder="e.g. 100000" />
-                                                <p className="text-xs text-dark-muted">Max ₹1,50,000 under 80C (PPF, LIC, ELSS etc.)</p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-xs text-dark-muted uppercase">Manual TDS % Override (optional)</label>
-                                                <input type="number" min="0" max="30" value={sc.tdsPercentage ?? ''} onChange={e => handleStatutoryChange('tdsPercentage', e.target.value === '' ? undefined : Number(e.target.value))}
-                                                    className={inputCls} placeholder="Leave blank for auto-slab" />
-                                                <p className="text-xs text-dark-muted">Overrides auto-calculation if filled</p>
-                                            </div>
-                                        </div>
-                                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                                            <p className="text-xs text-blue-300 font-medium">ℹ️ New Regime Slabs (FY 2024-25)</p>
-                                            <div className="grid grid-cols-2 gap-x-6 mt-2 text-xs text-dark-muted">
-                                                <span>₹0 – ₹3L → Nil</span><span>₹3L – ₹6L → 5%</span>
-                                                <span>₹6L – ₹9L → 10%</span><span>₹9L – ₹12L → 15%</span>
-                                                <span>₹12L – ₹15L → 20%</span><span>Above ₹15L → 30%</span>
-                                            </div>
-                                            <p className="text-xs text-dark-muted mt-1">+ 4% Health &amp; Education Cess | Standard Deduction ₹50,000</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </StatutoryCard>
-
-
-
-                    </div>
-                </AccordionSection>
+                )}
 
                 <div className="flex justify-end gap-4 pt-6">
                     <button type="button" onClick={() => navigate('/employees')} className="px-6 py-2 rounded-lg text-dark-muted hover:text-white transition-colors">

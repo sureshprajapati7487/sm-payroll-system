@@ -8,60 +8,29 @@ import {
     AlertCircle, Plus, Trash2, Edit3, Phone, Mail,
     ArrowRight, Target, TrendingUp, X, Check, Building2,
     ListChecks, ChevronDown, ChevronUp, Calendar, BarChart2,
-    IndianRupee, Activity
+    IndianRupee, Activity, Navigation
 } from 'lucide-react';
 import { ClientListPage } from './ClientListPage';
+import { RouteTab } from './RouteTab';
 
-// ─── Task Types ───────────────────────────────────────────────────────────────
-type TaskPriority = 'HIGH' | 'MEDIUM' | 'LOW';
-
-interface SalesTask {
-    id: string;
-    title: string;
-    description?: string;
-    assignedTo?: string;
-    priority: TaskPriority;
-    done: boolean;
-    dueDate?: string;
-    createdAt: string;
-    doneAt?: string;
-}
+import { useSalesTaskStore, SalesTask, TaskPriority, TaskStatus } from '@/store/salesTaskStore';
 
 const PRIORITY_META: Record<TaskPriority, { label: string; color: string; bg: string; dot: string }> = {
-    HIGH: { label: 'High', color: 'text-red-400', bg: 'bg-red-500/15 border-red-500/30', dot: 'bg-red-400' },
-    MEDIUM: { label: 'Medium', color: 'text-yellow-400', bg: 'bg-yellow-500/15 border-yellow-500/30', dot: 'bg-yellow-400' },
-    LOW: { label: 'Low', color: 'text-green-400', bg: 'bg-green-500/15 border-green-500/30', dot: 'bg-green-400' },
+    high: { label: 'High', color: 'text-red-400', bg: 'bg-red-500/15 border-red-500/30', dot: 'bg-red-400' },
+    medium: { label: 'Medium', color: 'text-yellow-400', bg: 'bg-yellow-500/15 border-yellow-500/30', dot: 'bg-yellow-400' },
+    low: { label: 'Low', color: 'text-green-400', bg: 'bg-green-500/15 border-green-500/30', dot: 'bg-green-400' },
 };
-
-const LS_KEY = 'sm-salesman-tasks';
-
-function loadTasks(): SalesTask[] {
-    try {
-        const raw = localStorage.getItem(LS_KEY);
-        if (raw) return JSON.parse(raw);
-    } catch { /* ignore */ }
-    return [
-        { id: 't1', title: 'Monthly Sales Target Follow-up', priority: 'HIGH', done: false, createdAt: new Date().toISOString(), dueDate: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0] },
-        { id: 't2', title: 'Client Visit — Surat', priority: 'MEDIUM', done: false, createdAt: new Date().toISOString(), dueDate: new Date(Date.now() + 1 * 86400000).toISOString().split('T')[0] },
-        { id: 't3', title: 'Submit Weekly Report', priority: 'LOW', done: true, createdAt: new Date().toISOString(), doneAt: new Date().toISOString() },
-    ];
-}
-
-function saveTasks(tasks: SalesTask[]) {
-    localStorage.setItem(LS_KEY, JSON.stringify(tasks));
-}
-
 // ─── Add/Edit Task Modal ──────────────────────────────────────────────────────
 const TaskModal = ({
     task, salesEmployees, onSave, onClose,
 }: {
     task: Partial<SalesTask> | null;
     salesEmployees: { id: string; name: string }[];
-    onSave: (t: SalesTask) => void;
+    onSave: (t: Partial<SalesTask>) => void;
     onClose: () => void;
 }) => {
     const [form, setForm] = useState<Partial<SalesTask>>(
-        task || { title: '', priority: 'MEDIUM', done: false }
+        task || { title: '', priority: 'medium', status: 'todo' }
     );
 
     const handleSave = () => {
@@ -70,12 +39,12 @@ const TaskModal = ({
             id: form.id || `task-${Date.now()}`,
             title: form.title!,
             description: form.description,
-            assignedTo: form.assignedTo,
-            priority: (form.priority as TaskPriority) || 'MEDIUM',
-            done: form.done ?? false,
+            salesmanId: form.salesmanId,
+            priority: (form.priority as TaskPriority) || 'medium',
+            status: form.status ?? 'todo',
             dueDate: form.dueDate,
             createdAt: form.createdAt || new Date().toISOString(),
-            doneAt: form.doneAt,
+            completedAt: form.completedAt,
         });
     };
 
@@ -142,8 +111,8 @@ const TaskModal = ({
                         <div>
                             <label className="text-xs text-dark-muted uppercase block mb-1">Assign To</label>
                             <select
-                                value={form.assignedTo || ''}
-                                onChange={e => setForm(p => ({ ...p, assignedTo: e.target.value || undefined }))}
+                                value={form.salesmanId || ''}
+                                onChange={e => setForm(p => ({ ...p, salesmanId: e.target.value || undefined }))}
                                 className="w-full rounded-lg px-3 py-2 text-sm"
                             >
                                 <option value="">-- Anyone --</option>
@@ -181,24 +150,25 @@ const TaskRow = ({
     onEdit: () => void;
     onDelete: () => void;
 }) => {
-    const priority = PRIORITY_META[task.priority];
-    const isOverdue = !task.done && task.dueDate && new Date(task.dueDate) < new Date();
+    const priority = PRIORITY_META[task.priority] || PRIORITY_META['medium'];
+    const isDone = task.status === 'done';
+    const isOverdue = !isDone && task.dueDate && new Date(task.dueDate) < new Date();
     const dueDate = task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : null;
 
     return (
-        <div className={`group flex items-start gap-3 px-5 py-4 hover:bg-white/5 transition-all duration-200 ${task.done ? 'opacity-60' : ''}`}>
+        <div className={`group flex items-start gap-3 px-5 py-4 hover:bg-white/5 transition-all duration-200 ${isDone ? 'opacity-60' : ''}`}>
             <button
                 onClick={onToggle}
-                className={`mt-0.5 shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${task.done
+                className={`mt-0.5 shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${isDone
                     ? 'bg-green-500 border-green-500 scale-110'
                     : 'border-dark-border hover:border-orange-400 hover:scale-110'
                     }`}
             >
-                {task.done && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                {isDone && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
             </button>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <p className={`font-semibold text-sm transition-all duration-300 ${task.done ? 'line-through text-dark-muted' : 'text-white'}`}>
+                    <p className={`font-semibold text-sm transition-all duration-300 ${isDone ? 'line-through text-dark-muted' : 'text-white'}`}>
                         {task.title}
                     </p>
                     <span className={`w-2 h-2 rounded-full shrink-0 ${priority.dot}`} title={priority.label} />
@@ -207,7 +177,7 @@ const TaskRow = ({
                             ⚠️ Overdue
                         </span>
                     )}
-                    {task.done && (
+                    {isDone && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/15 border border-green-500/30 text-green-400 font-semibold">
                             ✅ Done
                         </span>
@@ -223,18 +193,18 @@ const TaskRow = ({
                     {dueDate && (
                         <span className={`flex items-center gap-1 ${isOverdue ? 'text-red-400' : 'text-dark-muted'}`}>
                             <Calendar className="w-3 h-3" />
-                            {task.done ? `Done` : `Due: ${dueDate}`}
+                            {isDone ? `Done` : `Due: ${dueDate}`}
                         </span>
                     )}
-                    {task.done && task.doneAt && (
+                    {isDone && task.completedAt && (
                         <span className="text-green-400/70">
-                            Completed {new Date(task.doneAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                            Completed {new Date(task.completedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                         </span>
                     )}
                 </div>
             </div>
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                {!task.done && (
+                {!isDone && (
                     <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-white transition-colors" title="Edit">
                         <Edit3 className="w-3.5 h-3.5" />
                     </button>
@@ -481,8 +451,8 @@ export const SalesmanDashboard = () => {
     const { currentCompanyId } = useMultiCompanyStore();
     const navigate = useNavigate();
 
-    const [activeTab, setActiveTab] = useState<'tasks' | 'clients' | 'performance'>('tasks');
-    const [tasks, setTasks] = useState<SalesTask[]>(loadTasks);
+    const { tasks, fetchTasks, addTask, updateTask, deleteTask } = useSalesTaskStore();
+    const [activeTab, setActiveTab] = useState<'tasks' | 'clients' | 'performance' | 'route'>('tasks');
     const [modalTask, setModalTask] = useState<Partial<SalesTask> | null | false>(false);
     const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'DONE'>('ALL');
     const [searchEmp, setSearchEmp] = useState('');
@@ -490,7 +460,11 @@ export const SalesmanDashboard = () => {
     const [pendingDelete, setPendingDelete] = useState<string | null>(null);
     const [pendingClearDone, setPendingClearDone] = useState(false);
 
-    useEffect(() => { saveTasks(tasks); }, [tasks]);
+    useEffect(() => {
+        if (currentCompanyId) {
+            fetchTasks();
+        }
+    }, [currentCompanyId]);
 
     const salesEmployees = useMemo(() => {
         const base = currentCompanyId ? employees.filter(e => e.companyId === currentCompanyId) : employees;
@@ -508,17 +482,17 @@ export const SalesmanDashboard = () => {
     );
 
     const total = tasks.length;
-    const done = tasks.filter(t => t.done).length;
-    const pending = tasks.filter(t => !t.done).length;
-    const overdue = tasks.filter(t => !t.done && t.dueDate && new Date(t.dueDate) < new Date()).length;
+    const done = tasks.filter(t => t.status === 'done').length;
+    const pending = total - done;
+    const overdue = tasks.filter(t => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < new Date()).length;
     const progress = total > 0 ? Math.round((done / total) * 100) : 0;
 
     const pendingTasks = useMemo(() =>
         tasks
-            .filter(task => !task.done)
+            .filter(task => task.status !== 'done')
             .filter(() => filter === 'ALL' || filter === 'PENDING')
             .sort((a, b) => {
-                const pOrder = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+                const pOrder = { high: 0, medium: 1, low: 2 };
                 if (pOrder[a.priority] !== pOrder[b.priority]) return pOrder[a.priority] - pOrder[b.priority];
                 if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
                 return 0;
@@ -527,32 +501,41 @@ export const SalesmanDashboard = () => {
     );
 
     const doneTasks = useMemo(() =>
-        tasks.filter(t => t.done).sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || '')),
+        tasks.filter(t => t.status === 'done').sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || '')),
         [tasks]
     );
 
-    const saveTask = (t: SalesTask) => {
-        setTasks(prev => prev.some(p => p.id === t.id) ? prev.map(p => p.id === t.id ? t : p) : [t, ...prev]);
+    const saveTask = (t: Partial<SalesTask>) => {
+        if (t.id && tasks.some(existing => existing.id === t.id)) {
+            updateTask(t.id, t);
+        } else {
+            addTask(t);
+        }
         setModalTask(false);
     };
 
-    const toggleTask = (id: string) => {
-        setTasks(prev => prev.map(t =>
-            t.id === id ? { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : undefined } : t
-        ));
+    const toggleTask = (id: string, currentStatus: TaskStatus) => {
+        updateTask(id, {
+            status: currentStatus === 'done' ? 'todo' : 'done'
+        });
     };
 
-    const deleteTask = (id: string) => setPendingDelete(id);
+    const handleDelete = (id: string) => setPendingDelete(id);
 
-    const confirmDelete = () => {
-        if (pendingDelete) setTasks(prev => prev.filter(t => t.id !== pendingDelete));
+    const confirmDelete = async () => {
+        if (pendingDelete) {
+            await deleteTask(pendingDelete);
+        }
         setPendingDelete(null);
     };
 
     const clearDone = () => setPendingClearDone(true);
 
-    const confirmClearDone = () => {
-        setTasks(prev => prev.filter(t => !t.done));
+    const confirmClearDone = async () => {
+        const doneTaskIds = tasks.filter(t => t.status === 'done').map(t => t.id);
+        for (const id of doneTaskIds) {
+            await deleteTask(id);
+        }
         setPendingClearDone(false);
     };
 
@@ -560,6 +543,7 @@ export const SalesmanDashboard = () => {
 
     const TABS = [
         { key: 'tasks', label: 'Tasks', icon: ListChecks },
+        { key: 'route', label: "Today's Route", icon: Navigation },
         { key: 'clients', label: 'Clients / Parties', icon: Building2 },
         { key: 'performance', label: 'Performance', icon: BarChart2 },
     ] as const;
@@ -605,6 +589,9 @@ export const SalesmanDashboard = () => {
 
             {/* ── Clients Tab ── */}
             {activeTab === 'clients' && <ClientListPage />}
+
+            {/* ── Route Tab ── */}
+            {activeTab === 'route' && <RouteTab companyId={currentCompanyId} />}
 
             {/* ── Performance Tab ── */}
             {activeTab === 'performance' && <PerformanceTab salesEmployees={salesEmployees} />}
@@ -769,10 +756,10 @@ export const SalesmanDashboard = () => {
                                         <TaskRow
                                             key={task.id}
                                             task={task}
-                                            empName={getEmpName(task.assignedTo)}
-                                            onToggle={() => toggleTask(task.id)}
+                                            empName={getEmpName(task.salesmanId)}
+                                            onToggle={() => toggleTask(task.id, task.status)}
                                             onEdit={() => setModalTask(task)}
-                                            onDelete={() => deleteTask(task.id)}
+                                            onDelete={() => handleDelete(task.id)}
                                         />
                                     ))}
                                 </div>
@@ -804,10 +791,10 @@ export const SalesmanDashboard = () => {
                                                 <TaskRow
                                                     key={task.id}
                                                     task={task}
-                                                    empName={getEmpName(task.assignedTo)}
-                                                    onToggle={() => toggleTask(task.id)}
+                                                    empName={getEmpName(task.salesmanId)}
+                                                    onToggle={() => toggleTask(task.id, task.status)}
                                                     onEdit={() => setModalTask(task)}
-                                                    onDelete={() => deleteTask(task.id)}
+                                                    onDelete={() => handleDelete(task.id)}
                                                 />
                                             ))}
                                         </div>

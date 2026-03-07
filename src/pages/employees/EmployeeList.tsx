@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAuthStore } from '@/store/authStore';
@@ -58,6 +58,11 @@ export const EmployeeList = () => {
     const [credentialEmployee, setCredentialEmployee] = useState<Employee | null>(null);
     const [showFilters, setShowFilters] = useState(false);
 
+    // ── Pagination State ─────────────────────────────────────────────────────
+    const { totalCount, currentPage, totalPages, fetchEmployees } = useEmployeeStore();
+    const [page, setPage] = useState(1);
+    const limit = 50;
+
     // ── Filter state ─────────────────────────────────────────────────────────
     const [searchTerm, setSearchTerm] = useState('');
     const [deptFilter, setDeptFilter] = useState('All');
@@ -70,9 +75,30 @@ export const EmployeeList = () => {
     const [sortKey, setSortKey] = useState<SortKey>('name');
     const [sortDir, setSortDir] = useState<SortDir>('asc');
 
-    // ── Derived data ─────────────────────────────────────────────────────────
+    // ── Derived Data (from full list loaded in store if available, or just from active)
     const departments = useMemo(() => ['All', ...new Set(employees.map(e => e.department).filter(Boolean).sort())], [employees]);
     const designations = useMemo(() => ['All', ...new Set(employees.map(e => e.designation).filter(Boolean).sort())], [employees]);
+
+    // ── Server-Side Fetch Trigger ──────────────────────────────────────────────
+    useEffect(() => {
+        // Debounce search slightly
+        const timer = setTimeout(() => {
+            fetchEmployees({
+                page,
+                limit,
+                search: searchTerm,
+                status: statusFilter === 'All' ? undefined : statusFilter,
+                department: deptFilter === 'All' ? undefined : deptFilter,
+                shift: shiftFilter === 'All' ? undefined : shiftFilter,
+            });
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [page, limit, searchTerm, statusFilter, deptFilter, shiftFilter, fetchEmployees]);
+
+    // Reset page to 1 on new search
+    useEffect(() => {
+        setPage(1);
+    }, [searchTerm]);
 
     // ── Count active filters ──────────────────────────────────────────────────
     const activeFilterCount = [
@@ -95,24 +121,15 @@ export const EmployeeList = () => {
         setSalaryMax('');
         setDesignationFilter('All');
         setSearchTerm('');
+        setPage(1);
     };
 
-    // ── Filtered + sorted employees ───────────────────────────────────────────
+    // ── Client-Side Post-Filtering (for properties not yet supported by backend OP)
     const filteredEmployees = useMemo(() => {
         const minSal = salaryMin ? Number(salaryMin) : null;
         const maxSal = salaryMax ? Number(salaryMax) : null;
 
         const result = employees.filter(emp => {
-            if (searchTerm) {
-                const q = searchTerm.toLowerCase();
-                const matches =
-                    emp.name.toLowerCase().includes(q) ||
-                    emp.code.toLowerCase().includes(q) ||
-                    emp.designation?.toLowerCase().includes(q) ||
-                    emp.phone?.includes(q) ||
-                    emp.email?.toLowerCase().includes(q);
-                if (!matches) return false;
-            }
             if (deptFilter !== 'All' && emp.department !== deptFilter) return false;
             if (statusFilter !== 'All' && emp.status !== statusFilter) return false;
             if (shiftFilter !== 'All' && emp.shift !== shiftFilter) return false;
@@ -134,7 +151,7 @@ export const EmployeeList = () => {
         });
 
         return result;
-    }, [employees, searchTerm, deptFilter, statusFilter, shiftFilter, salaryTypeFilter,
+    }, [employees, deptFilter, statusFilter, shiftFilter, salaryTypeFilter,
         salaryMin, salaryMax, designationFilter, sortKey, sortDir]);
 
     // ── Stats strip ──────────────────────────────────────────────────────────
@@ -408,13 +425,33 @@ export const EmployeeList = () => {
 
             {/* ── Result count ────────────────────────────────────── */}
             {!isLoading && (
-                <div className="flex items-center justify-between text-xs text-dark-muted">
+                <div className="flex items-center justify-between flex-wrap gap-4 text-xs text-dark-muted">
                     <span className="flex items-center gap-1.5">
                         <Users className="w-3.5 h-3.5" />
-                        Showing <span className="text-dark-text font-semibold">{filteredEmployees.length}</span> of {employees.length} employees
+                        Showing <span className="text-dark-text font-semibold">{filteredEmployees.length}</span> of {totalCount} total employees
                     </span>
                     {filteredEmployees.length === 0 && (
                         <span className="text-warning">No employees match your filters</span>
+                    )}
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                disabled={page === 1}
+                                className="px-3 py-1.5 rounded-lg border border-dark-border bg-dark-bg hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Previous
+                            </button>
+                            <span className="text-dark-text font-medium px-2">Page {currentPage} of {totalPages}</span>
+                            <button
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                disabled={page === totalPages}
+                                className="px-3 py-1.5 rounded-lg border border-dark-border bg-dark-bg hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Next
+                            </button>
+                        </div>
                     )}
                 </div>
             )}

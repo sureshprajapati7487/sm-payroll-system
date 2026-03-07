@@ -102,6 +102,15 @@ const useInternalLoanStore = create<LoanState>()(
                     _rawLoans: [newLoan, ...state._rawLoans],
                     loans: [newLoan, ...state._rawLoans]
                 }));
+
+                try {
+                    await apiFetch(`/loans`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newLoan),
+                    });
+                } catch (e) { console.error('requestLoan API failed', e); }
+
                 // Audit
                 const empForAudit = useEmployeeStore.getState()._rawEmployees.find(e => e.id === newLoan.employeeId);
                 audit({
@@ -205,6 +214,16 @@ const useInternalLoanStore = create<LoanState>()(
                     });
                     return { _rawLoans: updatedList, loans: updatedList };
                 });
+
+                apiFetch(`/loans/${id}/approve`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        issuedDate: new Date().toISOString().split('T')[0],
+                        performedBy: useAuthStore.getState().user?.name || 'System'
+                    })
+                }).catch(console.error);
+
                 audit({
                     action: 'APPROVE_LOAN',
                     entityType: 'LOAN',
@@ -221,6 +240,15 @@ const useInternalLoanStore = create<LoanState>()(
                     const updated = state._rawLoans.map(l => l.id === id ? { ...l, status: LoanStatus.REJECTED } : l);
                     return { _rawLoans: updated, loans: updated };
                 });
+
+                apiFetch(`/loans/${id}/reject`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        performedBy: useAuthStore.getState().user?.name || 'System'
+                    })
+                }).catch(console.error);
+
                 audit({
                     action: 'REJECT_LOAN',
                     entityType: 'LOAN',
@@ -233,28 +261,35 @@ const useInternalLoanStore = create<LoanState>()(
 
             issueLoan: (loan) => {
                 const currentCompanyId = useMultiCompanyStore.getState().currentCompanyId;
-                set(state => {
-                    const newLoan: LoanRecord = {
-                        ...loan,
+                const newLoan: LoanRecord = {
+                    ...loan,
+                    id: Math.random().toString(36).substr(2, 9),
+                    companyId: currentCompanyId || undefined,
+                    balance: loan.amount,
+                    status: LoanStatus.ACTIVE,
+                    ledger: [{
                         id: Math.random().toString(36).substr(2, 9),
-                        companyId: currentCompanyId || undefined,
-                        balance: loan.amount,
-                        status: LoanStatus.ACTIVE,
-                        ledger: [{
-                            id: Math.random().toString(36).substr(2, 9),
-                            date: loan.issuedDate || new Date().toISOString().split('T')[0],
-                            amount: loan.amount,
-                            type: 'ADVANCE_PAYMENT',
-                            remarks: 'Manual Issue'
-                        }] as LoanTransaction[],
-                        auditTrail: [],
-                        skippedMonths: [],
-                        allowedSkips: 2,
-                        settlementRequest: null
-                    };
+                        date: loan.issuedDate || new Date().toISOString().split('T')[0],
+                        amount: loan.amount,
+                        type: 'ADVANCE_PAYMENT',
+                        remarks: 'Manual Issue'
+                    }] as LoanTransaction[],
+                    auditTrail: [],
+                    skippedMonths: [],
+                    allowedSkips: 2,
+                    settlementRequest: null
+                };
+
+                set(state => {
                     const updated = [newLoan, ...state._rawLoans];
                     return { _rawLoans: updated, loans: updated };
                 });
+
+                apiFetch(`/loans`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newLoan),
+                }).catch(console.error);
             },
 
             updateEMI: (loanId, newEmi) => {
@@ -287,6 +322,13 @@ const useInternalLoanStore = create<LoanState>()(
                     });
                     return { _rawLoans: updated, loans: updated };
                 });
+
+                apiFetch(`/loans/${loanId}/pay`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount }),
+                }).catch(console.error);
+
                 audit({
                     action: 'PAY_EMI',
                     entityType: 'LOAN',

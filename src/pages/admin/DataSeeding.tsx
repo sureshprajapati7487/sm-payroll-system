@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Database, Download, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { generateDemoData } from '@/utils/dataSeeder';
 import { generateBackup, restoreBackup } from '@/utils/backupUtils';
+import { apiFetch } from '@/lib/apiClient';
 
 export const DataSeeding = () => {
     const [seeding, setSeeding] = useState(false);
@@ -66,22 +67,17 @@ export const DataSeeding = () => {
         }
     };
 
-    const handleClear = async () => {
-        if (!confirm('⚠️ This will delete ALL data for the CURRENT COMPANY only. Other companies will NOT be affected. Continue?')) return;
-        if (!confirm('⚠️ Last warning! This action CANNOT be undone. Are you absolutely sure?')) return;
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [confirmText, setConfirmText] = useState('');
 
+    const executeClear = async () => {
         setClearing(true);
+        setShowConfirmModal(false);
+        setConfirmText('');
         addLog('Clearing current company data...');
 
         try {
-            // Import stores
             const { useMultiCompanyStore } = await import('@/store/multiCompanyStore');
-            const { useAttendanceStore } = await import('@/store/attendanceStore');
-            const { useProductionStore } = await import('@/store/productionStore');
-            const { useLoanStore } = await import('@/store/loanStore');
-            const { usePayrollStore } = await import('@/store/payrollStore');
-            const { useEmployeeStore } = await import('@/store/employeeStore');
-
             const currentCompanyId = useMultiCompanyStore.getState().currentCompanyId;
 
             if (!currentCompanyId) {
@@ -90,83 +86,21 @@ export const DataSeeding = () => {
                 return;
             }
 
-            addLog(`Clearing data for company: ${currentCompanyId}`);
+            addLog(`Triggering secure server data wipe for company: ${currentCompanyId}...`);
 
-            // Clear Attendance Records
-            const attendanceStore = useAttendanceStore.getState();
-            const employeeStore = useEmployeeStore.getState();
+            const res = await apiFetch('/admin/clear-data', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ companyId: currentCompanyId })
+            });
 
-            // Get employee IDs for current company
-            const companyEmployeeIds = employeeStore.employees
-                .filter(e => e.companyId === currentCompanyId)
-                .map(e => e.id);
-
-            // Filter out attendance records for current company employees
-            const filteredAttendance = attendanceStore.records.filter(
-                r => !companyEmployeeIds.includes(r.employeeId)
-            );
-
-            // Update stores by directly modifying localStorage
-            const attendanceKey = 'attendance-store';
-            const storedAttendance = localStorage.getItem(attendanceKey);
-            if (storedAttendance) {
-                const parsed = JSON.parse(storedAttendance);
-                parsed.state.records = filteredAttendance;
-                localStorage.setItem(attendanceKey, JSON.stringify(parsed));
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || 'Server rejected data wipe');
             }
-            addLog('✓ Attendance records cleared');
 
-            // Clear Production Entries
-            const productionStore = useProductionStore.getState();
-            const filteredProduction = productionStore.entries.filter(
-                e => !companyEmployeeIds.includes(e.employeeId)
-            );
-
-            const productionKey = 'production-store';
-            const storedProduction = localStorage.getItem(productionKey);
-            if (storedProduction) {
-                const parsed = JSON.parse(storedProduction);
-                parsed.state.entries = filteredProduction;
-                localStorage.setItem(productionKey, JSON.stringify(parsed));
-            }
-            addLog('✓ Production records cleared');
-
-            // Clear Loans
-            const loanStore = useLoanStore.getState();
-            const filteredLoans = loanStore.loans.filter(
-                l => l.companyId !== currentCompanyId
-            );
-
-            const loanKey = 'loan-store';
-            const storedLoans = localStorage.getItem(loanKey);
-            if (storedLoans) {
-                const parsed = JSON.parse(storedLoans);
-                parsed.state.loans = filteredLoans;
-                parsed.state._rawLoans = filteredLoans;
-                localStorage.setItem(loanKey, JSON.stringify(parsed));
-            }
-            addLog('✓ Loan records cleared');
-
-            // Clear Payroll Slips
-            const payrollStore = usePayrollStore.getState();
-            const filteredPayroll = payrollStore.slips.filter(
-                (slip: any) => !companyEmployeeIds.includes(slip.employeeId)
-            );
-
-            const payrollKey = 'payroll-store';
-            const storedPayroll = localStorage.getItem(payrollKey);
-            if (storedPayroll) {
-                const parsed = JSON.parse(storedPayroll);
-                parsed.state.slips = filteredPayroll;
-                localStorage.setItem(payrollKey, JSON.stringify(parsed));
-            }
-            addLog('✓ Payroll history cleared');
-
-            // Note: Expenses don't have companyId, so we skip them
-            // In future, if expenses need company filtering, add companyId to Expense type
-            addLog('✓ Expense records (skipped - no company link)');
-
-            addLog('✅ Current company data cleared successfully!');
+            const data = await res.json();
+            addLog(`✅ Server response: ${data.message || 'Company data cleared successfully!'}`);
             addLog('Reloading page...');
 
             setTimeout(() => {
@@ -179,6 +113,8 @@ export const DataSeeding = () => {
             setClearing(false);
         }
     };
+
+
 
     return (
         <div className="p-6 space-y-6">
@@ -299,7 +235,7 @@ export const DataSeeding = () => {
                         Permanently delete attendance, production, loans, payroll, and expenses for the <span className="text-warning font-semibold">CURRENT COMPANY ONLY</span>. Other companies will NOT be affected.
                     </p>
                     <button
-                        onClick={handleClear}
+                        onClick={() => setShowConfirmModal(true)}
                         disabled={clearing}
                         className="w-full bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
                     >
@@ -324,6 +260,60 @@ export const DataSeeding = () => {
                     )}
                 </div>
             </div>
+            {/* Modal for Danger Zone Confirmation */}
+            {showConfirmModal && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
+                    <div className="relative glass rounded-2xl border border-red-500/30 w-full max-w-md shadow-2xl shadow-red-500/10 overflow-hidden text-center">
+                        <div className="h-2 w-full bg-gradient-to-r from-red-600 to-rose-500" />
+                        <div className="p-8 space-y-6">
+                            <div className="mx-auto w-16 h-16 rounded-full bg-red-500/20 border-2 border-red-500/50 flex items-center justify-center animate-pulse">
+                                <AlertTriangle className="w-8 h-8 text-red-400" />
+                            </div>
+
+                            <div>
+                                <h2 className="text-2xl font-bold text-white mb-2">Absolute Danger Zone</h2>
+                                <p className="text-red-300 text-sm leading-relaxed font-medium">
+                                    You are about to irreversibly destroy <strong className="text-white bg-red-500/30 px-1 rounded">ALL DATA</strong> for this company.
+                                    This includes Payroll, Loans, Employees, and Production records.
+                                    <br /><br />
+                                    <strong>This CANNOT be undone.</strong>
+                                </p>
+                            </div>
+
+                            <div className="text-left space-y-2">
+                                <label className="text-xs font-semibold uppercase tracking-wider text-dark-muted">
+                                    Type <span className="text-red-400 font-bold select-all">DELETE</span> to confirm
+                                </label>
+                                <input
+                                    type="text"
+                                    value={confirmText}
+                                    onChange={(e) => setConfirmText(e.target.value)}
+                                    placeholder="Type DELETE here..."
+                                    className="w-full bg-dark-surface border-2 border-dark-border focus:border-red-500 rounded-xl px-4 py-3 text-white text-center font-bold tracking-widest placeholder:tracking-normal placeholder:font-normal placeholder:text-dark-muted/50 outline-none transition-colors"
+                                    autoComplete="off"
+                                />
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => { setShowConfirmModal(false); setConfirmText(''); }}
+                                    className="flex-1 py-3 rounded-xl border border-dark-border hover:bg-white/5 text-dark-muted hover:text-white transition-colors font-semibold"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={executeClear}
+                                    disabled={confirmText !== 'DELETE'}
+                                    className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:bg-dark-surface disabled:border disabled:border-dark-border disabled:text-dark-muted text-white transition-all font-bold shadow-lg shadow-red-500/20"
+                                >
+                                    Confirm Wipe
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

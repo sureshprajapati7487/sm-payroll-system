@@ -5,7 +5,6 @@ import {
     LoanRecord,
     SalarySlip,
     SalaryType,
-    PayrollStatus,
     AttendanceStatus,
     Holiday
 } from '@/types';
@@ -404,8 +403,8 @@ export const calculateSalary = (
         totalDeductions,
 
         netSalary,
-        status: PayrollStatus.GENERATED,
+        status: 'GENERATED',
+        generatedBy: 'System',
         generatedOn: new Date().toISOString(),
     };
 };
-

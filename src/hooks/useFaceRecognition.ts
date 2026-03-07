@@ -96,7 +96,7 @@ export function useFaceRecognition() {
     // Returns descriptor + quality info (face size)
     const getDescriptor = useCallback(async (
         videoEl: HTMLVideoElement
-    ): Promise<{ descriptor: Float32Array; faceSize: number } | null> => {
+    ): Promise<{ descriptor: Float32Array; faceSize: number; box?: any } | null> => {
         if (!modelsLoaded) return null;
         try {
             const detection = await faceapi
@@ -106,7 +106,7 @@ export function useFaceRecognition() {
             if (!detection) return null;
             const box = detection.detection.box;
             const faceSize = Math.min(box.width, box.height);
-            return { descriptor: detection.descriptor, faceSize };
+            return { descriptor: detection.descriptor, faceSize, box };
         } catch {
             return null;
         }

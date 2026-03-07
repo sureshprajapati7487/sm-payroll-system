@@ -13,105 +13,18 @@ import { useAuthStore } from '@/store/authStore';
 import { useAttendanceStore } from '@/store/attendanceStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useShiftStore } from '@/store/shiftStore';
-import { useSystemConfigStore } from '@/store/systemConfigStore';
+import { useSystemSettingStore } from '@/store/systemSettingStore';
+import { usePunchLocationStore } from '@/store/punchLocationStore';
 import { biometricStore } from '@/store/biometricStore';
 import { useFaceRecognition } from '@/hooks/useFaceRecognition';
+import { getBSSID, validateBSSID } from '@/hooks/useBSSID';
 
 type PunchState = 'idle' | 'loading' | 'success' | 'error';
 type PunchMode = 'face' | 'fingerprint' | 'photoUpload' | 'pin';
 
-// ── Live Clock ────────────────────────────────────────────────────────────────
-const LiveClock = () => {
-    const [time, setTime] = useState(new Date());
-    useEffect(() => {
-        const t = setInterval(() => setTime(new Date()), 1000);
-        return () => clearInterval(t);
-    }, []);
-    return (
-        <span className="font-mono text-xs text-slate-300 tabular-nums">
-            {time.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-        </span>
-    );
-};
-
-// ── Animated Face Overlay ──────────────────────────────────────────────────────
-const FaceScanOverlay = ({ scanned }: { scanned: boolean }) => (
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        {/* Corner brackets */}
-        <div className="relative w-36 h-44">
-            {/* Top-left */}
-            <span className={`absolute top-0 left-0 w-7 h-7 border-t-2 border-l-2 rounded-tl-lg transition-all duration-700 ${scanned ? 'border-green-400' : 'border-blue-400'}`} />
-            {/* Top-right */}
-            <span className={`absolute top-0 right-0 w-7 h-7 border-t-2 border-r-2 rounded-tr-lg transition-all duration-700 ${scanned ? 'border-green-400' : 'border-blue-400'}`} />
-            {/* Bottom-left */}
-            <span className={`absolute bottom-0 left-0 w-7 h-7 border-b-2 border-l-2 rounded-bl-lg transition-all duration-700 ${scanned ? 'border-green-400' : 'border-blue-400'}`} />
-            {/* Bottom-right */}
-            <span className={`absolute bottom-0 right-0 w-7 h-7 border-b-2 border-r-2 rounded-br-lg transition-all duration-700 ${scanned ? 'border-green-400' : 'border-blue-400'}`} />
-            {/* Oval face guide */}
-            <div className={`absolute inset-4 rounded-full border-2 border-dashed transition-all duration-700 ${scanned ? 'border-green-400/60' : 'border-blue-400/40 animate-pulse'}`} />
-            {/* Scan line */}
-            {!scanned && (
-                <div
-                    className="absolute left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent"
-                    style={{ animation: 'scanline 2s linear infinite', top: '30%' }}
-                />
-            )}
-            {scanned && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <CheckCircle className="w-10 h-10 text-green-400 drop-shadow-lg" />
-                </div>
-            )}
-        </div>
-    </div>
-);
-
-// ── Fingerprint Scanner UI ────────────────────────────────────────────────────
-const FingerprintScanner = ({
-    scanning, progress, verified
-}: { scanning: boolean; progress: number; verified: boolean }) => (
-    <div className="flex flex-col items-center gap-4 py-4">
-        {/* Ring */}
-        <div className="relative w-28 h-28">
-            {/* Background ring */}
-            <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="44" fill="none" stroke="#1e293b" strokeWidth="6" />
-                <circle
-                    cx="50" cy="50" r="44" fill="none"
-                    stroke={verified ? '#22c55e' : scanning ? '#60a5fa' : '#334155'}
-                    strokeWidth="6"
-                    strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 44}`}
-                    strokeDashoffset={`${2 * Math.PI * 44 * (1 - progress / 100)}`}
-                    style={{ transition: 'stroke-dashoffset 0.3s ease, stroke 0.5s ease' }}
-                />
-            </svg>
-            {/* Center icon */}
-            <div className={`absolute inset-3 rounded-full flex items-center justify-center transition-all duration-500 ${verified ? 'bg-green-500/15' : scanning ? 'bg-blue-500/15' : 'bg-slate-800'}`}>
-                {verified ? (
-                    <CheckCircle className="w-10 h-10 text-green-400" />
-                ) : (
-                    <Fingerprint className={`w-10 h-10 transition-all duration-300 ${scanning ? 'text-blue-400' : 'text-slate-500'}`} />
-                )}
-            </div>
-            {/* Ripple when scanning */}
-            {scanning && (
-                <span className="absolute inset-0 rounded-full border-2 border-blue-400/30 animate-ping" />
-            )}
-        </div>
-
-        <p className={`text-sm font-semibold text-center transition-colors duration-300 ${verified ? 'text-green-400' : scanning ? 'text-blue-400' : 'text-slate-400'}`}>
-            {verified ? '✅ Fingerprint Verified!' : scanning ? `Scanning... ${Math.round(progress)}%` : 'Button dabao aur finger rakh do'}
-        </p>
-        {scanning && (
-            <div className="w-full bg-slate-800 rounded-full h-1">
-                <div
-                    className="bg-gradient-to-r from-blue-500 to-indigo-400 h-1 rounded-full transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                />
-            </div>
-        )}
-    </div>
-);
+import { LiveClock } from './attendance/LiveClock';
+import { FaceScanOverlay } from './attendance/FaceScanOverlay';
+import { FingerprintScanner } from './attendance/FingerprintScanner';
 
 // ── Main Widget ────────────────────────────────────────────────────────────────
 export const CameraPunchWidget = () => {
@@ -169,7 +82,25 @@ export const CameraPunchWidget = () => {
     const { markCheckIn, markCheckOut, getTodayRecord, startBreak, endBreak, getActiveBreak, getTodayBreaks } = useAttendanceStore();
     const { employees } = useEmployeeStore();
     const { shifts } = useShiftStore();
-    const { punchMethods, punchLocation, punchLocations, shiftPunchWindows } = useSystemConfigStore();
+    const { settings } = useSystemSettingStore();
+    const { punchLocations } = usePunchLocationStore();
+
+    const punchLocation = settings.PUNCH_LOCATION_MASTER || { enabled: false, name: 'Office', lat: 0, lng: 0, radiusMeters: 100 };
+    const punchMethods = settings.PUNCH_METHODS || {
+        face: { enabled: true, label: 'Face Scan' },
+        fingerprint: { enabled: true, label: 'Thumb Print' },
+        photoUpload: { enabled: true, label: 'Live Selfie' }
+    };
+    const shiftPunchWindows: Array<{
+        id: string;
+        shiftId: string;
+        shiftName: string;
+        checkInFrom: string;
+        checkInTo: string;
+        checkOutFrom: string;
+        checkOutTo: string;
+        enabled: boolean;
+    }> = settings.SHIFT_PUNCH_WINDOWS || [];
 
     const myEmployee = employees.find(e =>
         (user?.email && e.email?.toLowerCase() === user.email.toLowerCase()) ||
@@ -278,8 +209,18 @@ export const CameraPunchWidget = () => {
             Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
+    // ── GPS Location Check (Multi-Zone support & Fake GPS Check) ─────────────────
+    const isMockLocation = (pos: GeolocationPosition): boolean => {
+        if (typeof window !== 'undefined' && (window as any).Android?.isMockLocation) {
+            return (window as any).Android.isMockLocation();
+        }
+        const c = pos.coords;
+        if (c.altitude === 0 && c.altitudeAccuracy === 0 && c.speed === 0 && c.heading === 0) {
+            return true;
+        }
+        return false;
+    };
 
-    // ── GPS Location Check (Multi-Zone support) ───────────────────────────────
     const checkLocation = useCallback(() => {
         // If multi-zones configured, use them; else fall back to legacy single-zone
         const zones = punchLocations.filter(l => l.enabled);
@@ -291,6 +232,13 @@ export const CameraPunchWidget = () => {
         setLocationError(null);
         navigator.geolocation.getCurrentPosition(
             (pos) => {
+                if (isMockLocation(pos)) {
+                    setLocationStatus('denied');
+                    setLocationError('⚠️ Fake GPS detected. Asli location use karein.');
+                    setMatchedZone(null);
+                    return;
+                }
+
                 const userLat = pos.coords.latitude;
                 const userLng = pos.coords.longitude;
 
@@ -302,16 +250,25 @@ export const CameraPunchWidget = () => {
                     else { setLocationStatus('outside'); setLocationError(`Aap ${distM}m door hain. Sirf ${punchLocation.radiusMeters}m ke andar punch kar sakte hain.`); }
                 } else {
                     // Multi-zone: find nearest enabled zone
-                    let nearest: { id: string; name: string; distM: number; radius: number } | null = null;
+                    let nearest: { id: string; name: string; distM: number; radius: number; allowedBSSIDs?: string[] } | null = null;
                     for (const z of zones) {
                         const d = Math.round(haversineKm(userLat, userLng, z.lat, z.lng) * 1000);
-                        if (!nearest || d < nearest.distM) nearest = { id: z.id, name: z.name, distM: d, radius: z.radiusMeters };
+                        if (!nearest || d < nearest.distM) nearest = { id: z.id, name: z.name, distM: d, radius: z.radiusMeters, allowedBSSIDs: z.allowedBSSIDs };
                     }
                     if (nearest) {
                         setLocationDistance(nearest.distM);
                         if (nearest.distM <= nearest.radius) {
-                            setLocationStatus('ok');
-                            setMatchedZone({ id: nearest.id, name: nearest.name, distM: nearest.distM });
+                            // ✅ GPS check passed — now run Wi-Fi BSSID check (Android WebView only)
+                            const { bssid, isAndroidApp } = getBSSID();
+                            const bssidResult = validateBSSID(bssid, isAndroidApp, nearest.allowedBSSIDs);
+                            if (!bssidResult.allowed) {
+                                setLocationStatus('denied');
+                                setLocationError(bssidResult.reason || 'Wrong Wi-Fi network. Please connect to the office Wi-Fi router.');
+                                setMatchedZone(null);
+                            } else {
+                                setLocationStatus('ok');
+                                setMatchedZone({ id: nearest.id, name: nearest.name, distM: nearest.distM });
+                            }
                         } else {
                             setLocationStatus('outside');
                             setMatchedZone(null);

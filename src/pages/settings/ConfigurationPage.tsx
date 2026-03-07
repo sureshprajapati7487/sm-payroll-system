@@ -1,15 +1,22 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { InfoTip } from '@/components/ui/InfoTip';
-import { useDepartmentStore, DeptSalaryBasis } from '@/store/departmentStore';
-import { useWorkGroupStore } from '@/store/workGroupStore';
-import { useShiftStore } from '@/store/shiftStore';
+import { useInternalDepartmentStore, useDepartmentStore, DeptSalaryBasis } from '@/store/departmentStore';
+import { useMultiCompanyStore } from '@/store/multiCompanyStore';
+import { useInternalWorkGroupStore, useWorkGroupStore } from '@/store/workGroupStore';
+import { useInternalSalaryTypeStore, useSalaryTypeStore } from '@/store/salaryTypeStore';
+import { useInternalAttendanceActionStore, useAttendanceActionStore } from '@/store/attendanceActionStore';
+import { useInternalPunchLocationStore, usePunchLocationStore } from '@/store/punchLocationStore';
+import { useInternalSystemSettingStore, useSystemSettingStore } from '@/store/systemSettingStore';
+import { useInternalShiftStore, useShiftStore } from '@/store/shiftStore';
 import { useSystemConfigStore } from '@/store/systemConfigStore';
+import { useSystemKeyStore, useInternalSystemKeyStore } from '@/store/systemKeyStore';
 import { useAuthStore } from '@/store/authStore';
 import { useHolidayStore } from '@/store/holidayStore';
 import { PERMISSIONS } from '@/config/permissions';
 import { Roles } from '@/types';
-import { Building2, Clock, Plus, Trash2, Edit2, Save, X, Briefcase, Gavel, FileCheck, AlertOctagon, Wallet, IndianRupee, CalendarCheck, Key, Lock, Eye, EyeOff, Calendar, Camera, MapPin, Fingerprint, ScanFace, Navigation, ToggleLeft, ToggleRight, Crosshair } from 'lucide-react';
+import { Building2, Clock, Plus, Trash2, Edit2, Save, X, Briefcase, Gavel, FileCheck, AlertOctagon, Wallet, IndianRupee, CalendarCheck, Key, Lock, Eye, EyeOff, Calendar, Camera, MapPin, Fingerprint, ScanFace, Navigation, ToggleLeft, ToggleRight, Crosshair, Shield } from 'lucide-react';
 import { WarningModal } from '@/components/ui/WarningModal';
+import { StatutorySettings } from './StatutorySettings';
 
 const SALARY_BASIS_OPTIONS: { value: DeptSalaryBasis; label: string; desc: string; color: string }[] = [
     { value: 'FIXED', label: 'Fixed Monthly', desc: 'Same salary every month (HR, Accounts, Security)', color: 'blue' },
@@ -626,19 +633,89 @@ const SalesmanConfigPanel = () => {
 
 export const ConfigurationPage = () => {
 
-    const [activeTab, setActiveTab] = useState<'departments' | 'workAllocation' | 'shifts' | 'rules' | 'loanTypes' | 'salaryTypes' | 'attendance' | 'keys' | 'holidays' | 'punch' | 'salesman'>('departments');
+    const [activeTab, setActiveTab] = useState<'departments' | 'workAllocation' | 'shifts' | 'rules' | 'loanTypes' | 'salaryTypes' | 'attendance' | 'keys' | 'holidays' | 'punch' | 'salesman' | 'statutory'>('departments');
     const { departments, addDepartment, updateDepartment, deleteDepartment } = useDepartmentStore();
     const { shifts, addShift, updateShift, removeShift } = useShiftStore();
     const { groups: workGroups, assignments, addGroup, removeGroup, getGroupEmployees } = useWorkGroupStore();
     const config = useSystemConfigStore();
     const { user, hasPermission } = useAuthStore();
-    const { holidays, addHoliday, removeHoliday } = useHolidayStore();
+    const { holidays, addHoliday, removeHoliday, fetchHolidays } = useHolidayStore();
     const isSuperAdmin = user?.role === Roles.SUPER_ADMIN;
     const isAdmin = user?.role === Roles.ADMIN || user?.role === Roles.SUPER_ADMIN;
 
+    const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
+    const fetchDepartments = useInternalDepartmentStore(s => s.fetchDepartments);
+    const fetchShifts = useInternalShiftStore(s => s.fetchShifts);
+    const fetchGroups = useInternalWorkGroupStore(s => s.fetchGroups);
+    const fetchSalaryTypes = useInternalSalaryTypeStore(s => s.fetchSalaryTypes);
+    const fetchAttendanceActions = useInternalAttendanceActionStore(s => s.fetchAttendanceActions);
+    const fetchPunchLocations = useInternalPunchLocationStore(s => s.fetchPunchLocations);
+    const fetchSystemSettings = useInternalSystemSettingStore(s => s.fetchSettings);
+    const fetchSystemKeys = useInternalSystemKeyStore(s => s.fetchKeys);
+
+    const { salaryTypes, addSalaryType, updateSalaryType, deleteSalaryType } = useSalaryTypeStore();
+    const { attendanceActions, addAttendanceAction, deleteAttendanceAction, toggleAttendanceAction } = useAttendanceActionStore();
+    const { punchLocations, addPunchLocation, updatePunchLocation, deletePunchLocation, togglePunchLocationZone } = usePunchLocationStore();
+    const { settings, updateSetting } = useSystemSettingStore();
+    const { keys: systemKeys, addKey: addSystemKey, updateKey: updateSystemKey, deleteKey: deleteSystemKey } = useSystemKeyStore();
+
+    useEffect(() => {
+        if (!currentCompanyId) return;
+        if (activeTab === 'departments') fetchDepartments(currentCompanyId);
+        if (activeTab === 'shifts' && fetchShifts) fetchShifts(currentCompanyId);
+        if (activeTab === 'workAllocation' && fetchGroups) fetchGroups(currentCompanyId);
+        if (activeTab === 'salaryTypes' && fetchSalaryTypes) fetchSalaryTypes(currentCompanyId);
+        if (activeTab === 'attendance' && fetchAttendanceActions) fetchAttendanceActions(currentCompanyId);
+        if (activeTab === 'holidays') fetchHolidays(currentCompanyId ? parseInt(currentCompanyId, 10) : undefined);
+        if (activeTab === 'keys') fetchSystemKeys(currentCompanyId);
+        if (activeTab === 'punch') {
+            fetchSystemSettings?.(currentCompanyId);
+            fetchPunchLocations?.(currentCompanyId);
+        }
+    }, [activeTab, currentCompanyId, fetchDepartments, fetchShifts, fetchGroups, fetchSalaryTypes, fetchAttendanceActions, fetchSystemKeys, fetchSystemSettings, fetchPunchLocations, fetchHolidays]);
+
     // Punch System tab state
     const [detectingGps, setDetectingGps] = useState(false);
-    const [locDraft, setLocDraft] = useState(config.punchLocation);
+
+    // DB defaults
+    const punchLocationMaster = settings.PUNCH_LOCATION_MASTER || { enabled: false, name: 'Office', lat: 0, lng: 0, radiusMeters: 100 };
+    const punchMethods = settings.PUNCH_METHODS || {
+        face: { enabled: true, label: 'Face Scan' },
+        fingerprint: { enabled: true, label: 'Thumb Print' },
+        photoUpload: { enabled: true, label: 'Live Selfie' }
+    };
+    const shiftPunchWindows = settings.SHIFT_PUNCH_WINDOWS || [];
+
+    const _updatePunchMethod = (method: string, updates: any) => {
+        updateSetting('PUNCH_METHODS', { ...punchMethods, [method]: { ...punchMethods[method], ...updates } });
+    };
+
+    const _updatePunchLocationMaster = (updates: any) => {
+        updateSetting('PUNCH_LOCATION_MASTER', { ...punchLocationMaster, ...updates });
+    };
+
+    const _updateShiftPunchWindow = (id: string, updates: any) => {
+        const updated = shiftPunchWindows.map((w: any) => w.id === id ? { ...w, ...updates } : w);
+        updateSetting('SHIFT_PUNCH_WINDOWS', updated);
+    };
+
+    const _addShiftPunchWindow = (win: any) => {
+        const newWin = { ...win, id: Math.random().toString(36).substr(2, 9) };
+        updateSetting('SHIFT_PUNCH_WINDOWS', [...shiftPunchWindows, newWin]);
+    };
+
+    const _removeShiftPunchWindow = (id: string) => {
+        updateSetting('SHIFT_PUNCH_WINDOWS', shiftPunchWindows.filter((w: any) => w.id !== id));
+    };
+
+    const [locDraft, setLocDraft] = useState<{
+        enabled: boolean;
+        name: string;
+        lat: number;
+        lng: number;
+        radiusMeters: number;
+    }>(punchLocationMaster);
+    useEffect(() => { setLocDraft(punchLocationMaster); }, [settings.PUNCH_LOCATION_MASTER]);
 
     // Warning Modal State
     const [warning, setWarning] = useState<{
@@ -742,10 +819,10 @@ export const ConfigurationPage = () => {
         e.preventDefault();
         const data = { ...stForm, key: stForm.key || stForm.label };
         if (editingStId) {
-            config.updateSalaryType(editingStId, data);
+            updateSalaryType(editingStId, data);
             setEditingStId(null);
         } else {
-            config.addSalaryType(data);
+            addSalaryType(data);
         }
         setStForm({ key: '', label: '', description: '', basis: 'MONTHLY' });
     };
@@ -864,6 +941,22 @@ export const ConfigurationPage = () => {
                             }`}
                     >
                         🛒 <span>Salesman</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('statutory')}
+                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'statutory'
+                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
+                            : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            }`}
+                    >
+                        <Shield className="w-4 h-4" /> <span>Statutory</span>
+                    </button>
+                    <button
+                        onClick={() => window.location.href = '/admin/audit-logs'}
+                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 border border-cyan-500/30`}
+                        title="View System Audit Trail"
+                    >
+                        <FileCheck className="w-4 h-4" /> <span>Audit Logs</span>
                     </button>
                 </div>
             </div>
@@ -1438,7 +1531,7 @@ export const ConfigurationPage = () => {
                     {/* Cards */}
                     <div className="lg:col-span-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {config.salaryTypes.map(st => (
+                            {salaryTypes.map(st => (
                                 <div key={st.id} className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-5 hover:border-primary-500/50 transition-all group flex flex-col justify-between">
                                     <div>
                                         <div className="flex items-center justify-between mb-2">
@@ -1453,7 +1546,7 @@ export const ConfigurationPage = () => {
                                                     <Edit2 className="w-4 h-4" />
                                                 </button>
                                                 <button
-                                                    onClick={() => setWarning({ isOpen: true, title: 'Delete Salary Type?', message: `\"${st.label}\" salary type delete ho jayega. Existing employees pe assigned data affect ho sakta hai.`, severity: 'danger', confirmText: 'Yes, Delete', onConfirm: () => config.deleteSalaryType(st.id) })}
+                                                    onClick={() => setWarning({ isOpen: true, title: 'Delete Salary Type?', message: `\"${st.label}\" salary type delete ho jayega. Existing employees pe assigned data affect ho sakta hai.`, severity: 'danger', confirmText: 'Yes, Delete', onConfirm: () => deleteSalaryType(st.id) })}
                                                     className="p-2 bg-slate-800 hover:bg-red-500/20 hover:text-red-500 rounded-lg transition-all"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
@@ -1474,14 +1567,6 @@ export const ConfigurationPage = () => {
                                     </div>
                                 </div>
                             ))}
-                            <div className="md:col-span-2 flex justify-center mt-4">
-                                <button
-                                    onClick={() => setWarning({ isOpen: true, title: 'Reset Salary Types?', message: 'Sare custom salary types hata ke defaults restore ho jayenge. Yeh action undo nahi ho sakta.', severity: 'danger', confirmText: 'Reset to Defaults', onConfirm: () => config.resetSalaryTypes() })}
-                                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-all"
-                                >
-                                    Reset to Defaults
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -1520,11 +1605,12 @@ export const ConfigurationPage = () => {
                                     <form onSubmit={e => {
                                         e.preventDefault();
                                         const fd = new FormData(e.currentTarget);
-                                        config.addAttendanceAction({
+                                        addAttendanceAction({
                                             key: fd.get('key') as string,
                                             label: fd.get('label') as string,
                                             icon: fd.get('icon') as string,
                                             color: fd.get('color') as string,
+                                            enabled: true
                                         });
                                         (e.target as HTMLFormElement).reset();
                                     }} className="space-y-4">
@@ -1555,7 +1641,7 @@ export const ConfigurationPage = () => {
 
                             {/* Cards */}
                             <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 content-start">
-                                {config.attendanceActions.map(action => (
+                                {attendanceActions.map(action => (
                                     <div key={action.id} className={`bg-slate-800/30 border rounded-2xl p-5 transition-all group ${action.enabled ? 'border-slate-700/50 hover:border-primary-500/50' : 'border-slate-700/20 opacity-60'}`}>
                                         <div className="flex items-start justify-between mb-3">
                                             {/* Preview button */}
@@ -1566,7 +1652,7 @@ export const ConfigurationPage = () => {
                                             <div className="flex items-center gap-2">
                                                 {/* Toggle ON/OFF */}
                                                 <button
-                                                    onClick={() => config.toggleAttendanceAction(action.id)}
+                                                    onClick={() => toggleAttendanceAction(action.id)}
                                                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${action.enabled ? 'bg-primary-600' : 'bg-slate-700'}`}
                                                     title={action.enabled ? 'Disable' : 'Enable'}
                                                 >
@@ -1574,7 +1660,7 @@ export const ConfigurationPage = () => {
                                                 </button>
                                                 {!action.isDefault && (
                                                     <button
-                                                        onClick={() => setWarning({ isOpen: true, title: 'Delete Action?', message: `"${action.label}" action permanently delete ho jayegi.`, severity: 'danger', confirmText: 'Delete', onConfirm: () => config.deleteAttendanceAction(action.id) })}
+                                                        onClick={() => setWarning({ isOpen: true, title: 'Delete Action?', message: `"${action.label}" action permanently delete ho jayegi.`, severity: 'danger', confirmText: 'Delete', onConfirm: () => deleteAttendanceAction(action.id) })}
                                                         className="p-1.5 bg-slate-800 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all text-slate-400"
                                                     >
                                                         <Trash2 className="w-3.5 h-3.5" />
@@ -1589,12 +1675,6 @@ export const ConfigurationPage = () => {
                                         </div>
                                     </div>
                                 ))}
-                                <div className="md:col-span-2 flex justify-center mt-2">
-                                    <button
-                                        onClick={() => setWarning({ isOpen: true, title: 'Reset Attendance Actions?', message: 'Sare custom actions remove ho jayenge aur defaults restore ho jayenge.', severity: 'danger', confirmText: 'Reset', onConfirm: () => config.resetAttendanceActions() })}
-                                        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-all"
-                                    >Reset to Defaults</button>
-                                </div>
                             </div>
 
                             {/* ── Punch Method Config ────────────────────────── */}
@@ -1614,13 +1694,13 @@ export const ConfigurationPage = () => {
                                         { key: 'fingerprint' as const, icon: '👆', desc: 'Device fingerprint/biometric se punch karo' },
                                         { key: 'photoUpload' as const, icon: '📷', desc: 'Gallery se photo upload karke punch karo' },
                                     ] as const).map(({ key, icon, desc }) => {
-                                        const m = config.punchMethods[key];
+                                        const m = punchMethods[key];
                                         return (
                                             <div key={key} className={`border rounded-2xl p-4 transition-all ${m.enabled ? 'border-blue-500/40 bg-blue-500/5' : 'border-slate-700/50 bg-slate-800/30 opacity-60'}`}>
                                                 <div className="flex items-start justify-between mb-3">
                                                     <span className="text-2xl">{icon}</span>
                                                     <button
-                                                        onClick={() => config.updatePunchMethod(key, { enabled: !m.enabled })}
+                                                        onClick={() => _updatePunchMethod(key, { enabled: !m.enabled })}
                                                         className={`w-11 h-6 rounded-full transition-all relative shrink-0 ${m.enabled ? 'bg-blue-500' : 'bg-slate-600'}`}
                                                     >
                                                         <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all shadow-sm ${m.enabled ? 'left-[22px]' : 'left-0.5'}`} />
@@ -1628,7 +1708,7 @@ export const ConfigurationPage = () => {
                                                 </div>
                                                 <input
                                                     value={m.label}
-                                                    onChange={e => config.updatePunchMethod(key, { label: e.target.value })}
+                                                    onChange={e => _updatePunchMethod(key, { label: e.target.value })}
                                                     className="w-full bg-transparent text-white font-bold text-sm border-b border-slate-700 focus:border-blue-500 outline-none pb-1 mb-1"
                                                 />
                                                 <p className="text-xs text-slate-500">{desc}</p>
@@ -1681,7 +1761,7 @@ export const ConfigurationPage = () => {
                                 <form onSubmit={e => {
                                     e.preventDefault();
                                     const fd = new FormData(e.currentTarget);
-                                    config.addSystemKey({
+                                    addSystemKey({
                                         key: fd.get('key') as string,
                                         label: fd.get('label') as string,
                                         value: fd.get('value') as string,
@@ -1727,7 +1807,7 @@ export const ConfigurationPage = () => {
                         {/* Keys Table */}
                         <div className="lg:col-span-2 space-y-3">
                             {CATEGORIES.map(cat => {
-                                const catKeys = config.systemKeys.filter(k => k.category === cat);
+                                const catKeys = systemKeys.filter(k => k.category === cat);
                                 if (catKeys.length === 0) return null;
                                 return (
                                     <div key={cat} className="bg-slate-800/30 border border-slate-700/50 rounded-2xl overflow-hidden">
@@ -1741,8 +1821,8 @@ export const ConfigurationPage = () => {
                                                     key={sk.id}
                                                     sk={sk}
                                                     isLast={idx === catKeys.length - 1}
-                                                    onDelete={() => setWarning({ isOpen: true, title: 'Delete Key?', message: `"${sk.key}" key permanently delete ho jayegi. Is key ka use karne wali features break ho sakti hain.`, severity: 'danger', confirmText: 'Delete', onConfirm: () => config.deleteSystemKey(sk.id) })}
-                                                    onUpdate={(data) => config.updateSystemKey(sk.id, data)}
+                                                    onDelete={() => setWarning({ isOpen: true, title: 'Delete Key?', message: `"${sk.key}" key permanently delete ho jayegi. Is key ka use karne wali features break ho sakti hain.`, severity: 'danger', confirmText: 'Delete', onConfirm: () => deleteSystemKey(sk.id) })}
+                                                    onUpdate={(data) => updateSystemKey(sk.id, data)}
                                                 />
                                             );
                                         })}
@@ -1863,20 +1943,6 @@ export const ConfigurationPage = () => {
             {/* ─── Punch System (Methods + Location) ─── */}
             {activeTab === 'punch' && (() => {
 
-                const detectMyLocation = () => {
-                    setDetectingGps(true);
-                    navigator.geolocation.getCurrentPosition(
-                        (pos) => {
-                            setLocDraft(d => ({ ...d, lat: +pos.coords.latitude.toFixed(6), lng: +pos.coords.longitude.toFixed(6) }));
-                            setDetectingGps(false);
-                        },
-                        () => setDetectingGps(false),
-                        { enableHighAccuracy: true, timeout: 10000 }
-                    );
-                };
-
-                const saveLocation = () => config.setPunchLocation(locDraft);
-
                 const METHOD_ICONS: Record<string, JSX.Element> = {
                     face: <ScanFace className="w-5 h-5" />,
                     fingerprint: <Fingerprint className="w-5 h-5" />,
@@ -1904,26 +1970,29 @@ export const ConfigurationPage = () => {
                             </div>
                             <div className="space-y-3">
                                 {(['face', 'fingerprint', 'photoUpload'] as const).map(method => {
-                                    const m = config.punchMethods[method];
+                                    const m = punchMethods[method];
                                     return (
                                         <div key={method} className={`flex items-center gap-4 px-4 py-3 rounded-xl border transition-all ${m.enabled ? 'bg-slate-700/30 border-slate-600/40' : 'bg-slate-800/20 border-slate-700/20 opacity-60'
                                             }`}>
                                             <span className={`${METHOD_COLORS[method]}`}>{METHOD_ICONS[method]}</span>
-                                            <div className="flex-1">
-                                                {isAdmin ? (
-                                                    <input
-                                                        value={m.label}
-                                                        onChange={e => config.updatePunchMethod(method, { label: e.target.value })}
-                                                        className="bg-transparent text-white text-sm font-semibold w-full outline-none border-b border-transparent focus:border-slate-500 transition-colors"
-                                                    />
-                                                ) : (
-                                                    <p className="text-sm font-semibold text-white">{m.label}</p>
-                                                )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    {isAdmin ? (
+                                                        <input
+                                                            value={m.label}
+                                                            onChange={e => _updatePunchMethod(method, { label: e.target.value })}
+                                                            className="bg-transparent text-white text-sm font-semibold w-full outline-none border-b border-transparent focus:border-slate-500 transition-colors"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-white font-bold text-sm">{m.label}</span>
+                                                    )}
+                                                    {!m.enabled && <span className="text-[10px] bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Disabled</span>}
+                                                </div>
                                                 <p className="text-xs text-slate-500 capitalize">{method === 'photoUpload' ? 'Live Camera Selfie' : method}</p>
                                             </div>
                                             {isAdmin && (
                                                 <button
-                                                    onClick={() => config.updatePunchMethod(method, { enabled: !m.enabled })}
+                                                    onClick={() => _updatePunchMethod(method, { enabled: !m.enabled })}
                                                     className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${m.enabled
                                                         ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
                                                         : 'bg-slate-700/50 text-slate-500 border border-slate-600/30 hover:bg-slate-700'
@@ -1954,110 +2023,132 @@ export const ConfigurationPage = () => {
                                 </div>
                                 {isAdmin && (
                                     <button
-                                        onClick={() => config.togglePunchLocation()}
-                                        className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all border ${config.punchLocation.enabled
+                                        onClick={() => _updatePunchLocationMaster({ enabled: !punchLocationMaster.enabled })}
+                                        className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all border ${punchLocationMaster.enabled
                                             ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
                                             : 'bg-slate-700/50 text-slate-400 border-slate-600/30 hover:bg-slate-700'
                                             }`}
                                     >
-                                        {config.punchLocation.enabled
+                                        {punchLocationMaster.enabled
                                             ? <><ToggleRight className="w-4 h-4" /> Location ON</>
                                             : <><ToggleLeft className="w-4 h-4" /> Location OFF</>}
                                     </button>
                                 )}
                             </div>
 
-                            {config.punchLocation.enabled && (
-                                <div className="space-y-4">
-                                    {/* Location name */}
-                                    <div>
-                                        <label className="text-xs text-slate-400 font-medium mb-1.5 block">Location Name</label>
-                                        <input
-                                            value={locDraft.name}
-                                            onChange={e => setLocDraft(d => ({ ...d, name: e.target.value }))}
-                                            placeholder="e.g. Head Office"
-                                            disabled={!isAdmin}
-                                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
-                                        />
-                                    </div>
+                            {punchLocationMaster.enabled && (() => {
+                                const detectMyLocation = () => {
+                                    setDetectingGps(true);
+                                    navigator.geolocation.getCurrentPosition(
+                                        (pos) => {
+                                            setLocDraft(d => ({ ...d, lat: pos.coords.latitude, lng: pos.coords.longitude }));
+                                            setDetectingGps(false);
+                                        },
+                                        (err) => {
+                                            console.error('GPS error:', err.message);
+                                            setDetectingGps(false);
+                                        },
+                                        { enableHighAccuracy: true }
+                                    );
+                                };
 
-                                    {/* Lat + Lng */}
-                                    <div className="grid grid-cols-2 gap-3">
+                                const saveLocation = () => {
+                                    if (!locDraft.lat || !locDraft.lng) return alert('Pehli GPS Location set kijiye');
+                                    _updatePunchLocationMaster(locDraft);
+                                    alert('Master Location Save ho gayi');
+                                };
+                                return (
+                                    <div className="space-y-4">
+                                        {/* Location name */}
                                         <div>
-                                            <label className="text-xs text-slate-400 font-medium mb-1.5 block">Latitude</label>
+                                            <label className="text-xs text-slate-400 font-medium mb-1.5 block">Location Name</label>
                                             <input
-                                                type="number" step="0.000001"
-                                                value={locDraft.lat}
-                                                onChange={e => setLocDraft(d => ({ ...d, lat: +e.target.value }))}
+                                                value={locDraft.name}
+                                                onChange={e => setLocDraft(d => ({ ...d, name: e.target.value }))}
+                                                placeholder="e.g. Head Office"
                                                 disabled={!isAdmin}
-                                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
+                                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
                                             />
                                         </div>
+
+                                        {/* Lat + Lng */}
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="text-xs text-slate-400 font-medium mb-1.5 block">Latitude</label>
+                                                <input
+                                                    type="number" step="0.000001"
+                                                    value={locDraft.lat}
+                                                    onChange={e => setLocDraft(d => ({ ...d, lat: +e.target.value }))}
+                                                    disabled={!isAdmin}
+                                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-slate-400 font-medium mb-1.5 block">Longitude</label>
+                                                <input
+                                                    type="number" step="0.000001"
+                                                    value={locDraft.lng}
+                                                    onChange={e => setLocDraft(d => ({ ...d, lng: +e.target.value }))}
+                                                    disabled={!isAdmin}
+                                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Detect GPS button */}
+                                        {isAdmin && (
+                                            <button
+                                                onClick={detectMyLocation}
+                                                disabled={detectingGps}
+                                                className="flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-all disabled:opacity-50"
+                                            >
+                                                {detectingGps
+                                                    ? <><Navigation className="w-3.5 h-3.5 animate-pulse" /> Detecting...</>
+                                                    : <><Crosshair className="w-3.5 h-3.5" /> My Current Location Detect Karo</>}
+                                            </button>
+                                        )}
+
+                                        {/* Radius */}
                                         <div>
-                                            <label className="text-xs text-slate-400 font-medium mb-1.5 block">Longitude</label>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-xs text-slate-400 font-medium">Allowed Radius</label>
+                                                <span className="text-sm font-bold text-emerald-400 font-mono">{locDraft.radiusMeters}m</span>
+                                            </div>
                                             <input
-                                                type="number" step="0.000001"
-                                                value={locDraft.lng}
-                                                onChange={e => setLocDraft(d => ({ ...d, lng: +e.target.value }))}
+                                                type="range" min={25} max={2000} step={25}
+                                                value={locDraft.radiusMeters}
+                                                onChange={e => setLocDraft(d => ({ ...d, radiusMeters: +e.target.value }))}
                                                 disabled={!isAdmin}
-                                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
+                                                className="w-full accent-emerald-500 disabled:opacity-50"
                                             />
+                                            <div className="flex justify-between text-xs text-slate-600 mt-1">
+                                                <span>25m</span><span>500m</span><span>1km</span><span>2km</span>
+                                            </div>
                                         </div>
+
+                                        {/* Active zone preview */}
+                                        <div className="bg-slate-900/50 rounded-xl px-4 py-3 flex items-center gap-3 border border-slate-700/30">
+                                            <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
+                                            <div className="text-xs">
+                                                <p className="text-white font-semibold">{locDraft.name || 'Location not set'}</p>
+                                                <p className="text-slate-500 font-mono">{locDraft.lat}, {locDraft.lng} · {locDraft.radiusMeters}m radius</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Save button */}
+                                        {isAdmin && (
+                                            <button
+                                                onClick={saveLocation}
+                                                className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30"
+                                            >
+                                                <Save className="w-4 h-4" /> Location Save Karo
+                                            </button>
+                                        )}
                                     </div>
+                                );
+                            })()}
 
-                                    {/* Detect GPS button */}
-                                    {isAdmin && (
-                                        <button
-                                            onClick={detectMyLocation}
-                                            disabled={detectingGps}
-                                            className="flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-all disabled:opacity-50"
-                                        >
-                                            {detectingGps
-                                                ? <><Navigation className="w-3.5 h-3.5 animate-pulse" /> Detecting...</>
-                                                : <><Crosshair className="w-3.5 h-3.5" /> My Current Location Detect Karo</>}
-                                        </button>
-                                    )}
-
-                                    {/* Radius */}
-                                    <div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <label className="text-xs text-slate-400 font-medium">Allowed Radius</label>
-                                            <span className="text-sm font-bold text-emerald-400 font-mono">{locDraft.radiusMeters}m</span>
-                                        </div>
-                                        <input
-                                            type="range" min={25} max={2000} step={25}
-                                            value={locDraft.radiusMeters}
-                                            onChange={e => setLocDraft(d => ({ ...d, radiusMeters: +e.target.value }))}
-                                            disabled={!isAdmin}
-                                            className="w-full accent-emerald-500 disabled:opacity-50"
-                                        />
-                                        <div className="flex justify-between text-xs text-slate-600 mt-1">
-                                            <span>25m</span><span>500m</span><span>1km</span><span>2km</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Active zone preview */}
-                                    <div className="bg-slate-900/50 rounded-xl px-4 py-3 flex items-center gap-3 border border-slate-700/30">
-                                        <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
-                                        <div className="text-xs">
-                                            <p className="text-white font-semibold">{locDraft.name || 'Location not set'}</p>
-                                            <p className="text-slate-500 font-mono">{locDraft.lat}, {locDraft.lng} · {locDraft.radiusMeters}m radius</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Save button */}
-                                    {isAdmin && (
-                                        <button
-                                            onClick={saveLocation}
-                                            className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30"
-                                        >
-                                            <Save className="w-4 h-4" /> Location Save Karo
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-
-                            {!config.punchLocation.enabled && (
+                            {!punchLocationMaster.enabled && (
                                 <div className="flex items-center gap-3 bg-slate-900/40 rounded-xl px-4 py-3 border border-slate-700/20">
                                     <MapPin className="w-4 h-4 text-slate-600" />
                                     <p className="text-xs text-slate-500">Location restriction disabled hai. Enable karo to office boundary se punch restrict karo.</p>
@@ -2087,7 +2178,7 @@ export const ConfigurationPage = () => {
                                             const lat = parseFloat(latStr || '0');
                                             const lng = parseFloat(lngStr || '0');
                                             if (isNaN(lat) || isNaN(lng)) return;
-                                            config.addPunchLocation({ name, lat, lng, radiusMeters: 100, enabled: true });
+                                            addPunchLocation({ name, lat, lng, radiusMeters: 100, enabled: true });
                                         }}
                                         className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-teal-500/15 text-teal-400 border border-teal-500/30 hover:bg-teal-500/25 transition-all"
                                     >
@@ -2096,51 +2187,134 @@ export const ConfigurationPage = () => {
                                 )}
                             </div>
 
-                            {config.punchLocations.length === 0 ? (
+                            {punchLocations.length === 0 ? (
                                 <div className="flex items-center gap-3 bg-slate-900/40 rounded-xl px-4 py-3 border border-slate-700/20">
                                     <MapPin className="w-4 h-4 text-slate-600" />
                                     <p className="text-xs text-slate-500">Koi GPS zone add nahi kiya. "+ Add Zone" se new location add karo.</p>
                                 </div>
                             ) : (
-                                <div className="space-y-2">
-                                    {config.punchLocations.map(zone => (
-                                        <div key={zone.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${zone.enabled ? 'bg-slate-700/30 border-slate-600/40' : 'bg-slate-800/20 border-slate-700/20 opacity-50'}`}>
-                                            <div className={`w-2 h-2 rounded-full shrink-0 ${zone.enabled ? 'bg-teal-400' : 'bg-slate-600'}`} />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold text-white truncate">{zone.name}</p>
-                                                <p className="text-xs text-slate-500 font-mono">{zone.lat.toFixed(5)}, {zone.lng.toFixed(5)} · {zone.radiusMeters}m</p>
-                                            </div>
-                                            {isAdmin && (
-                                                <div className="flex items-center gap-1 shrink-0">
-                                                    {/* Radius quick edit */}
-                                                    <input
-                                                        type="number"
-                                                        value={zone.radiusMeters}
-                                                        min={10} max={5000} step={10}
-                                                        onChange={e => config.updatePunchLocation(zone.id, { radiusMeters: +e.target.value })}
-                                                        className="w-16 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs font-mono text-center focus:outline-none focus:border-teal-500/50"
-                                                        title="Radius (meters)"
-                                                    />
-                                                    <span className="text-xs text-slate-500">m</span>
-                                                    <button
-                                                        onClick={() => config.togglePunchLocationZone(zone.id)}
-                                                        className={`px-2 py-1 text-xs font-bold rounded-lg border transition-all ${zone.enabled ? 'bg-teal-500/15 text-teal-400 border-teal-500/30' : 'bg-slate-700/50 text-slate-500 border-slate-600/30'}`}
-                                                    >
-                                                        {zone.enabled ? 'ON' : 'OFF'}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => config.removePunchLocation(zone.id)}
-                                                        className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
+                                <div className="space-y-3">
+                                    {punchLocations.map(zone => {
+                                        const bssids: string[] = zone.allowedBSSIDs || [];
+                                        return (
+                                            <div key={zone.id} className={`rounded-xl border transition-all ${zone.enabled ? 'bg-slate-700/30 border-slate-600/40' : 'bg-slate-800/20 border-slate-700/20 opacity-50'}`}>
+                                                {/* Main Zone Row */}
+                                                <div className="flex items-center gap-3 px-4 py-3">
+                                                    <div className={`w-2 h-2 rounded-full shrink-0 ${zone.enabled ? 'bg-teal-400' : 'bg-slate-600'}`} />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-semibold text-white truncate">{zone.name}</p>
+                                                        <p className="text-xs text-slate-500 font-mono">{zone.lat.toFixed(5)}, {zone.lng.toFixed(5)} · {zone.radiusMeters}m</p>
+                                                    </div>
+                                                    {isAdmin && (
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            {/* Radius quick edit */}
+                                                            <input
+                                                                type="number"
+                                                                value={zone.radiusMeters}
+                                                                min={10} max={5000} step={10}
+                                                                onChange={e => updatePunchLocation(zone.id, { radiusMeters: +e.target.value })}
+                                                                className="w-16 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs font-mono text-center focus:outline-none focus:border-teal-500/50"
+                                                                title="Radius (meters)"
+                                                            />
+                                                            <span className="text-xs text-slate-500">m</span>
+                                                            <button
+                                                                onClick={() => togglePunchLocationZone(zone.id)}
+                                                                className={`px-2 py-1 text-xs font-bold rounded-lg border transition-all ${zone.enabled ? 'bg-teal-500/15 text-teal-400 border-teal-500/30' : 'bg-slate-700/50 text-slate-500 border-slate-600/30'}`}
+                                                            >
+                                                                {zone.enabled ? 'ON' : 'OFF'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => deletePunchLocation(zone.id)}
+                                                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
-                                    ))}
+
+                                                {/* ── BSSID (Wi-Fi Router) Binding Section ── */}
+                                                <div className="mx-4 mb-3 px-3 pt-2 pb-3 bg-slate-900/50 rounded-lg border border-slate-700/30">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider">📶 Wi-Fi BSSID Binding</span>
+                                                        <span className="text-[10px] text-slate-600">Android App Only</span>
+                                                    </div>
+
+                                                    {/* Existing BSSIDs */}
+                                                    {bssids.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1.5 mb-2">
+                                                            {bssids.map((mac, idx) => (
+                                                                <span key={idx} className="flex items-center gap-1 bg-violet-500/10 border border-violet-500/30 text-violet-300 text-[11px] font-mono px-2 py-0.5 rounded-full">
+                                                                    {mac}
+                                                                    {isAdmin && (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                const updated = bssids.filter((_, i) => i !== idx);
+                                                                                updatePunchLocation(zone.id, { allowedBSSIDs: updated } as any);
+                                                                            }}
+                                                                            className="text-violet-500 hover:text-red-400 transition-colors ml-0.5"
+                                                                            title="Remove this BSSID"
+                                                                        >×</button>
+                                                                    )}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-[11px] text-slate-600 mb-2">No BSSID restrictions — all Wi-Fi networks allowed.</p>
+                                                    )}
+
+                                                    {/* Add BSSID input */}
+                                                    {isAdmin && (
+                                                        <form
+                                                            onSubmit={e => {
+                                                                e.preventDefault();
+                                                                const input = (e.currentTarget.elements.namedItem('bssidInput') as HTMLInputElement);
+                                                                const raw = input.value.trim().toUpperCase();
+                                                                // Basic MAC address format validation
+                                                                const macRegex = /^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$/;
+                                                                if (!macRegex.test(raw)) {
+                                                                    input.setCustomValidity('Format: AA:BB:CC:DD:EE:FF');
+                                                                    input.reportValidity();
+                                                                    return;
+                                                                }
+                                                                if (bssids.includes(raw)) {
+                                                                    input.setCustomValidity('Already added');
+                                                                    input.reportValidity();
+                                                                    return;
+                                                                }
+                                                                input.setCustomValidity('');
+                                                                updatePunchLocation(zone.id, { allowedBSSIDs: [...bssids, raw] } as any);
+                                                                input.value = '';
+                                                            }}
+                                                            className="flex gap-2"
+                                                        >
+                                                            <input
+                                                                name="bssidInput"
+                                                                type="text"
+                                                                placeholder="AA:BB:CC:DD:EE:FF"
+                                                                maxLength={17}
+                                                                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/60 transition-colors placeholder-slate-600"
+                                                                onChange={e => {
+                                                                    (e.target as HTMLInputElement).setCustomValidity('');
+                                                                }}
+                                                            />
+                                                            <button
+                                                                type="submit"
+                                                                className="px-3 py-1.5 bg-violet-500/15 border border-violet-500/30 text-violet-400 hover:bg-violet-500/25 text-xs font-bold rounded-lg transition-all"
+                                                            >
+                                                                + Add
+                                                            </button>
+                                                        </form>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                             <p className="text-[11px] text-slate-600 mt-3">💡 Punch ke waqt employee ki location sabse kareeb wale enabled zone se match hoti hai.</p>
+                            <p className="text-[11px] text-slate-600 mt-1">📶 BSSID binding sirf Android app users pe apply hoti hai. Regular browser pe skip hoti hai.</p>
+
                         </div>
 
                         {/* ── Shift-wise Punch Windows ── */}
@@ -2160,7 +2334,7 @@ export const ConfigurationPage = () => {
                                         onClick={() => {
                                             const shiftName = prompt('Shift name (e.g. Morning Shift):');
                                             if (!shiftName) return;
-                                            config.addShiftPunchWindow({
+                                            _addShiftPunchWindow({
                                                 shiftId: shiftName.toUpperCase().replace(/\s+/g, '_'),
                                                 shiftName,
                                                 checkInFrom: '07:30',
@@ -2177,14 +2351,14 @@ export const ConfigurationPage = () => {
                                 )}
                             </div>
 
-                            {config.shiftPunchWindows.length === 0 ? (
+                            {shiftPunchWindows.length === 0 ? (
                                 <div className="flex items-center gap-3 bg-slate-900/40 rounded-xl px-4 py-3 border border-slate-700/20">
                                     <Clock className="w-4 h-4 text-slate-600" />
                                     <p className="text-xs text-slate-500">Koi punch window set nahi. "+ Add Window" se shift-wise time restrict karo.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    {config.shiftPunchWindows.map(win => (
+                                    {shiftPunchWindows.map((win: any) => (
                                         <div key={win.id} className={`rounded-xl border p-4 transition-all ${win.enabled ? 'bg-slate-700/30 border-slate-600/40' : 'bg-slate-800/20 border-slate-700/20 opacity-50'}`}>
                                             <div className="flex items-center justify-between mb-3">
                                                 <div className="flex items-center gap-2">
@@ -2195,12 +2369,12 @@ export const ConfigurationPage = () => {
                                                 {isAdmin && (
                                                     <div className="flex items-center gap-1">
                                                         <button
-                                                            onClick={() => config.updateShiftPunchWindow(win.id, { enabled: !win.enabled })}
+                                                            onClick={() => _updateShiftPunchWindow(win.id, { enabled: !win.enabled })}
                                                             className={`px-2 py-0.5 text-xs font-bold rounded border transition-all ${win.enabled ? 'bg-violet-500/15 text-violet-400 border-violet-500/30' : 'bg-slate-700/50 text-slate-500 border-slate-600/30'}`}
                                                         >
                                                             {win.enabled ? 'ON' : 'OFF'}
                                                         </button>
-                                                        <button onClick={() => config.removeShiftPunchWindow(win.id)} className="p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all">
+                                                        <button onClick={() => _removeShiftPunchWindow(win.id)} className="p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all">
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
                                                     </div>
@@ -2216,7 +2390,7 @@ export const ConfigurationPage = () => {
                                                             type="time"
                                                             value={win.checkInFrom}
                                                             disabled={!isAdmin}
-                                                            onChange={e => config.updateShiftPunchWindow(win.id, { checkInFrom: e.target.value })}
+                                                            onChange={e => _updateShiftPunchWindow(win.id, { checkInFrom: e.target.value })}
                                                             className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
                                                         />
                                                         <span className="text-slate-500 text-xs">→</span>
@@ -2224,7 +2398,7 @@ export const ConfigurationPage = () => {
                                                             type="time"
                                                             value={win.checkInTo}
                                                             disabled={!isAdmin}
-                                                            onChange={e => config.updateShiftPunchWindow(win.id, { checkInTo: e.target.value })}
+                                                            onChange={e => _updateShiftPunchWindow(win.id, { checkInTo: e.target.value })}
                                                             className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
                                                         />
                                                     </div>
@@ -2238,7 +2412,7 @@ export const ConfigurationPage = () => {
                                                             type="time"
                                                             value={win.checkOutFrom}
                                                             disabled={!isAdmin}
-                                                            onChange={e => config.updateShiftPunchWindow(win.id, { checkOutFrom: e.target.value })}
+                                                            onChange={e => _updateShiftPunchWindow(win.id, { checkOutFrom: e.target.value })}
                                                             className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
                                                         />
                                                         <span className="text-slate-500 text-xs">→</span>
@@ -2246,7 +2420,7 @@ export const ConfigurationPage = () => {
                                                             type="time"
                                                             value={win.checkOutTo}
                                                             disabled={!isAdmin}
-                                                            onChange={e => config.updateShiftPunchWindow(win.id, { checkOutTo: e.target.value })}
+                                                            onChange={e => _updateShiftPunchWindow(win.id, { checkOutTo: e.target.value })}
                                                             className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
                                                         />
                                                     </div>
@@ -2273,6 +2447,7 @@ export const ConfigurationPage = () => {
                 confirmText={warning.confirmText}
             />
             {activeTab === 'salesman' && <SalesmanConfigPanel />}
+            {activeTab === 'statutory' && <StatutorySettings />}
         </div >
     );
 };

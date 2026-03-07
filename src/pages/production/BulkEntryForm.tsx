@@ -14,14 +14,15 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
+import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 
-type RowData = { item: string; rate: string; qty: string; remark: string };
+type RowData = { itemId?: string; item: string; rate: string; qty: string; remark: string };
 
 export const BulkEntryForm = ({ onClose }: { onClose?: () => void }) => {
     const navigate = useNavigate();
     const handleClose = () => onClose ? onClose() : navigate(-1);
     const { employees } = useEmployeeStore();
-    const { addEntry } = useProductionStore();
+    const { currentCompanyId } = useMultiCompanyStore();
     const { items, getItem } = useRateStore();
     const { groups } = useWorkGroupStore();
     const { productionGridDepts } = useSystemConfigStore();
@@ -39,6 +40,7 @@ export const BulkEntryForm = ({ onClose }: { onClose?: () => void }) => {
 
     // ── Defaults Panel ────────────────────────────────────────────────────────
     const [defaultItemName, setDefaultItemName] = useState('');
+    const [defaultItemId, setDefaultItemId] = useState('');
     const [defaultRate, setDefaultRate] = useState('');
     const [defaultQty, setDefaultQty] = useState('');
     const [selectedMasterItem, setSelectedMasterItem] = useState<{ id: string; name: string; rate: number } | null>(null);
@@ -108,6 +110,7 @@ export const BulkEntryForm = ({ onClose }: { onClose?: () => void }) => {
                 const cur = newRows[e.id] || { item: '', rate: '', qty: '', remark: '' };
                 newRows[e.id] = {
                     item: defaultItemName || cur.item,
+                    itemId: defaultItemName ? defaultItemId : cur.itemId,
                     rate: defaultRate || cur.rate,
                     qty: defaultQty || cur.qty,
                     remark: cur.remark,
@@ -128,9 +131,12 @@ export const BulkEntryForm = ({ onClose }: { onClose?: () => void }) => {
         , [rows, activeEmployees]);
 
     // ── Submit ────────────────────────────────────────────────────────────────
-    const handleSubmit = () => {
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleSubmit = async () => {
+        if (submitting) return;
         const missing: string[] = [];
-        let count = 0;
+        const validPayloads: any[] = [];
 
         selectedEmpIds.forEach(empId => {
             const row = getRow(empId);
@@ -142,27 +148,38 @@ export const BulkEntryForm = ({ onClose }: { onClose?: () => void }) => {
                 missing.push(emp?.name || empId);
                 return;
             }
-            addEntry({
+            validPayloads.push({
+                companyId: currentCompanyId || undefined,
                 date,
                 employeeId: empId,
                 item: row.item,
+                itemId: row.itemId,
                 qty,
                 rate,
                 remarks: row.remark || undefined,
-            } as any);
-            count++;
+            });
         });
 
         if (missing.length > 0) {
             showToast(`⚠️ Item/Rate missing for: ${missing.slice(0, 2).join(', ')}${missing.length > 2 ? ` +${missing.length - 2} more` : ''}`);
             return;
         }
-        if (count === 0) {
+        if (validPayloads.length === 0) {
             showToast('⚠️ Kisi ka bhi Qty fill nahi hai!');
             return;
         }
-        showToast(`✅ ${count} entries save ho gayi!`);
-        setTimeout(() => handleClose(), 1400);
+
+        setSubmitting(true);
+        const { addBulkEntries } = useProductionStore.getState();
+        const result = await addBulkEntries(validPayloads);
+        setSubmitting(false);
+
+        if (result.failedCount > 0) {
+            showToast(`⚠️ Partial Success: ${result.successCount} saved, ${result.failedCount} failed.`);
+        } else {
+            showToast(`✅ ${result.successCount} entries save ho gayi!`);
+        }
+        setTimeout(() => handleClose(), 1600);
     };
 
     const allSelected = activeEmployees.length > 0 && selectedEmpIds.size === activeEmployees.length;
@@ -222,7 +239,7 @@ export const BulkEntryForm = ({ onClose }: { onClose?: () => void }) => {
                             <div className="flex justify-between items-center mb-1">
                                 <label className="text-[10px] text-dark-muted font-bold uppercase tracking-wider">Default Item</label>
                                 <button type="button"
-                                    onClick={() => { setSelectedMasterItem(null); setDefaultItemName(''); setDefaultRate(''); setIsManual(!isManual); }}
+                                    onClick={() => { setSelectedMasterItem(null); setDefaultItemName(''); setDefaultItemId(''); setDefaultRate(''); setIsManual(!isManual); }}
                                     className="text-[10px] text-primary-400 hover:text-primary-300 font-medium underline underline-offset-2">
                                     {isManual ? 'Master list se' : 'Manual likho'}
                                 </button>
@@ -237,7 +254,7 @@ export const BulkEntryForm = ({ onClose }: { onClose?: () => void }) => {
                                     value={selectedMasterItem?.id || ''}
                                     onChange={val => {
                                         const item = getItem(val);
-                                        if (item) { setSelectedMasterItem(item); setDefaultItemName(item.name); setDefaultRate(item.rate.toString()); }
+                                        if (item) { setSelectedMasterItem(item); setDefaultItemName(item.name); setDefaultItemId(item.id); setDefaultRate(item.rate.toString()); }
                                     }}
                                     placeholder="Item select karo..." />
                             )}
@@ -405,7 +422,7 @@ export const BulkEntryForm = ({ onClose }: { onClose?: () => void }) => {
                                                     <div className="text-[10px] text-dark-muted mb-1.5 md:hidden uppercase font-bold tracking-wider">Item / Work</div>
                                                     <input type="text" placeholder="Item/kaam ka naam..."
                                                         value={row.item}
-                                                        onChange={e => { updateRow(emp.id, { item: e.target.value }); if (!isSelected) toggleSelect(emp.id); }}
+                                                        onChange={e => { updateRow(emp.id, { item: e.target.value, itemId: '' }); if (!isSelected) toggleSelect(emp.id); }}
                                                         className="w-full bg-dark-bg/60 md:bg-transparent border border-dark-border/40 md:border-0 md:border-b md:border-white/10 rounded-lg md:rounded-none focus:border-primary-500 outline-none px-3 py-2.5 md:px-1 md:py-1 text-white placeholder:text-dark-muted/50 text-[14px] md:text-[13px] transition-colors" />
                                                 </div>
 

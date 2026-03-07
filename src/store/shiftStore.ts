@@ -1,49 +1,93 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { Shift } from '@/types';
 import { useMultiCompanyStore } from './multiCompanyStore';
+import { apiFetch } from '@/lib/apiClient';
 
 interface ShiftState {
     shifts: Shift[];
-    addShift: (shift: Omit<Shift, 'id' | 'companyId'>) => void;
-    updateShift: (id: string, updates: Partial<Omit<Shift, 'companyId'>>) => void; // Added update
-    removeShift: (id: string) => void;
+    isLoading: boolean;
+    fetchShifts: (companyId: string) => Promise<void>;
+    addShift: (shift: Omit<Shift, 'id' | 'companyId'>) => Promise<void>;
+    updateShift: (id: string, updates: Partial<Omit<Shift, 'companyId'>>) => Promise<void>;
+    removeShift: (id: string) => Promise<void>;
     getShift: (id: string) => Shift | undefined;
 }
 
-// Export for direct store access (getState)
-export const useInternalShiftStore = create<ShiftState>()(
-    persist(
-        (set, get) => ({
-            shifts: [],
-            addShift: (shift) => {
-                const currentCompanyId = useMultiCompanyStore.getState().currentCompanyId;
-                if (!currentCompanyId) return;
+export const useInternalShiftStore = create<ShiftState>((set, get) => ({
+    shifts: [],
+    isLoading: false,
 
-                const newShift: Shift = {
-                    ...shift,
-                    id: Math.random().toString(36).substr(2, 9),
-                    companyId: currentCompanyId
-                };
-                set(state => ({ shifts: [...state.shifts, newShift] }));
-            },
-            updateShift: (id, updates) => {
-                set(state => ({
-                    shifts: state.shifts.map(s => s.id === id ? { ...s, ...updates } : s)
-                }));
-            },
-            removeShift: (id) => {
-                set(state => ({ shifts: state.shifts.filter(s => s.id !== id) }));
-            },
-            getShift: (id) => {
-                return get().shifts.find(s => s.id === id);
+    fetchShifts: async (companyId) => {
+        if (!companyId) return;
+        set({ isLoading: true });
+        try {
+            const res = await apiFetch(`/shifts?companyId=${companyId}`);
+            if (res.ok) {
+                const data = await res.json();
+                set({ shifts: data });
             }
-        }),
-        {
-            name: 'shift-storage'
+        } catch (error) {
+            console.error('Failed to fetch shifts:', error);
+        } finally {
+            set({ isLoading: false });
         }
-    )
-);
+    },
+
+    addShift: async (shift) => {
+        const currentCompanyId = useMultiCompanyStore.getState().currentCompanyId;
+        if (!currentCompanyId) return;
+
+        try {
+            const newShift = { ...shift, companyId: currentCompanyId };
+            const tempId = `temp-${Date.now()}`;
+            set(state => ({ shifts: [...state.shifts, { ...newShift, id: tempId } as Shift] }));
+
+            const res = await apiFetch(`/shifts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...newShift, id: Math.random().toString(36).substr(2, 9) })
+            });
+
+            if (res.ok) {
+                const saved = await res.json();
+                set(state => ({
+                    shifts: state.shifts.map(s => s.id === tempId ? saved : s)
+                }));
+            }
+        } catch (error) {
+            console.error('Failed to add shift', error);
+        }
+    },
+
+    updateShift: async (id, updates) => {
+        set(state => ({
+            shifts: state.shifts.map(s => s.id === id ? { ...s, ...updates } : s)
+        }));
+
+        try {
+            await apiFetch(`/shifts/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates)
+            });
+        } catch (error) {
+            console.error('Failed to update shift:', error);
+        }
+    },
+
+    removeShift: async (id) => {
+        set(state => ({ shifts: state.shifts.filter(s => s.id !== id) }));
+        try {
+            await apiFetch(`/shifts/${id}`, { method: 'DELETE' });
+        } catch (error) {
+            console.error('Failed to delete shift:', error);
+        }
+    },
+
+    getShift: (id) => {
+        return get().shifts.find(s => s.id === id);
+    }
+}));
 
 export const useShiftStore = () => {
     const store = useInternalShiftStore();
@@ -58,7 +102,6 @@ export const useShiftStore = () => {
         { id: 'NIGHT', companyId: currentCompanyId || '', name: 'Night Shift', startTime: '20:00', endTime: '05:00', graceTimeMinutes: 20 }
     ];
 
-    // Merge defaults with custom shifts, prioritized by custom ones if names match
     const finalShifts = [
         ...defaults.filter(def => !filteredShifts.some(s => s.name.toLowerCase() === def.name.toLowerCase())),
         ...filteredShifts

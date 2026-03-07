@@ -1,19 +1,43 @@
-import { useState } from 'react';
-import { TrendingUp, Download, AlertCircle } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { TrendingUp, Download, AlertCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { useSystemKeyStore } from '@/store/systemKeyStore';
 import { TDSCalculator as TDSCalc } from '@/utils/tdsCalculator';
 
 export const TDSCalculator = () => {
+    const { keys } = useSystemKeyStore();
     const [annualSalary, setAnnualSalary] = useState<number>(600000);
     const [section80C, setSection80C] = useState<number>(150000);
     const [section80D, setSection80D] = useState<number>(25000);
     const [result, setResult] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
 
-    const handleCalculate = () => {
-        const tds = TDSCalc.calculateTDS(annualSalary, {
-            section80C,
-            section80D
-        });
-        setResult(tds);
+    const customSlabs = useMemo(() => {
+        const slabKey = keys.find(k => k.key === 'PAYROLL_TAX_SLABS');
+        if (slabKey && slabKey.value) {
+            try { return JSON.parse(slabKey.value); } catch (e) { }
+        }
+        return undefined;
+    }, [keys]);
+
+    const handleCalculate = async () => {
+        setIsLoading(true);
+        setError('');
+        try {
+            const response = await fetch('/api/calculators/tds', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                body: JSON.stringify({ annualSalary, section80C, section80D, customSlabs })
+            });
+
+            if (!response.ok) throw new Error('Calculation Engine Error');
+            const data = await response.json();
+            setResult(data);
+        } catch (err: any) {
+            setError(err.message || 'Failed to connect to Calculation Engine');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const formatCurrency = (amount: number) => {
@@ -83,11 +107,23 @@ export const TDSCalculator = () => {
                         <p className="text-xs text-dark-muted mt-1">Health Insurance Premium</p>
                     </div>
 
+                    {error && (
+                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2 text-sm text-red-400">
+                            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                            {error}
+                        </div>
+                    )}
+
                     <button
                         onClick={handleCalculate}
-                        className="w-full bg-gradient-to-r from-primary-600 to-blue-600 hover:from-primary-500 hover:to-blue-500 text-white px-6 py-3 rounded-xl font-medium transition-all"
+                        disabled={isLoading}
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary-600 to-blue-600 hover:from-primary-500 hover:to-blue-500 text-white px-6 py-3 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Calculate TDS
+                        {isLoading ? (
+                            <><Loader2 className="w-5 h-5 animate-spin" /> Calculating...</>
+                        ) : (
+                            'Calculate TDS'
+                        )}
                     </button>
                 </div>
 
@@ -98,8 +134,8 @@ export const TDSCalculator = () => {
                         <div className="lg:col-span-2 space-y-4">
                             {/* Recommendation Badge */}
                             <div className={`glass rounded-2xl p-4 border-2 ${result.recommendedRegime === 'NEW'
-                                    ? 'border-primary-500 bg-primary-500/10'
-                                    : 'border-yellow-500 bg-yellow-500/10'
+                                ? 'border-primary-500 bg-primary-500/10'
+                                : 'border-yellow-500 bg-yellow-500/10'
                                 }`}>
                                 <div className="flex items-center gap-3">
                                     <AlertCircle className={`w-6 h-6 ${result.recommendedRegime === 'NEW' ? 'text-primary-400' : 'text-yellow-400'
@@ -152,6 +188,11 @@ export const TDSCalculator = () => {
                                                     {formatCurrency(result.oldRegimeTax)}
                                                 </span>
                                             </div>
+                                            {TDSCalc.getTaxBreakdown(result.taxableIncome, 'OLD', customSlabs).map((breakdown: any, i: number) => (
+                                                <div key={i} className="text-xs text-dark-muted mt-1">
+                                                    {breakdown.min ? breakdown.min.toLocaleString('en-IN') : breakdown.slab} : {formatCurrency(breakdown.tax)}
+                                                </div>
+                                            ))}
                                             <div className="text-xs text-dark-muted mt-1">
                                                 Monthly: {formatCurrency(result.oldRegimeTax / 12)}
                                             </div>
@@ -187,6 +228,11 @@ export const TDSCalculator = () => {
                                                     {formatCurrency(result.newRegimeTax)}
                                                 </span>
                                             </div>
+                                            {TDSCalc.getTaxBreakdown(result.taxableIncome, 'NEW', customSlabs).map((breakdown: any, i: number) => (
+                                                <div key={i} className="text-xs text-dark-muted mt-1">
+                                                    {breakdown.min ? breakdown.min.toLocaleString('en-IN') : breakdown.slab} : {formatCurrency(breakdown.tax)}
+                                                </div>
+                                            ))}
                                             <div className="text-xs text-dark-muted mt-1">
                                                 Monthly: {formatCurrency(result.newRegimeTax / 12)}
                                             </div>

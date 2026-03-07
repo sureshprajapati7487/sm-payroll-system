@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import { Calendar, Mail, Clock, Power, Plus, Trash2, CheckCircle, Play } from 'lucide-react';
 import { useScheduledReportStore } from '@/store/scheduledReportStore';
-import { useAttendanceStore } from '@/store/attendanceStore';
-import { usePayrollStore } from '@/store/payrollStore';
-import { useLeaveStore } from '@/store/leaveStore';
-import { useEmployeeStore } from '@/store/employeeStore';
+import { apiFetch } from '@/lib/apiClient';
 
 export const ScheduledReports = () => {
     const { reports, createScheduledReport, deleteScheduledReport, toggleReportStatus } = useScheduledReportStore();
@@ -20,56 +17,24 @@ export const ScheduledReports = () => {
         createdBy: 'Admin'
     });
 
-    const { records: attendance } = useAttendanceStore();
-    const { slips: payrollSlips } = usePayrollStore();
-    const { requests: leaveRequests } = useLeaveStore();
-    const { employees } = useEmployeeStore();
+    // Manual "Run Now" — fetch CSV from backend
+    const runNow = async (reportType: string, reportName: string) => {
+        try {
+            const response = await apiFetch(`/reports/download?type=${reportType}`);
+            if (!response.ok) throw new Error('Download failed');
 
-    // Manual "Run Now" — generate CSV from live data
-    const runNow = (reportType: string, reportName: string) => {
-        const getEmp = (id: string) => employees.find(e => e.id === id);
-        let rows: string[] = [];
-        let headers = '';
-
-        if (reportType === 'attendance') {
-            headers = 'Date,Employee,Code,Status,In Time,Out Time';
-            rows = attendance.map(r => {
-                const emp = getEmp(r.employeeId);
-                const inT = r.checkIn ? new Date(r.checkIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '';
-                const outT = r.checkOut ? new Date(r.checkOut).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '';
-                return `${r.date},${emp?.name || r.employeeId},${emp?.code || ''},${r.status},${inT},${outT}`;
-            });
-        } else if (reportType === 'payslip') {
-            headers = 'Month,Employee,Code,Basic,Gross,Deductions,Net Salary,Status';
-            rows = payrollSlips.map(s => {
-                const emp = getEmp(s.employeeId);
-                return `${s.month},${emp?.name || s.employeeId},${emp?.code || ''},${s.basicSalary},${s.grossSalary},${s.totalDeductions},${s.netSalary},${s.status}`;
-            });
-        } else if (reportType === 'statutory') {
-            headers = 'Month,Employee,Code,PF Deduction,Tax';
-            rows = payrollSlips.map(s => {
-                const emp = getEmp(s.employeeId);
-                return `${s.month},${emp?.name || s.employeeId},${emp?.code || ''},${s.pfDeduction},${s.taxDeduction}`;
-            });
-        } else {
-            headers = 'Employee,Code,Type,From,To,Status';
-            rows = leaveRequests.map(r => {
-                const emp = getEmp(r.employeeId);
-                return `${emp?.name || r.employeeId},${emp?.code || ''},${r.type},${r.startDate},${r.endDate},${r.status}`;
-            });
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${reportName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Failed to run report:', error);
         }
-
-        const bom = '\uFEFF';
-        const csv = bom + [headers, ...rows].join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${reportName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
     };
 
     const handleCreate = () => {

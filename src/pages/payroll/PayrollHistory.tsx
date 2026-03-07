@@ -205,8 +205,10 @@ export const PayrollHistory = () => {
                                 className="bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
                             >
                                 <option value="ALL">All Status</option>
-                                <option value="PAID">Paid</option>
-                                <option value="PENDING">Pending</option>
+                                <option value="LOCKED">Locked</option>
+                                <option value="FINAL_APPROVED">Approved</option>
+                                <option value="SIMULATION">Simulation</option>
+                                <option value="DRAFT">Draft</option>
                             </select>
                         </div>
 
@@ -268,7 +270,7 @@ export const PayrollHistory = () => {
                                                         ₹{Math.max(0, slip.netSalary).toLocaleString()}
                                                     </td>
                                                     <td className="p-4">
-                                                        <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${slip.status === 'PAID' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                                                        <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${slip.status === 'LOCKED' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
                                                             }`}>
                                                             {slip.status}
                                                         </span>

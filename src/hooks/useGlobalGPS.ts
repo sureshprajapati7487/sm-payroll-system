@@ -15,7 +15,7 @@ export type GpsPermission = 'granted' | 'denied' | 'prompt' | 'unknown';
 
 interface GlobalGPSReturn {
     permission: GpsPermission;
-    position: { lat: number; lng: number; accuracy?: number } | null;
+    position: { lat: number; lng: number; accuracy?: number; isMocked?: boolean } | null;
     requestPermission: () => Promise<void>;
     isTracking: boolean;
 }
@@ -24,7 +24,7 @@ export function useGlobalGPS(isLoggedIn: boolean): GlobalGPSReturn {
     const [permission, setPermission] = useState<GpsPermission>(() => {
         return (localStorage.getItem(GPS_PERM_KEY) as GpsPermission) || 'unknown';
     });
-    const [position, setPosition] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+    const [position, setPosition] = useState<{ lat: number; lng: number; accuracy?: number; isMocked?: boolean } | null>(null);
     const [isTracking, setIsTracking] = useState(false);
     const watchIdRef = useRef<number | null>(null);
 
@@ -33,6 +33,25 @@ export function useGlobalGPS(isLoggedIn: boolean): GlobalGPSReturn {
         setPermission(p);
         localStorage.setItem(GPS_PERM_KEY, p);
     }, []);
+
+    // ── Mock Location Detection (Heuristic + Native Bridge) ───────────────────
+    const isMockLocation = (pos: GeolocationPosition): boolean => {
+        // Native Android Bridge Check (If wrapped in WebView)
+        if (typeof window !== 'undefined' && (window as any).Android?.isMockLocation) {
+            return (window as any).Android.isMockLocation();
+        }
+
+        // Browser Heuristic Check
+        // Fake GPS apps often hardcode altitude, speed, and heading to exactly 0 or 0.0
+        // Browsers usually report null for these if hardware doesn't support it, not exactly 0.
+        // Extremely high accuracy (< 5m) on a cold start is also suspicious for a browser.
+        const c = pos.coords;
+        if (c.altitude === 0 && c.altitudeAccuracy === 0 && c.speed === 0 && c.heading === 0) {
+            return true;
+        }
+
+        return false;
+    };
 
     // ── Start GPS watchPosition ───────────────────────────────────────────────
     const startWatch = useCallback(() => {
@@ -43,6 +62,7 @@ export function useGlobalGPS(isLoggedIn: boolean): GlobalGPSReturn {
                     lat: pos.coords.latitude,
                     lng: pos.coords.longitude,
                     accuracy: pos.coords.accuracy,
+                    isMocked: isMockLocation(pos),
                 });
                 setIsTracking(true);
             },

@@ -5,8 +5,10 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
+const path = require('path');
+const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { initDB, Company, Employee, Attendance, Production, Leave, Loan, SalarySlip, Expense, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, sequelize } = require('./database');
+const { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, Expense, SalarySlip, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB } = require('./database');
 const { Op } = require('sequelize');
 const { startBackupScheduler, doBackup, getBackupStatus, setAutoBackupEnabled } = require('./backup');
 
@@ -113,13 +115,39 @@ function getErrorHint(err) {
     return ERROR_HINTS.DEFAULT;
 }
 
-const errorLog = [];
+const ERROR_LOG_PATH = path.join(__dirname, 'errors.log');
+
+// Load existing errors on startup
+let errorLog = [];
+try {
+    if (fs.existsSync(ERROR_LOG_PATH)) {
+        // Read file, split by lines, parse valid JSON, get last 100
+        const content = fs.readFileSync(ERROR_LOG_PATH, 'utf-8').trim();
+        if (content) {
+            const lines = content.split('\n');
+            errorLog = lines.map(l => {
+                try { return JSON.parse(l); } catch { return null; }
+            }).filter(Boolean).reverse().slice(0, 100);
+        }
+    }
+} catch (e) {
+    console.error('Failed to load error log file', e);
+}
+
 const addError = (err, endpoint = 'system') => {
     const hint = getErrorHint(typeof err === 'string' ? null : err);
     const message = typeof err === 'string' ? err : (err.message || String(err));
     const name = typeof err === 'object' ? (err.name || 'Error') : 'Error';
-    errorLog.unshift({ id: Date.now(), timestamp: new Date().toISOString(), endpoint, errorType: name, message, why: hint.why, fix: hint.fix, stack: typeof err === 'object' ? (err.stack || null) : null });
+    const logEntry = { id: Date.now(), timestamp: new Date().toISOString(), endpoint, errorType: name, message, why: hint.why, fix: hint.fix, stack: typeof err === 'object' ? (err.stack || null) : null };
+
+    errorLog.unshift(logEntry);
     if (errorLog.length > 100) errorLog.pop();
+
+    try {
+        fs.appendFileSync(ERROR_LOG_PATH, JSON.stringify(logEntry) + '\n');
+    } catch (fsErr) {
+        console.error('Failed to write to error log file', fsErr);
+    }
 };
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
@@ -198,6 +226,15 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(authMiddleware);
+
+// ── Company Scope Enforcement — prevents cross-tenant data bleed ──────────────
+const { requireCompanyScope } = require('./rbac');
+app.use((req, res, next) => {
+    // Skip public routes (they have no user context yet)
+    const PUBLIC_PREFIXES = ['/api/auth/', '/api/health', '/api/status/', '/api/companies', '/api/company-setup'];
+    if (PUBLIC_PREFIXES.some(p => req.path.startsWith(p))) return next();
+    requireCompanyScope(req, res, next);
+});
 
 
 
@@ -286,7 +323,22 @@ app.post('/api/status/errors/report', (req, res) => {
 app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
     try {
         const { idOrEmail, password } = req.body || {};
+        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+
         if (!idOrEmail || !password) return res.status(400).json({ error: 'idOrEmail and password are required' });
+
+        // IP Whitelist Check
+        const restrictions = await IPRestriction.findAll();
+        if (restrictions.length > 0) {
+            const whitelisted = restrictions.filter(r => r.isWhitelisted);
+            if (whitelisted.length > 0) {
+                const isAllowed = whitelisted.some(r => r.ipAddress === ipAddress);
+                if (!isAllowed) {
+                    await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', entityType: 'USER', entityName: idOrEmail, status: 'FAILED', ipAddress, errorMessage: 'IP not whitelisted' });
+                    return res.status(403).json({ error: 'Access denied from this IP address.' });
+                }
+            }
+        }
 
         const cleanId = (idOrEmail || '').trim().toUpperCase();
         const cleanEmail = (idOrEmail || '').trim().toLowerCase();
@@ -302,6 +354,7 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
         const employee = await Employee.findOne({ where: { [Op.or]: [{ code: cleanId }, { email: cleanEmail }] } });
         if (!employee) {
             recordFailedAttempt(attemptKey);
+            await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', entityType: 'USER', entityName: idOrEmail, status: 'FAILED', ipAddress, errorMessage: 'Invalid employee code/email' });
             return res.status(401).json({ error: 'Invalid credentials', fix: 'Check your employee code/email and password' });
         }
 
@@ -320,13 +373,22 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
 
         if (!isValid) {
             const entry = recordFailedAttempt(attemptKey);
+            await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', userId: employee.id, userName: employee.name, userRole: employee.role, entityType: 'USER', entityName: employee.name, status: 'FAILED', ipAddress, errorMessage: 'Invalid password' });
             const rem = MAX_FAILED_ATTEMPTS - entry.count;
             if (entry.lockedUntil) return res.status(429).json({ error: 'Too many failed attempts. Account locked for 15 minutes.', fix: '15 minute baad try karein.', lockedFor: LOCKOUT_DURATION_MS / 1000, retryAfter: LOCKOUT_DURATION_MS / 1000 });
             return res.status(401).json({ error: 'Invalid credentials', fix: 'Check your password and try again', attemptsRemaining: rem > 0 ? rem : 0 });
         }
 
         clearFailedAttempts(attemptKey);
-        const payload = { id: employee.id, name: employee.name, role: employee.role || 'EMPLOYEE', email: employee.email, companyId: employee.companyId };
+
+        // Session and Audit
+        const sessionId = `session-${Date.now()}-${uuidv4().substring(0, 8)}`;
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const userAgent = req.headers['user-agent'] || 'Unknown';
+        await UserSession.create({ id: sessionId, userId: employee.id, loginTime: new Date().toISOString(), lastActivity: new Date().toISOString(), ipAddress, userAgent, expiresAt, isActive: true });
+        await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN', userId: employee.id, userName: employee.name, userRole: employee.role, entityType: 'USER', entityName: employee.name, status: 'SUCCESS', ipAddress });
+
+        const payload = { id: employee.id, name: employee.name, role: employee.role || 'EMPLOYEE', email: employee.email, companyId: employee.companyId, sessionId };
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
         const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRES });
 
@@ -347,12 +409,19 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
 
 app.get('/api/auth/verify', (req, res) => { res.json({ valid: true, user: req.user }); });
 
-app.post('/api/auth/refresh', (req, res) => {
+app.post('/api/auth/refresh', async (req, res) => {
     const refreshToken = req.cookies?.refresh_token;
     if (!refreshToken) return res.status(401).json({ error: 'No refresh token', fix: 'Please login again' });
     try {
         const decoded = jwt.verify(refreshToken, REFRESH_SECRET);
-        const payload = { id: decoded.id, name: decoded.name, role: decoded.role, email: decoded.email, companyId: decoded.companyId };
+
+        if (decoded.sessionId) {
+            const session = await UserSession.findOne({ where: { id: decoded.sessionId } });
+            if (!session || !session.isActive) throw new Error('Session revoked or inactive');
+            await session.update({ lastActivity: new Date().toISOString() });
+        }
+
+        const payload = { id: decoded.id, name: decoded.name, role: decoded.role, email: decoded.email, companyId: decoded.companyId, sessionId: decoded.sessionId };
         const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
         console.log(`🔄 Token refreshed for: ${decoded.id}`);
         res.json({ token: newToken, user: payload, expiresIn: 15 * 60 });
@@ -362,7 +431,17 @@ app.post('/api/auth/refresh', (req, res) => {
     }
 });
 
-app.post('/api/auth/logout', (req, res) => {
+app.post('/api/auth/logout', async (req, res) => {
+    const refreshToken = req.cookies?.refresh_token;
+    if (refreshToken) {
+        try {
+            const decoded = jwt.verify(refreshToken, REFRESH_SECRET);
+            if (decoded.sessionId) await UserSession.update({ isActive: false }, { where: { id: decoded.sessionId } });
+
+            const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+            await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGOUT', userId: decoded.id, userName: decoded.name, userRole: decoded.role, entityType: 'USER', entityName: decoded.name, status: 'SUCCESS', ipAddress });
+        } catch (e) { }
+    }
     res.clearCookie('refresh_token', { path: '/' });
     res.json({ success: true, message: 'Logged out successfully' });
 });
@@ -396,6 +475,22 @@ app.post('/api/companies', async (req, res) => {
         res.status(201).json(newCompany);
     } catch (e) { addError(e, 'POST /api/companies'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
+app.put('/api/companies/:id', async (req, res) => {
+    try {
+        const company = await Company.findOne({ where: { id: req.params.id } });
+        if (!company) return res.status(404).json({ error: 'Company not found' });
+        await company.update(req.body);
+        res.json(company);
+    } catch (e) { addError(e, `PUT /api/companies/${req.params.id}`); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
+});
+app.delete('/api/companies/:id', async (req, res) => {
+    try {
+        const company = await Company.findOne({ where: { id: req.params.id } });
+        if (!company) return res.status(404).json({ error: 'Company not found' });
+        await company.destroy();
+        res.json({ success: true });
+    } catch (e) { addError(e, `DELETE /api/companies/${req.params.id}`); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
+});
 
 // ── Modular Routes ─────────────────────────────────────────────────────────────
 // Route logic is split into separate files for maintainability.
@@ -404,6 +499,10 @@ const attendanceRoute = require('./routes/attendance');
 const payrollRoute = require('./routes/payroll');
 const clientsRoute = require('./routes/clients');
 const adminRoute = require('./routes/admin');
+const financeRoute = require('./routes/finance');
+const analyticsRoute = require('./routes/analytics');
+const reportsRoute = require('./routes/reports');
+const uploadRoute = require('./routes/upload');
 
 // Inject shared dependencies into each route module
 const sharedModels = {
@@ -412,22 +511,32 @@ const sharedModels = {
     Client, ClientVisit, Company, sequelize,
     addError, getErrorHint,
     doBackup, getBackupStatus, setAutoBackupEnabled,
+    CustomReportTemplate, ScheduledReport, StatutoryRule,
 };
 employeesRoute.init(sharedModels);
 attendanceRoute.init(sharedModels);
 payrollRoute.init(sharedModels);
 clientsRoute.init(sharedModels);
 adminRoute.init(sharedModels);
+analyticsRoute.init(sharedModels);
+reportsRoute.init(sharedModels);
+
+const calculatorsRoutes = require('./routes/calculators.js');
 
 // Mount routes
 app.use('/api/employees', employeesRoute.router);
 app.use('/api/attendance', attendanceRoute.router);
-app.use('/api', payrollRoute.router);                   // /api/production, /api/leaves, /api/loans, /api/payroll
+app.use('/api', payrollRoute.router);                   // /api/leaves, /api/loans, /api/payroll
 app.use('/api/clients', clientsRoute.router);                   // /api/clients/*
 app.use('/api/visits', clientsRoute.visitsRouter);             // /api/visits/* (frontend uses this path)
+app.use('/api/finance', financeRoute);                  // /api/finance/advances
 app.use('/api', adminRoute.router);                     // /api/biometrics, /api/expenses, /api/advance-salary, /api/holidays, /api/audit-logs, /api/backup, /api/whatsapp
+app.use('/api/analytics', analyticsRoute.router);
+app.use('/api/reports', reportsRoute.router);
+app.use('/api/calculators', calculatorsRoutes);
+app.use('/api/upload', uploadRoute);
 
-
+app.use('/api/downloads', express.static(path.join(__dirname, 'public/downloads')));
 
 // ── Catch-All 404 ─────────────────────────────────────────────────────────────
 app.use((req, res) => {
@@ -443,6 +552,8 @@ app.use((err, req, res, _next) => {
 const HTTPS_PORT = 3443;
 
 initDB().then(() => {
+    require('./scheduler').init(sharedModels);
+    require('./cronManager').initCronManager(); // Initialize background cron jobs
     app.listen(PORT, HOST, () => {
         console.log(`\n✅ SM Payroll Backend (HTTP)  → http://${HOST}:${PORT}`);
         console.log(`📊 Health:  http://localhost:${PORT}/api/health`);

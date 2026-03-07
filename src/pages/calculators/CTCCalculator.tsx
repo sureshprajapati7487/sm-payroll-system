@@ -1,25 +1,41 @@
 import { useState } from 'react';
-import { Calculator, Download, RefreshCw } from 'lucide-react';
-import { CTCCalculator as CTCCalc } from '@/utils/ctcCalculator';
+import { Calculator, Download, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 
 export const CTCCalculator = () => {
+    const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
     const [basicSalary, setBasicSalary] = useState<number>(30000);
     const [state, setState] = useState('MAHARASHTRA');
     const [result, setResult] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
 
-    const handleCalculate = () => {
-        const ctc = CTCCalc.calculateCTC({
-            basicSalary,
-            state
-        });
-        setResult(ctc);
+    const handleCalculate = async () => {
+        setIsLoading(true);
+        setError('');
+        try {
+            const response = await fetch('/api/calculators/ctc', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                body: JSON.stringify({ companyId: currentCompanyId, basicSalary, state })
+            });
+
+            if (!response.ok) throw new Error('Calculation Engine Error');
+            const data = await response.json();
+            setResult(data);
+        } catch (err: any) {
+            setError(err.message || 'Failed to connect to Calculation Engine');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleReset = () => {
         setBasicSalary(30000);
         setState('MAHARASHTRA');
         setResult(null);
+        setError('');
     };
 
     const formatCurrency = (amount: number) => {
@@ -86,11 +102,23 @@ export const CTCCalculator = () => {
                         </select>
                     </div>
 
+                    {error && (
+                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2 text-sm text-red-400">
+                            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                            {error}
+                        </div>
+                    )}
+
                     <button
                         onClick={handleCalculate}
-                        className="w-full bg-gradient-to-r from-primary-600 to-blue-600 hover:from-primary-500 hover:to-blue-500 text-white px-6 py-3 rounded-xl font-medium transition-all"
+                        disabled={isLoading}
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary-600 to-blue-600 hover:from-primary-500 hover:to-blue-500 text-white px-6 py-3 rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Calculate CTC
+                        {isLoading ? (
+                            <><Loader2 className="w-5 h-5 animate-spin" /> Calculating...</>
+                        ) : (
+                            'Calculate CTC'
+                        )}
                     </button>
                 </div>
 

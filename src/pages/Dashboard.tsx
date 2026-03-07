@@ -1,10 +1,9 @@
 import { useEffect } from 'react';
+import { useAnalyticsStore } from '@/store/analyticsStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAttendanceStore } from '@/store/attendanceStore';
 import { useProductionStore } from '@/store/productionStore';
-import { usePayrollStore } from '@/store/payrollStore';
 import { useLoanStore } from '@/store/loanStore';
-import { useLeaveStore } from '@/store/leaveStore';
 import { useAuthStore } from '@/store/authStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { useAuditStore } from '@/store/auditStore';
@@ -36,11 +35,10 @@ export const Dashboard = () => {
     const { records } = useAttendanceStore();
     const { entries } = useProductionStore();
     const { loans } = useLoanStore();
-    const { slips } = usePayrollStore();
-    const { requests: leaveRequests } = useLeaveStore();
     const { user } = useAuthStore();
     const { currentCompanyId } = useMultiCompanyStore();
     const { logs: auditLogs } = useAuditStore();
+    const { stats, fetchDashboardStats } = useAnalyticsStore();
     const navigate = useNavigate();
 
     // --- COMMON VARIABLES ---
@@ -57,19 +55,26 @@ export const Dashboard = () => {
     const isEmployee = user?.role === 'EMPLOYEE';
     const isManager = user?.role === 'MANAGER';
 
-    // ── C3: Auto-redirect employees on small screens to Mobile Dashboard ──────
+    // ── C3: Auto-redirect ALL users on small screens to Mobile Dashboard ──────
     useEffect(() => {
         const check = () => {
             // Skip if user explicitly opted for full dashboard
             const preferFull = sessionStorage.getItem('prefer-full-dashboard');
-            if (isEmployee && window.innerWidth < 640 && !preferFull) {
+            if (window.innerWidth < 640 && !preferFull) {
                 navigate('/mobile/dashboard', { replace: true });
             }
         };
         check(); // on mount
         window.addEventListener('resize', check);
         return () => window.removeEventListener('resize', check);
-    }, [isEmployee, navigate]);
+    }, [navigate]);
+
+    // ── Fetch Analytics on mount ──────────────────────────────────────────────
+    useEffect(() => {
+        if (!isEmployee && currentCompanyId) {
+            fetchDashboardStats(currentCompanyId, currentMonth);
+        }
+    }, [currentCompanyId, currentMonth, isEmployee]);
 
     // 1. Employee View (Strictly Personal)
     if (isEmployee) {
@@ -159,89 +164,37 @@ export const Dashboard = () => {
     }
 
     // 3. Admin View (Company Wide)
-    // --- KPI CALCULATIONS ---
-    const totalEmployees = companyEmployees.length;
-    const activeEmployees = companyEmployees.filter(e => e.status === 'ACTIVE').length;
-    const empIds = new Set(companyEmployees.map(e => e.id));
-
-    // Today's Attendance (company-scoped)
-    const todayRecords = records.filter(r => r.date === today && empIds.has(r.employeeId));
-    const presentedCount = todayRecords.filter(r => ['PRESENT', 'LATE', 'HALF_DAY'].includes(r.status)).length;
-    const absentToday = activeEmployees - presentedCount;
-    const attendancePercentage = activeEmployees > 0 ? Math.round((presentedCount / activeEmployees) * 100) : 0;
-
-    // Production Value (Current Month, company-scoped)
-    const monthEntries = entries.filter(p => p.date.startsWith(currentMonth) && empIds.has(p.employeeId));
-    const monthProduction = monthEntries.reduce((sum, p) => sum + p.totalAmount, 0);
-
-    // Previous month MoM
-    const prevMonthDate = new Date();
-    prevMonthDate.setMonth(prevMonthDate.getMonth() - 1);
-    const prevMonth = prevMonthDate.toISOString().slice(0, 7);
-    const prevMonthProduction = entries
-        .filter(p => p.date.startsWith(prevMonth) && empIds.has(p.employeeId))
-        .reduce((sum, p) => sum + p.totalAmount, 0);
-    const momChange = prevMonthProduction > 0
-        ? (((monthProduction - prevMonthProduction) / prevMonthProduction) * 100).toFixed(1)
-        : null;
-
-    // Loans (company-scoped)
-    const companyLoans = loans.filter(l => !currentCompanyId || l.companyId === currentCompanyId);
-    const activeLoans = companyLoans.filter(l => l.status === 'ACTIVE');
-    const totalOutstanding = activeLoans.reduce((sum, l) => sum + l.balance, 0);
-
-    // Pending Approvals
-    const pendingLeaves = leaveRequests.filter(r =>
-        r.status === 'PENDING' && (!currentCompanyId || (r as any).companyId === currentCompanyId)
-    ).length;
-    const pendingProduction = entries.filter(p =>
-        p.status === 'PENDING' && empIds.has(p.employeeId)
-    ).length;
-    const pendingLoans = companyLoans.filter(l => l.status === 'REQUESTED').length;
-
-    // Net Payroll this month
-    const monthSlips = slips.filter(s => s.month === currentMonth && (!currentCompanyId || s.companyId === currentCompanyId));
-    const netPayrollThisMonth = monthSlips.reduce((sum, s) => sum + s.netSalary, 0);
-    const slipsGenerated = monthSlips.length;
-
-    // 1. Attendance Trend (Last 7 Days)
-    const attendanceTrendData = [];
-    for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
-        const dayRecords = records.filter(r => r.date === dateStr && empIds.has(r.employeeId));
-        const present = dayRecords.filter(r => ['PRESENT', 'LATE'].includes(r.status)).length;
-        attendanceTrendData.push({
-            name: d.toLocaleDateString('en-US', { weekday: 'short' }),
-            present,
-            total: activeEmployees
-        });
+    if (!stats) {
+        return (
+            <div className="flex flex-col items-center justify-center p-20 text-white gap-3">
+                <Activity className="w-8 h-8 text-primary-400 animate-spin" />
+                <p className="text-dark-muted font-medium tracking-wide">Crunching dashboard analytics...</p>
+            </div>
+        );
     }
 
-    // 2. Production by Department
-    const deptProduction: Record<string, number> = {};
-    entries.filter(e => empIds.has(e.employeeId)).forEach(entry => {
-        const emp = companyEmployees.find(e => e.id === entry.employeeId);
-        if (emp?.department) {
-            deptProduction[emp.department] = (deptProduction[emp.department] || 0) + entry.qty;
-        }
-    });
-    const productionData = Object.keys(deptProduction).map(dept => ({
-        name: dept,
-        units: deptProduction[dept]
-    }));
+    const {
+        totalStaff: totalEmployees,
+        activeStaff: activeEmployees,
+        attendancePercentage,
+        presentedCount,
+        absentToday,
+        monthProduction,
+        momChange,
+        totalOutstandingLoans: totalOutstanding,
+        activeLoansCount,
+        pendingLeaves,
+        pendingProduction,
+        pendingLoans,
+        netPayrollThisMonth,
+        slipsGenerated,
+        attendanceTrendData,
+        productionData,
+        payrollDistribution
+    } = stats;
 
-    // 3. Payroll Distribution — real monthSlips data (no hardcoded fallbacks)
-    const basicTotal = monthSlips.reduce((sum, s) => sum + s.basicSalary, 0);
-    const prodTotal = monthSlips.reduce((sum, s) => sum + s.productionAmount, 0);
-    const otTotal = monthSlips.reduce((sum, s) => sum + s.overtimeAmount, 0);
-    const hasPayrollData = basicTotal + prodTotal + otTotal > 0;
-    const payrollDistribution = hasPayrollData ? [
-        { name: 'Basic Salary', value: basicTotal },
-        { name: 'Production', value: prodTotal },
-        { name: 'Overtime', value: otTotal },
-    ] : [];
+    const hasPayrollData = payrollDistribution.length > 0;
+    const activeLoans = { length: activeLoansCount }; // shim for JSX rendering below
 
 
     return (
@@ -290,9 +243,9 @@ export const Dashboard = () => {
                     <div className="mt-2 text-xs flex items-center gap-1">
                         {momChange !== null ? (
                             <>
-                                <TrendingUp className="w-3 h-3" style={{ color: parseFloat(momChange) >= 0 ? '#10b981' : '#ef4444' }} />
-                                <span style={{ color: parseFloat(momChange) >= 0 ? '#10b981' : '#ef4444' }}>
-                                    {parseFloat(momChange) >= 0 ? '+' : ''}{momChange}% vs last month
+                                <TrendingUp className="w-3 h-3" style={{ color: momChange >= 0 ? '#10b981' : '#ef4444' }} />
+                                <span style={{ color: momChange >= 0 ? '#10b981' : '#ef4444' }}>
+                                    {momChange >= 0 ? '+' : ''}{momChange}% vs last month
                                 </span>
                             </>
                         ) : (

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { apiGet, apiJson } from '@/lib/apiClient';
 
 export interface ReportColumn {
     id: string;
@@ -31,9 +31,10 @@ interface CustomReportState {
     availableColumns: ReportColumn[];
 
     // Actions
-    saveTemplate: (template: Omit<CustomReportTemplate, 'id' | 'createdAt' | 'updatedAt'>) => void;
-    updateTemplate: (id: string, updates: Partial<CustomReportTemplate>) => void;
-    deleteTemplate: (id: string) => void;
+    fetchTemplates: () => Promise<void>;
+    saveTemplate: (template: Omit<CustomReportTemplate, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+    updateTemplate: (id: string, updates: Partial<CustomReportTemplate>) => Promise<void>; // Optional fallback
+    deleteTemplate: (id: string) => Promise<void>;
     getTemplate: (id: string) => CustomReportTemplate | undefined;
 }
 
@@ -64,46 +65,52 @@ const DEFAULT_COLUMNS: ReportColumn[] = [
 ];
 
 export const useCustomReportStore = create<CustomReportState>()(
-    persist(
-        (set, get) => ({
-            templates: [],
-            availableColumns: DEFAULT_COLUMNS,
+    (set, get) => ({
+        templates: [],
+        availableColumns: DEFAULT_COLUMNS,
 
-            saveTemplate: (template) => {
-                const newTemplate: CustomReportTemplate = {
-                    ...template,
-                    id: `tpl-${Date.now()}`,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
-                };
+        fetchTemplates: async () => {
+            try {
+                const data = await apiGet<CustomReportTemplate[]>('/reports/templates');
+                set({ templates: data });
+            } catch (error) {
+                console.error('Failed to fetch templates:', error);
+            }
+        },
 
+        saveTemplate: async (template) => {
+            try {
+                const newTemplate = await apiJson<CustomReportTemplate>(
+                    'POST',
+                    '/reports/templates',
+                    template
+                );
                 set(state => ({
                     templates: [...state.templates, newTemplate]
                 }));
-            },
+            } catch (error) {
+                console.error('Failed to save template:', error);
+            }
+        },
 
-            updateTemplate: (id, updates) => {
-                set(state => ({
-                    templates: state.templates.map(t =>
-                        t.id === id
-                            ? { ...t, ...updates, updatedAt: new Date().toISOString() }
-                            : t
-                    )
-                }));
-            },
+        updateTemplate: async (_id, _updates) => {
+            console.warn('Backend updateTemplate not fully implemented, falling back to read-only or delete-recreate if needed.');
+            // Implement /reports/templates/:id PUT/PATCH if desired
+        },
 
-            deleteTemplate: (id) => {
+        deleteTemplate: async (id) => {
+            try {
+                await apiJson('DELETE', `/reports/templates/${id}`);
                 set(state => ({
                     templates: state.templates.filter(t => t.id !== id)
                 }));
-            },
-
-            getTemplate: (id) => {
-                return get().templates.find(t => t.id === id);
+            } catch (error) {
+                console.error('Failed to delete template:', error);
             }
-        }),
-        {
-            name: 'custom-report-store'
+        },
+
+        getTemplate: (id) => {
+            return get().templates.find(t => t.id === id);
         }
-    )
+    })
 );

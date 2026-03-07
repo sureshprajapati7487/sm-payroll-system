@@ -21,8 +21,10 @@ export const ExpensesDashboard = () => {
         category: 'OTHER' as Expense['category'],
         amount: '',
         description: '',
-        paidTo: ''
+        paidTo: '',
     });
+    const [receiptFile, setReceiptFile] = useState<File | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
     const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING'>('ALL');
 
     // Stats
@@ -34,9 +36,34 @@ export const ExpensesDashboard = () => {
         .filter(e => filterStatus === 'ALL' || e.status === filterStatus)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.amount || !form.description) return;
+
+        let receiptUrl = undefined;
+        if (receiptFile) {
+            setIsUploading(true);
+            try {
+                const formData = new FormData();
+                formData.append('receipt', receiptFile);
+
+                // Assuming you have an API client base URL configured
+                const response = await fetch('http://localhost:3000/api/upload/receipt', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const data = await response.json();
+                if (data.url) {
+                    receiptUrl = data.url;
+                } else {
+                    console.error('Upload failed:', data);
+                }
+            } catch (err) {
+                console.error('Upload error:', err);
+            } finally {
+                setIsUploading(false);
+            }
+        }
 
         addExpense({
             date: form.date,
@@ -45,10 +72,12 @@ export const ExpensesDashboard = () => {
             description: form.description,
             paidTo: form.paidTo || undefined,
             addedBy: user?.name || 'Admin',
-        });
+            receiptUrl
+        } as any); // Type cast due to adding receiptUrl
 
         // Reset but keep date
         setForm({ ...form, amount: '', description: '', paidTo: '' });
+        setReceiptFile(null);
     };
 
     const getCategoryIcon = (cat: string) => {
@@ -177,12 +206,27 @@ export const ExpensesDashboard = () => {
                                 />
                             </div>
 
+                            <div>
+                                <label className="block text-xs text-dark-muted mb-1">Receipt (Optional)</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={e => setReceiptFile(e.target.files?.[0] || null)}
+                                    className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white text-sm file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-primary-600 file:text-white hover:file:bg-primary-500"
+                                />
+                                {receiptFile && <p className="text-xs text-dark-muted mt-1">{receiptFile.name}</p>}
+                            </div>
+
                             <button
                                 type="submit"
-                                className="w-full py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
+                                disabled={isUploading}
+                                className={clsx(
+                                    "w-full py-2 text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2",
+                                    isUploading ? "bg-primary-800" : "bg-primary-600 hover:bg-primary-500"
+                                )}
                             >
-                                <Plus className="w-4 h-4" />
-                                Submit Request
+                                {isUploading ? <Clock className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                                {isUploading ? 'Uploading & Submitting...' : 'Submit Request'}
                             </button>
                         </form>
                     </div>
@@ -240,6 +284,8 @@ export const ExpensesDashboard = () => {
                                                             </div>
                                                             <div className="text-white font-medium">{exp.description}</div>
                                                             {exp.paidTo && <div className="text-xs text-dark-muted">Paid to: {exp.paidTo}</div>}
+                                                            {/* @ts-ignore - receiptUrl is newly added */}
+                                                            {exp.receiptUrl && <a href={exp.receiptUrl} target="_blank" rel="noreferrer" className="text-xs text-primary-400 hover:underline mt-1 inline-block">View Receipt 🔗</a>}
                                                         </td>
                                                         <td className="p-4">
                                                             <div className="flex flex-col gap-1">
@@ -272,7 +318,7 @@ export const ExpensesDashboard = () => {
                                                         </td>
                                                         <td className="p-4 text-right">
                                                             <div className="flex items-center justify-end gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                                                                {exp.status === 'PENDING' && (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') && (
+                                                                {exp.status === 'PENDING' && (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'ACCOUNT_ADMIN') && (
                                                                     <>
                                                                         <button
                                                                             onClick={() => updateStatus(exp.id, 'APPROVED')}

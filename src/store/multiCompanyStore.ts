@@ -93,13 +93,24 @@ export const useMultiCompanyStore = create<MultiCompanyState>()(
                 }
             },
 
-            updateCompany: (id, updates) => {
+            updateCompany: async (id, updates) => {
+                // Optimistic UI update
                 set(state => ({
                     companies: (Array.isArray(state.companies) ? state.companies : []).map(c =>
                         c.id === id ? { ...c, ...updates } : c
                     )
                 }));
-                // TODO: Call API
+
+                // Persist to backend
+                try {
+                    await apiFetch(`/companies/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updates)
+                    });
+                } catch (error) {
+                    console.error('Failed to update company:', error);
+                }
             },
 
             switchCompany: (id) => {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Play, Calculator, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useEmployeeStore } from '@/store/employeeStore';
 
 interface SimulationResult {
     employeeId: string;
@@ -16,36 +17,32 @@ export const PayrollSimulation = () => {
     const [percentage, setPercentage] = useState(10);
     const [results, setResults] = useState<SimulationResult[]>([]);
 
-    // Mock employee data
-    const mockEmployees = [
-        { id: '1', name: 'Rajesh Kumar', salary: 45000 },
-        { id: '2', name: 'Priya Singh', salary: 38000 },
-        { id: '3', name: 'Amit Patel', salary: 52000 },
-        { id: '4', name: 'Sneha Mehta', salary: 41000 },
-        { id: '5', name: 'Vikram Reddy', salary: 48000 }
-    ];
+    const { employees } = useEmployeeStore();
+
+    // Use actual active employees with a defined basic salary
+    const activeEmployees = employees.filter(e => e.status === 'ACTIVE' && e.basicSalary > 0);
 
     const runSimulation = () => {
         setRunning(true);
 
         setTimeout(() => {
-            const simulationResults: SimulationResult[] = mockEmployees.map(emp => {
-                let newSalary = emp.salary;
+            const simulationResults: SimulationResult[] = activeEmployees.map(emp => {
+                let newSalary = emp.basicSalary;
 
                 if (scenario === 'raise') {
-                    newSalary = emp.salary * (1 + percentage / 100);
+                    newSalary = emp.basicSalary * (1 + percentage / 100);
                 } else if (scenario === 'bonus') {
-                    newSalary = emp.salary + (emp.salary * percentage / 100);
+                    newSalary = emp.basicSalary + (emp.basicSalary * percentage / 100);
                 } else if (scenario === 'deduction') {
-                    newSalary = emp.salary * (1 - percentage / 100);
+                    newSalary = emp.basicSalary * (1 - percentage / 100);
                 }
 
                 return {
                     employeeId: emp.id,
                     employeeName: emp.name,
-                    currentSalary: emp.salary,
+                    currentSalary: emp.basicSalary,
                     simulatedSalary: Math.round(newSalary),
-                    difference: Math.round(newSalary - emp.salary),
+                    difference: Math.round(newSalary - emp.basicSalary),
                     percentChange: percentage
                 };
             });

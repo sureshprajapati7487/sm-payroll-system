@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Role, Roles, User } from '@/types';
+import { User } from '@/types';
 import { ROLE_PERMISSIONS, PermissionValue } from '@/config/permissions';
 import { audit, auditAnonymous } from '@/lib/auditLogger';
 import { API_URL } from '@/lib/apiConfig';
@@ -11,22 +11,12 @@ interface AuthState {
     isAuthenticated: boolean;
     isLoading: boolean;
     tokenExpiresAt: number | null; // epoch ms
-    login: (role: Role) => void;
     loginWithCredentials: (idOrEmail: string, password: string) => Promise<{ error: string; attemptsRemaining?: number; retryAfter?: number } | null>;
     refreshAccessToken: () => Promise<boolean>;
     startAutoRefresh: () => void;
     logout: () => void;
     hasPermission: (permission: PermissionValue) => boolean;
 }
-
-// Quick dev mock users (used by one-click role buttons on login page)
-const MOCK_USERS: Record<Role, User> = {
-    [Roles.SUPER_ADMIN]: { id: '1', name: 'Suresh Owner', role: Roles.SUPER_ADMIN, email: 'owner@smpayroll.com', avatar: 'https://ui-avatars.com/api/?name=Super+Admin' },
-    [Roles.ADMIN]: { id: '2', name: 'Operational Admin', role: Roles.ADMIN, email: 'admin@smpayroll.com', avatar: 'https://ui-avatars.com/api/?name=Admin' },
-    [Roles.ACCOUNT_ADMIN]: { id: '3', name: 'Finance Controller', role: Roles.ACCOUNT_ADMIN, email: 'accounts@smpayroll.com', avatar: 'https://ui-avatars.com/api/?name=Account+Admin' },
-    [Roles.MANAGER]: { id: '4', name: 'Team Manager', role: Roles.MANAGER, email: 'manager@smpayroll.com', avatar: 'https://ui-avatars.com/api/?name=Manager' },
-    [Roles.EMPLOYEE]: { id: '5', name: 'Rahul Employee', role: Roles.EMPLOYEE, email: 'rahul@smpayroll.com', avatar: 'https://ui-avatars.com/api/?name=Employee' },
-};
 
 export const useAuthStore = create<AuthState>()(
     persist(
@@ -36,35 +26,6 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             isLoading: false,
             tokenExpiresAt: null,
-
-            // One-click dev login — calls server to get a real signed JWT
-            login: (role: Role) => {
-                set({ isLoading: true });
-                const user = MOCK_USERS[role];
-                // Call real server dev-login to get a properly signed JWT
-                fetch(`${API_URL}/auth/dev-login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: user.id, name: user.name, role: user.role, email: user.email }),
-                })
-                    .then(r => r.ok ? r.json() : null)
-                    .then(data => {
-                        const token = data?.token || null;
-                        set({ user, token, isAuthenticated: true, isLoading: false, tokenExpiresAt: Date.now() + 8 * 60 * 60 * 1000 });
-                        setTimeout(() => audit({
-                            action: 'LOGIN',
-                            entityType: 'USER',
-                            entityId: user.id,
-                            entityName: user.name,
-                            details: { role: user.role, method: 'mock' },
-                            status: 'SUCCESS',
-                        }), 100);
-                    })
-                    .catch(() => {
-                        // Fallback: set without token (offline mode)
-                        set({ user, token: null, isAuthenticated: true, isLoading: false });
-                    });
-            },
 
             // Real JWT login — calls server, returns null on success or error object on failure
             loginWithCredentials: async (idOrEmail: string, password: string) => {
@@ -110,40 +71,7 @@ export const useAuthStore = create<AuthState>()(
                         };
                     }
 
-                    // ❌ Server login failed — try LOCAL fallback (employee saved locally but not in DB)
-                    const { useEmployeeStore } = await import('@/store/employeeStore');
-                    const { _rawEmployees } = useEmployeeStore.getState();
-                    const input = idOrEmail.trim().toUpperCase();
-                    const localEmployee = (_rawEmployees || []).find(
-                        (e: any) => e.code?.toUpperCase() === input || e.id?.toUpperCase() === input
-                    );
-
-                    if (localEmployee && (localEmployee.password || '').trim() === password.trim()) {
-                        // Found in local store — get a dev-login JWT from server
-                        const devRes = await fetch(`${API_URL}/auth/dev-login`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                id: localEmployee.id,
-                                name: localEmployee.name,
-                                role: localEmployee.role || 'SUPER_ADMIN',
-                                email: localEmployee.email,
-                                companyId: localEmployee.companyId,
-                            }),
-                        });
-                        const devData = devRes.ok ? await devRes.json() : null;
-                        const token = devData?.token || null;
-                        const user: User = {
-                            id: localEmployee.id,
-                            name: localEmployee.name,
-                            role: localEmployee.role as Role,
-                            email: localEmployee.email,
-                        };
-                        set({ user, token, isAuthenticated: true, isLoading: false });
-                        return null; // success via local fallback
-                    }
-
-                    // Both server and local failed
+                    // Server login failed
                     set({ isLoading: false });
                     auditAnonymous({
                         action: 'LOGIN_FAILED',
@@ -192,7 +120,7 @@ export const useAuthStore = create<AuthState>()(
                     const { token, user, expiresIn } = await res.json();
                     const tokenExpiresAt = Date.now() + (expiresIn ? expiresIn * 1000 : 15 * 60 * 1000);
                     set({ token, user, tokenExpiresAt });
-                    if (import.meta.env.DEV) console.log('🔄 Access token auto-refreshed');
+
                     return true;
                 } catch {
                     return false;

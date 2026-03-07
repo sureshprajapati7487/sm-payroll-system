@@ -1,4 +1,15 @@
+/**
+ * @deprecated MobileFaceScan is UNUSED and ORPHANED.
+ *
+ * This component is superseded by:
+ *   - `CameraPunchWidget`  — for employee self-punch with camera selfie
+ *   - `FaceKioskPage`      — for admin kiosk with live face-recognition AI
+ *
+ * It uses `react-webcam` which conflicts with the rest of the app (native getUserMedia).
+ * Do NOT import this anywhere. Kept for reference only.
+ */
 import { useState, useRef, useEffect } from 'react';
+
 import { Camera, CheckCircle, XCircle, Loader, Sun, Zap } from 'lucide-react';
 import Webcam from 'react-webcam';
 

@@ -1,11 +1,16 @@
-import { useState } from 'react';
-import { Shield, Plus, X, Clock, Eye } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Shield, Plus, X, Clock, Eye, LogOut } from 'lucide-react';
 import { useAuditStore } from '@/store/auditStore';
 
 export const SecuritySettings = () => {
-    const { ipRestrictions, sessions, addIPRestriction, removeIPRestriction } = useAuditStore();
+    const { ipRestrictions, sessions, addIPRestriction, removeIPRestriction, fetchSessions, fetchIPRestrictions, revokeSession } = useAuditStore();
     const [newIP, setNewIP] = useState('');
     const [ipDescription, setIpDescription] = useState('');
+
+    useEffect(() => {
+        fetchSessions();
+        fetchIPRestrictions();
+    }, [fetchSessions, fetchIPRestrictions]);
 
     const handleAddIP = () => {
         if (!newIP) return;
@@ -101,18 +106,27 @@ export const SecuritySettings = () => {
                             </div>
                         ) : (
                             activeSessions.map((session) => (
-                                <div key={session.sessionId} className="bg-dark-surface rounded-lg p-3 text-sm">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="text-white font-medium">User: {session.userId}</div>
-                                        <span className="text-xs px-2 py-1 bg-green-500/20 text-green-400 rounded">
-                                            Active
-                                        </span>
+                                <div key={session.id} className="bg-dark-surface rounded-lg p-3 text-sm flex justify-between items-center group">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="text-white font-medium">User ID: {session.userId}</div>
+                                            <span className="text-xs px-2 py-1 bg-green-500/20 text-green-400 rounded">
+                                                Active
+                                            </span>
+                                        </div>
+                                        <div className="text-dark-muted text-xs space-y-1">
+                                            <div>Login: {new Date(session.loginTime).toLocaleString()}</div>
+                                            <div>Last Activity: {new Date(session.lastActivity).toLocaleString()}</div>
+                                            <div>IP: {session.ipAddress}</div>
+                                        </div>
                                     </div>
-                                    <div className="text-dark-muted text-xs space-y-1">
-                                        <div>Login: {new Date(session.loginTime).toLocaleString()}</div>
-                                        <div>Last Activity: {new Date(session.lastActivity).toLocaleString()}</div>
-                                        <div>IP: {session.ipAddress}</div>
-                                    </div>
+                                    <button
+                                        onClick={() => revokeSession(session.id)}
+                                        className="text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 p-2 rounded opacity-0 group-hover:opacity-100 transition-all ml-4"
+                                        title="Revoke session (Force Logout)"
+                                    >
+                                        <LogOut className="w-4 h-4" />
+                                    </button>
                                 </div>
                             ))
                         )}

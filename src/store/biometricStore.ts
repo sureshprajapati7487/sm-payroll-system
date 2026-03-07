@@ -76,6 +76,26 @@ export const biometricStore = {
         if (data) lsSaveEmp(empId, data);
     },
 
+    // ── Sync All Faces: fetch all registered faces for offline Kiosk match ────
+    async syncAllFaces(): Promise<void> {
+        try {
+            const res = await apiFetch('/biometrics/all');
+            if (!res.ok) return;
+            const allFaces: Record<string, number[]> = await res.json();
+
+            const existing = lsLoadAll();
+            for (const [empId, faceDescriptor] of Object.entries(allFaces)) {
+                if (!existing[empId]) existing[empId] = {};
+                existing[empId].faceDescriptor = faceDescriptor;
+                existing[empId].registeredAt = existing[empId].registeredAt || new Date().toISOString();
+            }
+            localStorage.setItem(LS_KEY, JSON.stringify(existing));
+            console.log(`[BiometricStore] Synced ${Object.keys(allFaces).length} faces for offline matching.`);
+        } catch (e) {
+            console.warn('[BiometricStore] Failed to sync all faces', e);
+        }
+    },
+
     // ── Thumb (WebAuthn) ──────────────────────────────────────────────────────
     getThumbCredential(empId: string): ThumbCredential | null {
         return lsLoadAll()[empId]?.thumbCredential ?? null;

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { usePayrollStore } from '@/store/payrollStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useLoanStore } from '@/store/loanStore';
-import { PayrollStatus } from '@/types';
 import {
     X, CheckCircle, FileSpreadsheet, FileText,
     Banknote, DollarSign, Wallet, Send
@@ -48,7 +47,7 @@ export const PayrollDisbursementModal = ({ month, onClose }: PayrollDisbursement
             variant: 'warning',
         });
         if (ok) {
-            selectedSlips.forEach(id => { const s = slips.find(x => x.id === id); if (s && s.status !== PayrollStatus.PAID) markAsPaid(id); });
+            selectedSlips.forEach(id => { const s = slips.find(x => x.id === id); if (s && s.status !== 'PAID') markAsPaid(id); });
             setSelectedSlips(new Set());
         }
     };
@@ -56,9 +55,9 @@ export const PayrollDisbursementModal = ({ month, onClose }: PayrollDisbursement
     // Stats
     const totalPayout = slips.reduce((sum, s) => sum + s.netSalary, 0);
     const totalEMI = slips.reduce((sum, s) => sum + (s.loanDeduction || 0), 0);
-    const totalPending = slips.filter(s => s.status !== PayrollStatus.PAID).reduce((sum, s) => sum + s.netSalary, 0);
-    const totalPaid = slips.filter(s => s.status === PayrollStatus.PAID).reduce((sum, s) => sum + s.netSalary, 0);
-    const pendingCount = slips.filter(s => s.status !== PayrollStatus.PAID).length;
+    const totalPending = slips.filter(s => s.status !== 'PAID').reduce((sum, s) => sum + s.netSalary, 0);
+    const totalPaid = slips.filter(s => s.status === 'PAID').reduce((sum, s) => sum + s.netSalary, 0);
+    const pendingCount = slips.filter(s => s.status !== 'PAID').length;
 
     const handleApproveAll = async () => {
         const ok = await confirm({
@@ -69,7 +68,7 @@ export const PayrollDisbursementModal = ({ month, onClose }: PayrollDisbursement
             variant: 'warning',
         });
         if (ok) {
-            slips.forEach(slip => { if (slip.status !== PayrollStatus.PAID) markAsPaid(slip.id); });
+            slips.forEach(slip => { if (slip.status !== 'PAID') markAsPaid(slip.id); });
         }
     };
 
@@ -277,14 +276,14 @@ export const PayrollDisbursementModal = ({ month, onClose }: PayrollDisbursement
                                             <td className="p-4 text-center">
                                                 <span className={clsx(
                                                     "px-2 py-1 rounded text-xs font-bold uppercase",
-                                                    slip.status === PayrollStatus.PAID ? "bg-success/20 text-success" : "bg-warning/20 text-warning"
+                                                    slip.status === 'PAID' ? "bg-success/20 text-success" : "bg-warning/20 text-warning"
                                                 )}>
                                                     {slip.status}
                                                 </span>
                                             </td>
                                             <td className="p-4 text-right">
                                                 <div className="flex items-center justify-end gap-1.5">
-                                                    {slip.status !== PayrollStatus.PAID && (
+                                                    {slip.status !== 'PAID' && (
                                                         <button
                                                             onClick={() => markAsPaid(slip.id)}
                                                             className="px-3 py-1.5 bg-success/20 text-success hover:bg-success hover:text-white rounded-lg transition-colors text-xs font-bold"
@@ -292,7 +291,7 @@ export const PayrollDisbursementModal = ({ month, onClose }: PayrollDisbursement
                                                             Approve
                                                         </button>
                                                     )}
-                                                    {slip.status === PayrollStatus.PAID && (
+                                                    {slip.status === 'PAID' && (
                                                         <span className="text-xs text-dark-muted flex items-center gap-1">
                                                             <CheckCircle className="w-3 h-3" /> Paid
                                                         </span>

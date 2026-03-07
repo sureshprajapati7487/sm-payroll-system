@@ -4,7 +4,6 @@ import { usePayrollStore } from '@/store/payrollStore';
 import { useAuthStore } from '@/store/authStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { PERMISSIONS } from '@/config/permissions';
-import { PayrollStatus } from '@/types';
 import { calculateSalary } from '@/utils/salaryCalculator';
 import { useAttendanceStore } from '@/store/attendanceStore';
 import { useProductionStore } from '@/store/productionStore';
@@ -27,7 +26,7 @@ import { InfoTip } from '@/components/ui/InfoTip';
 export const PayrollDashboard = () => {
     const navigate = useNavigate();
     const { user, hasPermission } = useAuthStore();
-    const { slips, generateMonthlyPayroll, markAsPaid, fetchPayroll, isLoading, isSaving } = usePayrollStore();
+    const { slips, generateMonthlyPayroll, advanceState, fetchPayroll, isLoading, isSaving } = usePayrollStore();
     const { employees } = useEmployeeStore();
 
     // Default to current month YYYY-MM
@@ -59,7 +58,7 @@ export const PayrollDashboard = () => {
         const searchMatch = empName.includes(searchTerm.toLowerCase());
 
         // Status Filter
-        const statusMatch = showPendingOnly ? s.status !== PayrollStatus.PAID : true;
+        const statusMatch = showPendingOnly ? s.status !== 'LOCKED' : true;
 
         // Department Filter
         const emp = employees.find(e => e.id === s.employeeId);
@@ -173,7 +172,7 @@ export const PayrollDashboard = () => {
                 <div className="glass p-5 rounded-xl border border-dark-border">
                     <p className="text-dark-muted text-xs uppercase tracking-wider mb-1">Pending Payment</p>
                     <p className="text-2xl font-bold text-warning">
-                        {filteredSlips.filter(s => s.status !== PayrollStatus.PAID).length}
+                        {filteredSlips.filter(s => s.status !== 'LOCKED').length}
                     </p>
                 </div>
             </div>
@@ -264,7 +263,7 @@ export const PayrollDashboard = () => {
                                             <td className="p-4">
                                                 <span className={clsx(
                                                     "px-2 py-1 rounded text-xs font-bold",
-                                                    !isEstimate && slip.status === PayrollStatus.PAID ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
+                                                    !isEstimate && slip.status === 'LOCKED' ? "bg-success/10 text-success" : "bg-warning/10 text-warning"
                                                 )}>
                                                     {isEstimate ? 'RUNNING' : slip.status}
                                                 </span>
@@ -284,11 +283,29 @@ export const PayrollDashboard = () => {
 
                                                     {!isEstimate ? (
                                                         <>
-                                                            {slip.status !== PayrollStatus.PAID && canGenerate && (
+                                                            {slip.status === 'DRAFT' && canGenerate && (
                                                                 <button
-                                                                    onClick={() => markAsPaid(slip.id)}
+                                                                    onClick={() => advanceState(slip.id, 'simulate')}
+                                                                    className="p-1.5 text-info hover:bg-info/10 rounded transition-colors"
+                                                                    title="Simulate Payroll"
+                                                                >
+                                                                    <div className="w-5 h-5 flex items-center justify-center font-bold text-xs">SIM</div>
+                                                                </button>
+                                                            )}
+                                                            {slip.status === 'SIMULATION' && canGenerate && (
+                                                                <button
+                                                                    onClick={() => advanceState(slip.id, 'approve')}
+                                                                    className="p-1.5 text-warning hover:bg-warning/10 rounded transition-colors"
+                                                                    title="Approve Payroll"
+                                                                >
+                                                                    <div className="w-5 h-5 flex items-center justify-center font-bold text-xs">APP</div>
+                                                                </button>
+                                                            )}
+                                                            {slip.status === 'FINAL_APPROVED' && canGenerate && (
+                                                                <button
+                                                                    onClick={() => advanceState(slip.id, 'lock')}
                                                                     className="p-1.5 text-success hover:bg-success/10 rounded transition-colors"
-                                                                    title="Mark Paid"
+                                                                    title="Lock & Finalize Deductions"
                                                                 >
                                                                     <Banknote className="w-5 h-5" />
                                                                 </button>
