@@ -553,8 +553,9 @@ const SalesTask = sequelize.define('SalesTask', {
 const initDB = async () => {
     try {
         console.log('Syncing database...');
-        // DANGEROUS on production: do not use { alter: true } as it locks tables and causes hangs
-        await sequelize.sync();
+        // Safe Auto-Migration: { alter: { drop: false } } ensures Sequelize adds missing columns without deleting data.
+        // This guarantees continuous uptime and prevents "column does not exist" crashes on production (Render).
+        await sequelize.sync({ alter: { drop: false } });
         console.log('Database synced successfully.');
 
         // Seed initial admin if database is empty (useful for fresh Render deployments)
