@@ -122,7 +122,7 @@ export const useClientStore = create<ClientStore>()(
                 set({ loading: true, error: null });
                 try {
                     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
-                    const res = await fetch(`${API}/api/clients${qs ? '?' + qs : ''}`, { headers: authHeader() });
+                    const res = await fetch(`${API}/clients${qs ? '?' + qs : ''}`, { headers: authHeader() });
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'Failed to fetch clients');
                     set({ clients: data, loading: false });
@@ -130,7 +130,7 @@ export const useClientStore = create<ClientStore>()(
             },
 
             addClient: async (data) => {
-                const res = await fetch(`${API}/api/clients`, {
+                const res = await fetch(`${API}/clients`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...authHeader() },
                     body: JSON.stringify(data)
@@ -142,7 +142,7 @@ export const useClientStore = create<ClientStore>()(
             },
 
             updateClient: async (id, data) => {
-                const res = await fetch(`${API}/api/clients/${id}`, {
+                const res = await fetch(`${API}/clients/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', ...authHeader() },
                     body: JSON.stringify(data)
@@ -154,13 +154,13 @@ export const useClientStore = create<ClientStore>()(
             },
 
             deleteClient: async (id) => {
-                const res = await fetch(`${API}/api/clients/${id}`, { method: 'DELETE', headers: authHeader() });
+                const res = await fetch(`${API}/clients/${id}`, { method: 'DELETE', headers: authHeader() });
                 if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to delete'); }
                 set(s => ({ clients: s.clients.filter(c => c.id !== id) }));
             },
 
             bulkImportClients: async (clients, companyId) => {
-                const res = await fetch(`${API}/api/clients/bulk`, {
+                const res = await fetch(`${API}/clients/bulk`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...authHeader() },
                     body: JSON.stringify({ clients, companyId })
@@ -172,7 +172,7 @@ export const useClientStore = create<ClientStore>()(
             },
 
             setClientLocation: async (clientId, lat, lng, setBy) => {
-                const res = await fetch(`${API}/api/clients/${clientId}/location`, {
+                const res = await fetch(`${API}/clients/${clientId}/location`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', ...authHeader() },
                     body: JSON.stringify({ latitude: lat, longitude: lng, setBy })
@@ -186,7 +186,7 @@ export const useClientStore = create<ClientStore>()(
                 set({ loading: true });
                 try {
                     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
-                    const res = await fetch(`${API}/api/visits${qs ? '?' + qs : ''}`, { headers: authHeader() });
+                    const res = await fetch(`${API}/visits${qs ? '?' + qs : ''}`, { headers: authHeader() });
                     const visits = await res.json();
                     if (!res.ok) throw new Error(visits.error);
                     set({ visits, loading: false });
@@ -194,7 +194,7 @@ export const useClientStore = create<ClientStore>()(
             },
 
             checkIn: async ({ companyId, clientId, salesmanId, salesmanName, lat, lng, purpose, notes }) => {
-                const res = await fetch(`${API}/api/visits/checkin`, {
+                const res = await fetch(`${API}/visits/checkin`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...authHeader() },
                     body: JSON.stringify({ companyId, clientId, salesmanId, salesmanName, checkInLat: lat, checkInLng: lng, purpose, notes })
@@ -206,7 +206,7 @@ export const useClientStore = create<ClientStore>()(
             },
 
             checkOut: async (visitId, params) => {
-                const res = await fetch(`${API}/api/visits/${visitId}/checkout`, {
+                const res = await fetch(`${API}/visits/${visitId}/checkout`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', ...authHeader() },
                     body: JSON.stringify({ checkOutLat: params.lat, checkOutLng: params.lng, ...params })
@@ -221,7 +221,7 @@ export const useClientStore = create<ClientStore>()(
 
             fetchActiveVisit: async (salesmanId) => {
                 try {
-                    const res = await fetch(`${API}/api/visits/active/${salesmanId}`, { headers: authHeader() });
+                    const res = await fetch(`${API}/visits/active/${salesmanId}`, { headers: authHeader() });
                     if (!res.ok) { set({ activeVisit: null }); return; }
                     const data = await res.json();
                     // Only set if data has a valid visit object
@@ -230,7 +230,7 @@ export const useClientStore = create<ClientStore>()(
             },
 
             fetchStats: async (salesmanId) => {
-                const res = await fetch(`${API}/api/visits/stats/${salesmanId}`, { headers: authHeader() });
+                const res = await fetch(`${API}/visits/stats/${salesmanId}`, { headers: authHeader() });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error);
                 return data;

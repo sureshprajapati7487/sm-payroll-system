@@ -41,7 +41,7 @@ export const useSalesTaskStore = create<SalesTaskState>((set, get) => ({
 
         set({ isLoading: true, error: null });
         try {
-            const res = await apiFetch('/api/sales/tasks');
+            const res = await apiFetch('/sales/tasks');
             if (res.ok) {
                 const tasks: SalesTask[] = await res.json();
                 set({ tasks, isLoading: false });
@@ -57,7 +57,7 @@ export const useSalesTaskStore = create<SalesTaskState>((set, get) => ({
     addTask: async (data) => {
         set({ isLoading: true, error: null });
         try {
-            const res = await apiFetch('/api/sales/tasks', {
+            const res = await apiFetch('/sales/tasks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
@@ -85,7 +85,7 @@ export const useSalesTaskStore = create<SalesTaskState>((set, get) => ({
         }));
 
         try {
-            const res = await apiFetch(`/api/sales/tasks/${id}`, {
+            const res = await apiFetch(`/sales/tasks/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updates),
@@ -115,7 +115,7 @@ export const useSalesTaskStore = create<SalesTaskState>((set, get) => ({
         }));
 
         try {
-            await apiFetch(`/api/sales/tasks/${id}`, { method: 'DELETE' });
+            await apiFetch(`/sales/tasks/${id}`, { method: 'DELETE' });
         } catch (err: any) {
             set({ tasks: prevTasks, error: err.message || 'Failed to delete task' });
             throw err;
