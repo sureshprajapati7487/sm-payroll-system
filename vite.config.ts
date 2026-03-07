@@ -94,11 +94,12 @@ export default defineConfig(async () => {
     server: {
       host: true,
       port: 5173,
-      https: !isProd,
       proxy: {
         '/api': {
-          target: 'http://localhost:3000',
+          // Use the HTTPS backend server on port 3443 (self-signed cert, ignore SSL errors)
+          target: 'https://localhost:3443',
           changeOrigin: true,
+          secure: false,        // allow self-signed certificate
         }
       }
     },
