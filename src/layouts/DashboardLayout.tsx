@@ -125,24 +125,23 @@ const NAV_GROUPS = [
 ];
 
 
-// ── Mobile Bottom Nav (4 primary tabs + More) ──────────────────────────────
+// ── Mobile Bottom Nav (5 primary tabs) ────────────────────────────────────────────
 const BOTTOM_NAV = [
     { label: 'Home', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Staff', path: '/employees', icon: Users },
     { label: 'Attend', path: '/attendance', icon: CalendarClock },
     { label: 'Payroll', path: '/payroll', icon: Banknote },
+    { label: 'Salesman', path: '/salesman', icon: ShoppingBag },
 ];
 
-// ── More menu items ─────────────────────────────────────────────────────────
+// ── More menu items ────────────────────────────────────────────────
 const MORE_ITEMS = [
+    { label: 'Staff', path: '/employees', icon: Users },
     { label: 'Leaves', path: '/leaves', icon: CalendarClock },
     { label: 'Loans', path: '/loans', icon: Wallet },
     { label: 'Expenses', path: '/expenses', icon: Wallet },
     { label: 'Production', path: '/production', icon: Factory },
-    { label: 'Salesman', path: '/salesman', icon: ShoppingBag },
     { label: 'Approvals', path: '/approvals', icon: UserCheck },
     { label: 'Settings', path: '/settings', icon: Settings },
-    { label: 'Mobile', path: '/mobile/dashboard', icon: LayoutDashboard },
     { label: 'Reports', path: '/reports/builder', icon: ShieldCheck },
 ];
 
@@ -458,7 +457,7 @@ export const DashboardLayout = () => {
                 </div>
 
                 {/* Page content — pb-24 on mobile to avoid bottom nav overlap */}
-                <div className="p-4 md:p-6 max-w-7xl mx-auto pb-24 md:pb-6">
+                <div className="p-4 md:p-6 max-w-7xl mx-auto pb-24 md:pb-6 overflow-x-hidden">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={location.pathname}

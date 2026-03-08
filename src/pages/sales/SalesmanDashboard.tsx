@@ -549,17 +549,17 @@ export const SalesmanDashboard = () => {
     ] as const;
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
             {/* ── Header ── */}
-            <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-start justify-between flex-wrap gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center">
-                            <ShoppingBag className="w-5 h-5 text-orange-400" />
+                    <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-orange-500/20 flex items-center justify-center shrink-0">
+                            <ShoppingBag className="w-4 h-4 md:w-5 md:h-5 text-orange-400" />
                         </div>
                         Salesman Dashboard
                     </h1>
-                    <p className="text-dark-muted mt-1">Sales team overview + task management + performance</p>
+                    <p className="text-dark-muted mt-1 text-sm hidden md:block">Sales team overview + task management + performance</p>
                 </div>
                 {activeTab === 'tasks' && (
                     <button
@@ -575,16 +575,18 @@ export const SalesmanDashboard = () => {
             {currentCompanyId && <TodayActivityBanner companyId={currentCompanyId} />}
 
             {/* ── Tab Bar ── */}
-            <div className="flex gap-1 glass rounded-xl border border-dark-border p-1 w-fit">
-                {TABS.map(({ key, label, icon: Icon }) => (
-                    <button
-                        key={key}
-                        onClick={() => setActiveTab(key)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === key ? 'bg-primary-500/20 text-primary-400 shadow' : 'text-dark-muted hover:text-white'}`}
-                    >
-                        <Icon className="w-4 h-4" /> {label}
-                    </button>
-                ))}
+            <div className="overflow-x-auto pb-1 -mx-1 px-1">
+                <div className="flex gap-1 glass rounded-xl border border-dark-border p-1 w-max min-w-full md:w-fit">
+                    {TABS.map(({ key, label, icon: Icon }) => (
+                        <button
+                            key={key}
+                            onClick={() => setActiveTab(key)}
+                            className={`flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all whitespace-nowrap ${activeTab === key ? 'bg-primary-500/20 text-primary-400 shadow' : 'text-dark-muted hover:text-white'}`}
+                        >
+                            <Icon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" /> {label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* ── Clients Tab ── */}
