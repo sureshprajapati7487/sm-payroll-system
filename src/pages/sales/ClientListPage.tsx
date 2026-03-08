@@ -3,6 +3,8 @@ import { useClientStore, SalesClient, ClientVisitRecord, VisitOutcome } from '@/
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAuthStore } from '@/store/authStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
+import { useInternalSystemSettingStore } from '@/store/systemSettingStore';
+import { DEFAULT_SALESMAN_CONFIG } from '@/utils/salesmanConfig';
 import { useGeofence, GeofenceEvent } from '@/hooks/useGeofence';
 import * as XLSX from 'xlsx';
 import {
@@ -734,6 +736,7 @@ export const ClientListPage = () => {
     const { employees } = useEmployeeStore();
     const { user } = useAuthStore();
     const { currentCompanyId } = useMultiCompanyStore();
+    const { settings: sysSettings, fetchSettings } = useInternalSystemSettingStore();
 
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('ALL');
@@ -761,8 +764,10 @@ export const ClientListPage = () => {
         if (currentCompanyId) {
             fetchClients({ companyId: currentCompanyId });
             if (user?.id) fetchActiveVisit(user.id);
+            // Fetch system settings (GPS radius, etc.) from DB — ensures phone gets correct config
+            fetchSettings(currentCompanyId);
         }
-        // fetchClients + fetchActiveVisit — Zustand stable actions (safe)
+        // fetchClients + fetchActiveVisit + fetchSettings — Zustand stable actions (safe)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentCompanyId, user?.id]);
 
@@ -804,12 +809,18 @@ export const ClientListPage = () => {
 
     // ── Geofence Hook ─────────────────────────────────────────────────────────
     const [geofenceEnabled, setGeofenceEnabled] = useState(true);
+
+    // Read GPS radius REACTIVELY from Zustand store (updates when DB settings load)
+    // This fixes the "50m bug" where phone showed default before DB fetch completed
+    const savedConfig = sysSettings?.SALESMAN_CONFIG;
+    const reactiveRadius: number = savedConfig?.gpsRadiusMeters ?? DEFAULT_SALESMAN_CONFIG.gpsRadiusMeters;
+
     const { isTracking, nearbyClient, nearbyDistanceM, geofenceRadius, events: geoEvents, clearEvents, gpsError } = useGeofence({
         salesmanId: user?.id,
         salesmanName: user?.name,
         companyId: currentCompanyId || undefined,
         clients,
-        // radiusMetres: not passed — useGeofence will auto-read from System Settings → Salesman Config
+        radiusMetres: reactiveRadius,  // ← reactive: updates when DB settings load
         enabled: geofenceEnabled,
     });
 
