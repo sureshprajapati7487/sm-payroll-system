@@ -7,7 +7,7 @@ const path = require('path');
 const { requireRole } = require('../rbac');
 
 let Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Biometric, Expense, AdvanceSalary, Holiday, AuditLog, UserSession, IPRestriction, Attendance, Production, Loan, SalarySlip, StatutoryRule, addError, getErrorHint;
-let _doBackup, _getBackupStatus, _setAutoBackupEnabled;
+let _doBackup, _getBackupStatus, _setAutoBackupEnabled, _getBackupConfig, _updateBackupConfig;
 
 const WA_CONFIG_FILE = path.join(__dirname, '..', 'whatsapp_config.json');
 const BACKUP_DIR = path.join(__dirname, '..', 'backups');
@@ -44,7 +44,8 @@ function init(models) {
     getErrorHint = models.getErrorHint;
     _doBackup = models.doBackup;
     _getBackupStatus = models.getBackupStatus;
-    _setAutoBackupEnabled = models.setAutoBackupEnabled;
+    _getBackupConfig = models.getConfig;
+    _updateBackupConfig = models.updateConfig;
 }
 
 // ── Departments ────────────────────────────────────────────────────────────────
@@ -622,6 +623,23 @@ router.get('/backup/status', (req, res) => {
     try { res.json(_getBackupStatus()); }
     catch (e) { addError(e, 'GET /api/backup/status'); res.status(500).json({ error: e.message }); }
 });
+
+router.get('/backup/download/:filename', (req, res) => {
+    try {
+        const { filename } = req.params;
+        if (!filename.startsWith('database_backup_') || !filename.endsWith('.sqlite')) {
+            return res.status(400).json({ error: 'Invalid backup filename' });
+        }
+        const filePath = path.join(BACKUP_DIR, filename);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'Backup file not found' });
+        }
+        res.download(filePath);
+    } catch (e) {
+        addError(e, `GET /api/backup/download/${req.params.filename}`);
+        res.status(500).json({ error: e.message });
+    }
+});
 router.post('/backup/now', (req, res) => {
     try { res.json(_doBackup('manual')); }
     catch (e) { addError(e, 'POST /api/backup/now'); res.status(500).json({ error: e.message }); }
@@ -636,11 +654,29 @@ router.delete('/backup/:filename', (req, res) => {
         res.json({ success: true, deleted: filename });
     } catch (e) { addError(e, `DELETE /api/backup/${req.params.filename}`); res.status(500).json({ error: e.message }); }
 });
+// GET full config (schedules, email, whatsapp) — masks sensitive fields
+router.get('/backup/config', (req, res) => {
+    try {
+        const cfg = _getBackupConfig ? _getBackupConfig() : {};
+        const safe = JSON.parse(JSON.stringify(cfg));
+        if (safe.email?.pass) safe.email.pass = '••••••••';
+        if (safe.whatsapp?.wabaToken) safe.whatsapp.wabaToken = '••••••••';
+        res.json(safe);
+    } catch (e) { addError(e, 'GET /api/backup/config'); res.status(500).json({ error: e.message }); }
+});
+
+// PATCH config — accepts schedules, enabled, email, whatsapp sub-objects
 router.patch('/backup/config', (req, res) => {
     try {
-        const { enabled } = req.body;
-        if (typeof enabled === 'boolean') _setAutoBackupEnabled(enabled);
-        res.json({ success: true, enabled: typeof enabled === 'boolean' ? enabled : true, message: `Auto-backup ${enabled ? 'enabled' : 'paused'} successfully` });
+        const payload = req.body;
+        // Prevent overwriting sensitive fields with masked placeholders
+        if (payload.email?.pass === '••••••••') delete payload.email.pass;
+        if (payload.whatsapp?.wabaToken === '••••••••') delete payload.whatsapp.wabaToken;
+        const updated = _updateBackupConfig ? _updateBackupConfig(payload) : {};
+        const safe = JSON.parse(JSON.stringify(updated));
+        if (safe.email?.pass) safe.email.pass = '••••••••';
+        if (safe.whatsapp?.wabaToken) safe.whatsapp.wabaToken = '••••••••';
+        res.json({ success: true, config: safe });
     } catch (e) { addError(e, 'PATCH /api/backup/config'); res.status(500).json({ error: e.message }); }
 });
 

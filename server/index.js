@@ -10,7 +10,7 @@ const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, Expense, SalarySlip, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB } = require('./database');
 const { Op } = require('sequelize');
-const { startBackupScheduler, doBackup, getBackupStatus, setAutoBackupEnabled } = require('./backup');
+const { startBackupScheduler, doBackup, getBackupStatus, getConfig, updateConfig } = require('./backup');
 
 const BCRYPT_ROUNDS = 10;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
@@ -535,7 +535,7 @@ const sharedModels = {
     Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation,
     SystemSetting, SystemKey, IPRestriction, UserSession,
     addError, getErrorHint,
-    doBackup, getBackupStatus, setAutoBackupEnabled,
+    doBackup, getBackupStatus, getConfig, updateConfig,
     CustomReportTemplate, ScheduledReport, StatutoryRule,
 };
 employeesRoute.init(sharedModels);
@@ -564,6 +564,59 @@ app.use('/api/sales', salesRoute);                      // /api/sales/tasks
 app.use('/api/production', productionRoute);            // /api/production/*
 
 app.use('/api/downloads', express.static(path.join(__dirname, 'public/downloads')));
+
+// ── BACKUP ROUTES ─────────────────────────────────────────────────────────────
+app.get('/api/backup/status', (req, res) => {
+    try { res.json(getBackupStatus()); }
+    catch (e) { addError(e, 'GET /api/backup/status'); res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/backup/now', (req, res) => {
+    try {
+        const result = doBackup('manual');
+        res.json(result);
+    } catch (e) { addError(e, 'POST /api/backup/now'); res.status(500).json({ success: false, error: e.message }); }
+});
+
+app.get('/api/backup/config', (req, res) => {
+    try { res.json(getConfig()); }
+    catch (e) { addError(e, 'GET /api/backup/config'); res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/backup/config', (req, res) => {
+    try {
+        const updated = updateConfig(req.body);
+        res.json({ success: true, config: updated });
+    } catch (e) { addError(e, 'PATCH /api/backup/config'); res.status(500).json({ success: false, error: e.message }); }
+});
+
+app.get('/api/backup/download/:filename', (req, res) => {
+    try {
+        const { filename } = req.params;
+        // Security: only allow backup files
+        if (!filename.startsWith('database_backup_') || !filename.endsWith('.sqlite')) {
+            return res.status(400).json({ error: 'Invalid filename' });
+        }
+        const filePath = path.join(__dirname, 'backups', filename);
+        if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup file not found' });
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.sendFile(filePath);
+    } catch (e) { addError(e, 'GET /api/backup/download'); res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/backup/:filename', (req, res) => {
+    try {
+        const { filename } = req.params;
+        if (!filename.startsWith('database_backup_') || !filename.endsWith('.sqlite')) {
+            return res.status(400).json({ error: 'Invalid filename' });
+        }
+        const filePath = path.join(__dirname, 'backups', filename);
+        if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Backup file not found' });
+        fs.unlinkSync(filePath);
+        res.json({ success: true, deleted: filename });
+    } catch (e) { addError(e, 'DELETE /api/backup'); res.status(500).json({ error: e.message }); }
+});
 
 // ── Catch-All 404 ─────────────────────────────────────────────────────────────
 app.use((req, res) => {
