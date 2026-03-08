@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User } from '@/types';
-import { ROLE_PERMISSIONS, PermissionValue } from '@/config/permissions';
+import { PermissionValue } from '@/config/permissions';
 import { audit, auditAnonymous } from '@/lib/auditLogger';
 import { API_URL } from '@/lib/apiConfig';
+import { useRolePermissionsStore } from '@/store/rolePermissionsStore';
 
 interface AuthState {
     user: User | null;
@@ -159,7 +160,7 @@ export const useAuthStore = create<AuthState>()(
             hasPermission: (permission: PermissionValue) => {
                 const { user } = get();
                 if (!user) return false;
-                return ROLE_PERMISSIONS[user.role].includes(permission);
+                return useRolePermissionsStore.getState().hasPermission(user.role, permission);
             },
         }),
         {

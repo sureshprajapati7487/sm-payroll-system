@@ -17,6 +17,7 @@ import { Roles } from '@/types';
 import { Building2, Clock, Plus, Trash2, Edit2, Save, X, Briefcase, Gavel, FileCheck, AlertOctagon, IndianRupee, CalendarCheck, Key, Lock, Eye, EyeOff, Calendar, Camera, MapPin, Fingerprint, ScanFace, Navigation, ToggleLeft, ToggleRight, Crosshair, Shield } from 'lucide-react';
 import { WarningModal } from '@/components/ui/WarningModal';
 import { StatutorySettings } from './StatutorySettings';
+import { RoleAccessConfig } from './RoleAccessConfig';
 
 const SALARY_BASIS_OPTIONS: { value: DeptSalaryBasis; label: string; desc: string; color: string }[] = [
     { value: 'FIXED', label: 'Fixed Monthly', desc: 'Same salary every month (HR, Accounts, Security)', color: 'blue' },
@@ -650,7 +651,7 @@ const SalesmanConfigPanel = () => {
 
 export const ConfigurationPage = () => {
 
-    const [activeTab, setActiveTab] = useState<'departments' | 'workAllocation' | 'shifts' | 'rules' | 'salaryTypes' | 'attendance' | 'keys' | 'holidays' | 'punch' | 'salesman' | 'statutory'>('departments');
+    const [activeTab, setActiveTab] = useState<'departments' | 'workAllocation' | 'shifts' | 'rules' | 'salaryTypes' | 'attendance' | 'keys' | 'holidays' | 'punch' | 'salesman' | 'statutory' | 'roles'>('departments');
     const { departments, addDepartment, updateDepartment, deleteDepartment } = useDepartmentStore();
     const { shifts, addShift, updateShift, removeShift } = useShiftStore();
     const { groups: workGroups, assignments, addGroup, removeGroup, getGroupEmployees } = useWorkGroupStore();
@@ -952,6 +953,18 @@ export const ConfigurationPage = () => {
                     >
                         <FileCheck className="w-4 h-4" /> <span>Audit Logs</span>
                     </button>
+                    {isSuperAdmin && (
+                        <button
+                            onClick={() => setActiveTab('roles')}
+                            className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'roles'
+                                ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20'
+                                : 'text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/30'
+                                }`}
+                            title="Role Access Control (Super Admin Only)"
+                        >
+                            <Shield className="w-4 h-4" /> <span>Role Access</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -969,7 +982,7 @@ export const ConfigurationPage = () => {
                 />
             )}
 
-            {activeTab !== 'salaryTypes' && activeTab !== 'attendance' && activeTab !== 'keys' && activeTab !== 'holidays' && activeTab !== 'punch' && activeTab !== 'departments' && activeTab !== 'salesman' && activeTab !== 'statutory' && (
+            {activeTab !== 'salaryTypes' && activeTab !== 'attendance' && activeTab !== 'keys' && activeTab !== 'holidays' && activeTab !== 'punch' && activeTab !== 'departments' && activeTab !== 'salesman' && activeTab !== 'statutory' && activeTab !== 'roles' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Content Switching */}
                     {activeTab === 'rules' ? (
@@ -2342,6 +2355,7 @@ export const ConfigurationPage = () => {
             />
             {activeTab === 'salesman' && <SalesmanConfigPanel />}
             {activeTab === 'statutory' && <StatutorySettings />}
+            {activeTab === 'roles' && <RoleAccessConfig />}
         </div >
     );
 };
