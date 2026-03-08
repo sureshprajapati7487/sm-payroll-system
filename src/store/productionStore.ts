@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { ProductionEntry, ProductionStatus } from '@/types';
 import { apiFetch } from '@/lib/apiClient';
+import { useAuthStore } from './authStore';
+import { useRolePermissionsStore } from './rolePermissionsStore';
+import { useEmployeeStore } from './employeeStore';
 
 interface ProductionState {
     entries: ProductionEntry[];
@@ -17,7 +20,7 @@ interface ProductionState {
     getEntriesByEmployee: (employeeId: string) => ProductionEntry[];
 }
 
-export const useProductionStore = create<ProductionState>((set, get) => ({
+const useInternalProductionStore = create<ProductionState>((set, get) => ({
     entries: [],
     isLoading: false,
 
@@ -145,3 +148,39 @@ export const useProductionStore = create<ProductionState>((set, get) => ({
 
     getEntriesByEmployee: (employeeId) => get().entries.filter(e => e.employeeId === employeeId),
 }));
+
+// ── Exported Hook with Data Visibility Filtering ─────────────────────────────
+export const useProductionStore = () => {
+    const store = useInternalProductionStore();
+    const user = useAuthStore(s => s.user);
+    const getScope = useRolePermissionsStore(s => s.getScope);
+
+    const { _rawStore } = useEmployeeStore();
+    const employees = _rawStore?._rawEmployees || [];
+
+    const filteredEntries = store.entries.filter(e => {
+        if (!user) return true;
+
+        const scope = getScope(user.role);
+        if (scope === 'ALL') return true;
+
+        if (scope === 'TEAM') {
+            const userEmp = employees.find((emp: any) => emp.id === user.id);
+            const recordEmp = employees.find((emp: any) => emp.id === e.employeeId);
+            if (!userEmp?.department) return e.employeeId === user.id; // Fallback to OWN
+            return recordEmp?.department === userEmp.department;
+        }
+
+        if (scope === 'OWN') return e.employeeId === user.id;
+
+        return false;
+    });
+
+    return {
+        ...store,
+        entries: filteredEntries,
+        _rawStore: store
+    };
+};
+
+useProductionStore.getState = () => useInternalProductionStore.getState();

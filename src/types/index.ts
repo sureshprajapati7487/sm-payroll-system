@@ -133,6 +133,9 @@ export interface Employee {
 
     // ── Statutory / Govt Deductions ──────────────────────────
     statutoryConfig?: StatutoryConfig;
+
+    // ── Dynamic Custom Fields ─────────────────────────────────
+    customData?: Record<string, any>;
 }
 
 
@@ -269,6 +272,16 @@ export interface LeaveRequest {
     reason: string;
     status: LeaveStatus;
     appliedOn: string;
+    // Workflow tracking
+    workflowApprovals?: {
+        stepId: string;
+        roleId: string;
+        roleName: string;
+        status: 'PENDING' | 'APPROVED' | 'REJECTED';
+        actorName?: string;
+        actedAt?: string;
+    }[];
+    currentWorkflowStep?: number; // 0-based index of the current awaiting step
 }
 
 export enum LoanType {
@@ -326,6 +339,17 @@ export interface LoanRecord {
     skippedMonths?: SkippedMonth[]; // EMI skip history
     allowedSkips?: number; // Max skips allowed (default: 2)
     settlementRequest?: SettlementRequest | null; // Early settlement request
+
+    // Workflow tracking
+    workflowApprovals?: {
+        stepId: string;
+        roleId: string;
+        roleName: string;
+        status: 'PENDING' | 'APPROVED' | 'REJECTED';
+        actorName?: string;
+        actedAt?: string;
+    }[];
+    currentWorkflowStep?: number; // 0-based index of the current awaiting step
 }
 
 // Notification System Types

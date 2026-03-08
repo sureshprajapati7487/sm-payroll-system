@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { LeaveRequest, LeaveStatus } from '@/types';
 import { useMultiCompanyStore } from './multiCompanyStore';
 import { apiFetch } from '@/lib/apiClient';
+import { useAuthStore } from './authStore';
+import { useRolePermissionsStore } from './rolePermissionsStore';
+import { useEmployeeStore } from './employeeStore';
+import { useWorkflowStore } from './workflowStore';
 
 interface LeaveState {
     requests: LeaveRequest[];
@@ -16,7 +20,7 @@ interface LeaveState {
     getLeavesByEmployee: (employeeId: string) => LeaveRequest[];
 }
 
-export const useLeaveStore = create<LeaveState>((set, get) => ({
+const useInternalLeaveStore = create<LeaveState>((set, get) => ({
     requests: [],
     isLoading: false,
 
@@ -42,12 +46,23 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
     requestLeave: async (req) => {
         const companyId = useMultiCompanyStore.getState().currentCompanyId;
 
+        // Check if there's an active workflow for 'leave'
+        const activeWorkflow = useWorkflowStore.getState().getWorkflowByModule('leave');
+        const workflowApprovals = activeWorkflow?.steps.map(step => ({
+            stepId: step.id,
+            roleId: step.roleId,
+            roleName: step.roleName,
+            status: 'PENDING' as const,
+        }));
+
         const newRequest: LeaveRequest = {
             ...req,
             id: Math.random().toString(36).substr(2, 9),
             companyId: companyId || undefined,
             status: LeaveStatus.PENDING,
             appliedOn: new Date().toISOString().split('T')[0],
+            workflowApprovals: workflowApprovals || [],
+            currentWorkflowStep: workflowApprovals && workflowApprovals.length > 0 ? 0 : undefined,
         };
 
         // Optimistic update
@@ -75,7 +90,52 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
 
     // ── Approve → PATCH /api/leaves/:id/approve ──────────────────────────────
     approveLeave: async (id) => {
-        // Optimistic update
+        const user = useAuthStore.getState().user;
+        const leave = get().requests.find(r => r.id === id);
+
+        // Workflow-aware approval
+        if (leave?.workflowApprovals && leave.workflowApprovals.length > 0) {
+            const stepIdx = leave.currentWorkflowStep ?? 0;
+            const updatedApprovals = leave.workflowApprovals.map((a, i) =>
+                i === stepIdx
+                    ? { ...a, status: 'APPROVED' as const, actorName: user?.name ?? '', actedAt: new Date().toISOString() }
+                    : a
+            );
+            const nextStep = stepIdx + 1;
+            const allDone = nextStep >= updatedApprovals.length;
+
+            set(state => ({
+                requests: state.requests.map(r =>
+                    r.id === id
+                        ? {
+                            ...r,
+                            workflowApprovals: updatedApprovals,
+                            currentWorkflowStep: allDone ? undefined : nextStep,
+                            status: allDone ? LeaveStatus.APPROVED : LeaveStatus.PENDING,
+                        }
+                        : r
+                )
+            }));
+
+            // Persist to server
+            try {
+                if (allDone) {
+                    await apiFetch(`/leaves/${id}/approve`, { method: 'PATCH' });
+                } else {
+                    // Partial step — just save the workflow progress
+                    await apiFetch(`/leaves/${id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ workflowApprovals: updatedApprovals, currentWorkflowStep: nextStep }),
+                    }).catch(() => null); // Non-critical
+                }
+            } catch (e) {
+                console.error('[LeaveStore] approveLeave (workflow) failed:', e);
+            }
+            return;
+        }
+
+        // No workflow — direct approve (original behaviour)
         set(state => ({
             requests: state.requests.map(r =>
                 r.id === id ? { ...r, status: LeaveStatus.APPROVED } : r
@@ -83,12 +143,9 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
         }));
 
         try {
-            await apiFetch(`/leaves/${id}/approve`, {
-                method: 'PATCH',
-            });
+            await apiFetch(`/leaves/${id}/approve`, { method: 'PATCH' });
         } catch (e) {
             console.error('[LeaveStore] approveLeave failed:', e);
-            // Rollback
             set(state => ({
                 requests: state.requests.map(r =>
                     r.id === id ? { ...r, status: LeaveStatus.PENDING } : r
@@ -140,3 +197,40 @@ export const useLeaveStore = create<LeaveState>((set, get) => ({
         return get().requests.filter(r => r.employeeId === employeeId);
     }
 }));
+
+// ── Exported Hook with Data Visibility Filtering ─────────────────────────────
+export const useLeaveStore = () => {
+    const store = useInternalLeaveStore();
+    const user = useAuthStore(s => s.user);
+    const getScope = useRolePermissionsStore(s => s.getScope);
+
+    // We need employee data to know departments for TEAM filtering
+    const { _rawStore } = useEmployeeStore();
+    const employees = _rawStore?._rawEmployees || [];
+
+    const filteredRequests = store.requests.filter(r => {
+        if (!user) return true;
+
+        const scope = getScope(user.role);
+        if (scope === 'ALL') return true;
+
+        if (scope === 'TEAM') {
+            const userEmp = employees.find((emp: any) => emp.id === user.id);
+            const recordEmp = employees.find((emp: any) => emp.id === r.employeeId);
+            if (!userEmp?.department) return r.employeeId === user.id; // Fallback to OWN
+            return recordEmp?.department === userEmp.department;
+        }
+
+        if (scope === 'OWN') return r.employeeId === user.id;
+
+        return false;
+    });
+
+    return {
+        ...store,
+        requests: filteredRequests,
+        _rawStore: store
+    };
+};
+
+useLeaveStore.getState = () => useInternalLeaveStore.getState();

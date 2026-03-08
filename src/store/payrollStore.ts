@@ -6,6 +6,8 @@ import { useAdvanceSalaryStore } from './advanceSalaryStore';
 import { useMultiCompanyStore } from './multiCompanyStore';
 import { apiFetch } from '@/lib/apiClient';
 import { audit } from '@/lib/auditLogger';
+import { useAuthStore } from './authStore';
+import { useRolePermissionsStore } from './rolePermissionsStore';
 
 interface PayrollState {
     slips: SalarySlip[];
@@ -21,7 +23,7 @@ interface PayrollState {
     markAsPaid: (slipId: string) => Promise<void>;
 }
 
-export const usePayrollStore = create<PayrollState>((set, get) => ({
+const useInternalPayrollStore = create<PayrollState>((set, get) => ({
     slips: [],
     monthsGenerated: [],
     isLoading: false,
@@ -194,3 +196,40 @@ export const usePayrollStore = create<PayrollState>((set, get) => ({
         }
     },
 }));
+
+// ── Exported Hook with Data Visibility Filtering ─────────────────────────────
+export const usePayrollStore = () => {
+    const store = useInternalPayrollStore();
+    const user = useAuthStore(s => s.user);
+    const getScope = useRolePermissionsStore(s => s.getScope);
+
+    const { _rawStore } = useEmployeeStore();
+    const employees = _rawStore?._rawEmployees || [];
+
+    const filteredSlips = store.slips.filter(s => {
+        if (!user) return true;
+
+        const scope = getScope(user.role);
+        if (scope === 'ALL') return true;
+
+        if (scope === 'TEAM') {
+            const userEmp = employees.find((emp: any) => emp.id === user.id);
+            const recordEmp = employees.find((emp: any) => emp.id === s.employeeId);
+            if (!userEmp?.department) return s.employeeId === user.id; // Fallback to OWN
+            return recordEmp?.department === userEmp.department;
+        }
+
+        if (scope === 'OWN') return s.employeeId === user.id;
+
+        return false;
+    });
+
+    return {
+        ...store,
+        slips: filteredSlips,
+        getSlipsByMonth: (month: string) => filteredSlips.filter((s: any) => s.month === month),
+        _rawStore: store
+    };
+};
+
+usePayrollStore.getState = () => useInternalPayrollStore.getState();

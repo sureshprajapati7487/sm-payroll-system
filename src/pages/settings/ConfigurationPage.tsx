@@ -14,10 +14,12 @@ import { useAuthStore } from '@/store/authStore';
 import { useHolidayStore } from '@/store/holidayStore';
 import { PERMISSIONS } from '@/config/permissions';
 import { Roles } from '@/types';
-import { Building2, Clock, Plus, Trash2, Edit2, Save, X, Briefcase, Gavel, FileCheck, AlertOctagon, IndianRupee, CalendarCheck, Key, Lock, Eye, EyeOff, Calendar, Camera, MapPin, Fingerprint, ScanFace, Navigation, ToggleLeft, ToggleRight, Crosshair, Shield } from 'lucide-react';
+import { Building2, Clock, Plus, Trash2, Edit2, Save, X, Briefcase, Gavel, FileCheck, AlertOctagon, IndianRupee, CalendarCheck, Key, Lock, Eye, EyeOff, Calendar, Camera, MapPin, Fingerprint, ScanFace, Navigation, ToggleLeft, ToggleRight, Crosshair, Shield, Network, Settings2 } from 'lucide-react';
 import { WarningModal } from '@/components/ui/WarningModal';
 import { StatutorySettings } from './StatutorySettings';
 import { RoleAccessConfig } from './RoleAccessConfig';
+import { CustomFieldsConfig } from './CustomFieldsConfig';
+import { WorkflowBuilder } from './WorkflowConfig';
 
 const SALARY_BASIS_OPTIONS: { value: DeptSalaryBasis; label: string; desc: string; color: string }[] = [
     { value: 'FIXED', label: 'Fixed Monthly', desc: 'Same salary every month (HR, Accounts, Security)', color: 'blue' },
@@ -651,7 +653,7 @@ const SalesmanConfigPanel = () => {
 
 export const ConfigurationPage = () => {
 
-    const [activeTab, setActiveTab] = useState<'departments' | 'workAllocation' | 'shifts' | 'rules' | 'salaryTypes' | 'attendance' | 'keys' | 'holidays' | 'punch' | 'salesman' | 'statutory' | 'roles'>('departments');
+    const [activeTab, setActiveTab] = useState<'departments' | 'workAllocation' | 'shifts' | 'rules' | 'salaryTypes' | 'attendance' | 'keys' | 'holidays' | 'punch' | 'salesman' | 'statutory' | 'roles' | 'customFields' | 'workflows'>('departments');
     const { departments, addDepartment, updateDepartment, deleteDepartment } = useDepartmentStore();
     const { shifts, addShift, updateShift, removeShift } = useShiftStore();
     const { groups: workGroups, assignments, addGroup, removeGroup, getGroupEmployees } = useWorkGroupStore();
@@ -869,8 +871,8 @@ export const ConfigurationPage = () => {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
                                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${isActive
-                                        ? `${colorMap[tab.color]} shadow-md`
-                                        : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
+                                    ? `${colorMap[tab.color]} shadow-md`
+                                    : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
                                     }`}
                             >
                                 {tab.icon}
@@ -888,10 +890,10 @@ export const ConfigurationPage = () => {
                     <button
                         onClick={() => isSuperAdmin && setActiveTab('keys')}
                         className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${activeTab === 'keys'
-                                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
-                                : isSuperAdmin
-                                    ? 'bg-slate-800 text-amber-400 border border-amber-500/30 hover:bg-amber-500/10'
-                                    : 'bg-slate-800/40 text-slate-600 border border-slate-800 cursor-not-allowed'
+                            ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
+                            : isSuperAdmin
+                                ? 'bg-slate-800 text-amber-400 border border-amber-500/30 hover:bg-amber-500/10'
+                                : 'bg-slate-800/40 text-slate-600 border border-slate-800 cursor-not-allowed'
                             }`}
                         title={!isSuperAdmin ? 'Super Admin only' : 'System Keys'}
                     >
@@ -915,14 +917,46 @@ export const ConfigurationPage = () => {
                         <button
                             onClick={() => setActiveTab('roles')}
                             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${activeTab === 'roles'
-                                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                                    : 'bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20'
+                                ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20'
                                 }`}
                             title="Role Access Control — Super Admin Only"
                         >
                             <Shield className="w-3.5 h-3.5" />
                             Role Access
                             <span className="ml-0.5 text-[9px] bg-rose-500/30 text-rose-300 px-1 py-0.5 rounded font-bold">SA</span>
+                        </button>
+                    )}
+
+                    {/* Custom Fields — Super Admin only */}
+                    {isSuperAdmin && (
+                        <button
+                            onClick={() => setActiveTab('customFields')}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${activeTab === 'customFields'
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                                : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20'
+                                }`}
+                            title="Custom Fields Config — Super Admin Only"
+                        >
+                            <Settings2 className="w-3.5 h-3.5" />
+                            Custom Fields
+                            <span className="ml-0.5 text-[9px] bg-indigo-500/30 text-indigo-300 px-1 py-0.5 rounded font-bold">SA</span>
+                        </button>
+                    )}
+
+                    {/* Workflows — Super Admin only */}
+                    {isSuperAdmin && (
+                        <button
+                            onClick={() => setActiveTab('workflows')}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${activeTab === 'workflows'
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                                : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20'
+                                }`}
+                            title="Approval Workflows — Super Admin Only"
+                        >
+                            <Network className="w-3.5 h-3.5" />
+                            Workflows
+                            <span className="ml-0.5 text-[9px] bg-indigo-500/30 text-indigo-300 px-1 py-0.5 rounded font-bold">SA</span>
                         </button>
                     )}
                 </div>
@@ -942,7 +976,7 @@ export const ConfigurationPage = () => {
                 />
             )}
 
-            {activeTab !== 'salaryTypes' && activeTab !== 'attendance' && activeTab !== 'keys' && activeTab !== 'holidays' && activeTab !== 'punch' && activeTab !== 'departments' && activeTab !== 'salesman' && activeTab !== 'statutory' && activeTab !== 'roles' && (
+            {activeTab !== 'salaryTypes' && activeTab !== 'attendance' && activeTab !== 'keys' && activeTab !== 'holidays' && activeTab !== 'punch' && activeTab !== 'departments' && activeTab !== 'salesman' && activeTab !== 'statutory' && activeTab !== 'roles' && activeTab !== 'customFields' && activeTab !== 'workflows' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Content Switching */}
                     {activeTab === 'rules' ? (
@@ -2316,6 +2350,8 @@ export const ConfigurationPage = () => {
             {activeTab === 'salesman' && <SalesmanConfigPanel />}
             {activeTab === 'statutory' && <StatutorySettings />}
             {activeTab === 'roles' && <RoleAccessConfig />}
+            {activeTab === 'customFields' && <CustomFieldsConfig />}
+            {activeTab === 'workflows' && <WorkflowBuilder />}
         </div >
     );
 };

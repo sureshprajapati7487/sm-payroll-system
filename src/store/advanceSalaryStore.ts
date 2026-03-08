@@ -2,6 +2,9 @@
 import { create } from 'zustand';
 import { apiFetch } from '@/lib/apiClient';
 import { useMultiCompanyStore } from './multiCompanyStore';
+import { useAuthStore } from './authStore';
+import { useRolePermissionsStore } from './rolePermissionsStore';
+import { useEmployeeStore } from './employeeStore';
 
 export interface AdvanceSalaryRequest {
     id: string;
@@ -33,7 +36,7 @@ interface AdvanceSalaryState {
     deleteRequest: (requestId: string) => Promise<void>;
 }
 
-export const useAdvanceSalaryStore = create<AdvanceSalaryState>((set, get) => ({
+export const useInternalAdvanceSalaryStore = create<AdvanceSalaryState>((set, get) => ({
     requests: [],
     isLoading: false,
 
@@ -155,3 +158,39 @@ export const useAdvanceSalaryStore = create<AdvanceSalaryState>((set, get) => ({
     getEmployeeRequests: (employeeId) =>
         get().requests.filter(r => r.employeeId === employeeId).sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime()),
 }));
+
+// ── Exported Hook with Data Visibility Filtering ─────────────────────────────
+export const useAdvanceSalaryStore = () => {
+    const store = useInternalAdvanceSalaryStore();
+    const user = useAuthStore(s => s.user);
+    const getScope = useRolePermissionsStore(s => s.getScope);
+
+    const { _rawStore } = useEmployeeStore();
+    const employees = _rawStore?._rawEmployees || [];
+
+    const filteredRequests = store.requests.filter(r => {
+        if (!user) return true;
+
+        const scope = getScope(user.role);
+        if (scope === 'ALL') return true;
+
+        if (scope === 'TEAM') {
+            const userEmp = employees.find((emp: any) => emp.id === user.id);
+            const recordEmp = employees.find((emp: any) => emp.id === r.employeeId);
+            if (!userEmp?.department) return r.employeeId === user.id; // Fallback to OWN
+            return recordEmp?.department === userEmp.department;
+        }
+
+        if (scope === 'OWN') return r.employeeId === user.id;
+
+        return false;
+    });
+
+    return {
+        ...store,
+        requests: filteredRequests,
+        _rawStore: store
+    };
+};
+
+useAdvanceSalaryStore.getState = () => useInternalAdvanceSalaryStore.getState();

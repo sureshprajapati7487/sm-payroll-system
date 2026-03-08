@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { useAuthStore } from './authStore';
 import { useMultiCompanyStore } from './multiCompanyStore';
 import { apiFetch } from '@/lib/apiClient';
+import { useRolePermissionsStore } from './rolePermissionsStore';
+import { useEmployeeStore } from './employeeStore';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface AuditLog {
@@ -37,7 +39,7 @@ interface ExpenseState {
     getStats: (month: string) => { total: number; count: number; pending: number };
 }
 
-export const useExpenseStore = create<ExpenseState>((set, get) => ({
+export const useInternalExpenseStore = create<ExpenseState>((set, get) => ({
     expenses: [],
     isLoading: false,
     isSaving: false,
@@ -176,3 +178,40 @@ export const useExpenseStore = create<ExpenseState>((set, get) => ({
         return { total, count: filtered.length, pending };
     }
 }));
+
+// ── Exported Hook with Data Visibility Filtering ─────────────────────────────
+export const useExpenseStore = () => {
+    const store = useInternalExpenseStore();
+    const user = useAuthStore(s => s.user);
+    const getScope = useRolePermissionsStore(s => s.getScope);
+
+    const { _rawStore } = useEmployeeStore();
+    const employees = _rawStore?._rawEmployees || [];
+
+    const filteredExpenses = store.expenses.filter(e => {
+        if (!user) return true;
+
+        const scope = getScope(user.role);
+        if (scope === 'ALL') return true;
+
+        if (scope === 'TEAM') {
+            const userEmp = employees.find((emp: any) => emp.id === user.id);
+            // Expense doesn't have employeeId, it has addedBy string name
+            const recordEmp = employees.find((emp: any) => emp.name === e.addedBy);
+            if (!userEmp?.department) return e.addedBy === user.name;
+            return recordEmp?.department === userEmp.department;
+        }
+
+        if (scope === 'OWN') return e.addedBy === user.name;
+
+        return false;
+    });
+
+    return {
+        ...store,
+        expenses: filteredExpenses,
+        _rawStore: store
+    };
+};
+
+useExpenseStore.getState = () => useInternalExpenseStore.getState();

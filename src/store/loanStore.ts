@@ -8,8 +8,10 @@ import { useMultiCompanyStore } from './multiCompanyStore';
 import { useAttendanceStore } from './attendanceStore';
 import { useProductionStore } from './productionStore';
 import { useHolidayStore } from './holidayStore';
+import { useRolePermissionsStore } from './rolePermissionsStore';
 import { sendLoanApprovalNotification } from '@/utils/notificationService';
 import { audit } from '@/lib/auditLogger';
+import { useWorkflowStore } from './workflowStore';
 
 interface LoanState {
     loans: LoanRecord[];
@@ -95,7 +97,21 @@ const useInternalLoanStore = create<LoanState>()(
                     }],
                     skippedMonths: [],
                     allowedSkips: 2,
-                    settlementRequest: null
+                    settlementRequest: null,
+                    // Workflow initialisation
+                    ...(() => {
+                        const activeWorkflow = useWorkflowStore.getState().getWorkflowByModule('loan');
+                        if (!activeWorkflow || activeWorkflow.steps.length === 0) return {};
+                        return {
+                            workflowApprovals: activeWorkflow.steps.map(step => ({
+                                stepId: step.id,
+                                roleId: step.roleId,
+                                roleName: step.roleName,
+                                status: 'PENDING' as const,
+                            })),
+                            currentWorkflowStep: 0,
+                        };
+                    })()
                 };
 
                 set(state => ({
@@ -191,8 +207,62 @@ const useInternalLoanStore = create<LoanState>()(
 
             approveLoan: (id) => {
                 const loan = useInternalLoanStore.getState()._rawLoans.find(l => l.id === id);
+                const currentUser = useAuthStore.getState().user;
+
+                // ── Workflow-aware approval ───────────────────────────────────
+                if (loan?.workflowApprovals && loan.workflowApprovals.length > 0) {
+                    const stepIdx = loan.currentWorkflowStep ?? 0;
+                    const updatedApprovals = loan.workflowApprovals.map((a, i) =>
+                        i === stepIdx
+                            ? { ...a, status: 'APPROVED' as const, actorName: currentUser?.name ?? '', actedAt: new Date().toISOString() }
+                            : a
+                    );
+                    const nextStep = stepIdx + 1;
+                    const allDone = nextStep >= updatedApprovals.length;
+
+                    set(state => {
+                        const updatedList = state._rawLoans.map(l => {
+                            if (l.id !== id) return l;
+                            return {
+                                ...l,
+                                workflowApprovals: updatedApprovals,
+                                currentWorkflowStep: allDone ? undefined : nextStep,
+                                status: allDone ? LoanStatus.ACTIVE : LoanStatus.CHECKED,
+                                ...(allDone ? {
+                                    ledger: [{
+                                        id: Math.random().toString(36).substr(2, 9),
+                                        date: l.issuedDate || new Date().toISOString().split('T')[0],
+                                        amount: l.amount,
+                                        type: 'ADVANCE_PAYMENT' as const,
+                                        remarks: 'Loan Approved & Issued (Workflow Complete)'
+                                    }]
+                                } : {})
+                            };
+                        });
+                        return { _rawLoans: updatedList, loans: updatedList };
+                    });
+
+                    if (allDone) {
+                        apiFetch(`/loans/${id}/approve`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ issuedDate: new Date().toISOString().split('T')[0], performedBy: currentUser?.name || 'System' })
+                        }).catch(console.error);
+
+                        audit({
+                            action: 'APPROVE_LOAN',
+                            entityType: 'LOAN',
+                            entityId: id,
+                            entityName: (() => { const e = useEmployeeStore.getState()._rawEmployees.find(x => x.id === loan?.employeeId); return e?.name ?? loan?.employeeId ?? id; })(),
+                            details: { amount: loan?.amount, via: 'workflow' },
+                            status: 'SUCCESS',
+                        });
+                    }
+                    return;
+                }
+
+                // ── No workflow — original logic ─────────────────────────────
                 set(state => {
-                    const currentUser = useAuthStore.getState().user;
                     const updatedList = state._rawLoans.map(l => {
                         if (l.id === id) {
                             if (l.checkingApproverId === currentUser?.id && l.status === LoanStatus.REQUESTED) {
@@ -220,7 +290,7 @@ const useInternalLoanStore = create<LoanState>()(
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         issuedDate: new Date().toISOString().split('T')[0],
-                        performedBy: useAuthStore.getState().user?.name || 'System'
+                        performedBy: currentUser?.name || 'System'
                     })
                 }).catch(console.error);
 
@@ -592,8 +662,31 @@ const useInternalLoanStore = create<LoanState>()(
 export const useLoanStore = () => {
     const store = useInternalLoanStore();
     const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
+    const user = useAuthStore(s => s.user);
+    const getScope = useRolePermissionsStore(s => s.getScope);
 
-    const filteredLoans = store._rawLoans.filter(l => l.companyId === currentCompanyId);
+    const { _rawStore } = useEmployeeStore();
+    const employees = _rawStore?._rawEmployees || [];
+
+    const filteredLoans = store._rawLoans.filter(l => {
+        if (l.companyId !== currentCompanyId) return false;
+
+        if (!user) return true;
+
+        const scope = getScope(user.role);
+        if (scope === 'ALL') return true;
+
+        if (scope === 'TEAM') {
+            const userEmp = employees.find((emp: any) => emp.id === user.id);
+            const recordEmp = employees.find((emp: any) => emp.id === l.employeeId);
+            if (!userEmp?.department) return l.employeeId === user.id; // Fallback to OWN
+            return recordEmp?.department === userEmp.department;
+        }
+
+        if (scope === 'OWN') return l.employeeId === user.id;
+
+        return false;
+    });
 
     return {
         ...store,

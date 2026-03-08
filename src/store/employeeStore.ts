@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { Employee, EmployeeStatus } from '@/types';
 import { useMultiCompanyStore } from './multiCompanyStore';
+import { useAuthStore } from './authStore';
+import { useRolePermissionsStore } from './rolePermissionsStore';
 import { audit } from '@/lib/auditLogger';
 
 interface EmployeeState {
@@ -247,19 +249,33 @@ const useInternalEmployeeStore = create<EmployeeState>((set, get) => ({
 }));
 
 
-// Exported Hook (Wraps Internal Store + Filters by Company)
+// Exported Hook (Wraps Internal Store + Filters by Company and Visibility Scope)
 export const useEmployeeStore = () => {
     const store = useInternalEmployeeStore();
     const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
+    const user = useAuthStore(s => s.user);
+    const getScope = useRolePermissionsStore(s => s.getScope);
 
-    // Filter employees for the current company
+    // Filter employees for the current company AND user's Data Visibility Level
     const filteredEmployees = Array.isArray(store._rawEmployees) ? store._rawEmployees.filter(e => {
-        // If data has no companyId (Legacy), show it ONLY if we are in "Legacy Mode" or just show it until migrated.
-        // Better: Show Legacy data ONLY if currentCompanyId matches the 'default' or if we want to force migration.
-        // User request: "Mene naya kiya toh sab New hona chahiye".
-        // So strict filtering: match companyId.
-        // Legacy data (undefined companyId) will be HIDDEN in new companies.
-        return e.companyId === currentCompanyId;
+        // 1. Must match current company (hard rule)
+        if (e.companyId !== currentCompanyId) return false;
+
+        // 2. Data Visibility Rule (based on Super Admin config)
+        if (!user) return true; // Safe fallback if accessed outside auth context
+
+        const scope = getScope(user.role);
+        if (scope === 'ALL') return true;
+
+        if (scope === 'TEAM') {
+            const userEmp = store._rawEmployees.find(emp => emp.id === user.id);
+            if (!userEmp?.department) return e.id === user.id; // Fallback to OWN
+            return e.department === userEmp.department;
+        }
+
+        if (scope === 'OWN') return e.id === user.id;
+
+        return false;
     }) : [];
 
     return {

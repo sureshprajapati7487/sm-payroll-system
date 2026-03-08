@@ -3,6 +3,9 @@ import { AttendanceRecord, AttendanceStatus } from '@/types';
 import { calculateLateDuration } from '@/config/shiftRules';
 import { useInternalShiftStore } from '@/store/shiftStore';
 import { apiFetch } from '@/lib/apiClient';
+import { useAuthStore } from './authStore';
+import { useRolePermissionsStore } from './rolePermissionsStore';
+import { useEmployeeStore } from './employeeStore';
 
 interface AttendanceState {
     records: AttendanceRecord[];
@@ -50,7 +53,7 @@ interface AttendanceState {
     }) => Promise<void>;
 }
 
-export const useAttendanceStore = create<AttendanceState>((set, get) => {
+const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
     // ── LocalStorage Queue Helpers ──
     const saveQueue = (q: any[]) => {
         try { localStorage.setItem('sm_attendance_queue', JSON.stringify(q)); } catch { }
@@ -507,3 +510,40 @@ export const useAttendanceStore = create<AttendanceState>((set, get) => {
         },
     };
 });
+
+// ── Exported Hook with Data Visibility Filtering ─────────────────────────────
+export const useAttendanceStore = () => {
+    const store = useInternalAttendanceStore();
+    const user = useAuthStore(s => s.user);
+    const getScope = useRolePermissionsStore(s => s.getScope);
+
+    // We need employee data to know departments for TEAM filtering
+    const { _rawStore } = useEmployeeStore();
+    const employees = _rawStore?._rawEmployees || [];
+
+    const filteredRecords = store.records.filter(r => {
+        if (!user) return true;
+
+        const scope = getScope(user.role);
+        if (scope === 'ALL') return true;
+
+        if (scope === 'TEAM') {
+            const userEmp = employees.find((emp: any) => emp.id === user.id);
+            const recordEmp = employees.find((emp: any) => emp.id === r.employeeId);
+            if (!userEmp?.department) return r.employeeId === user.id; // Fallback to OWN
+            return recordEmp?.department === userEmp.department;
+        }
+
+        if (scope === 'OWN') return r.employeeId === user.id;
+
+        return false;
+    });
+
+    return {
+        ...store,
+        records: filteredRecords,
+        _rawStore: store
+    };
+};
+
+useAttendanceStore.getState = () => useInternalAttendanceStore.getState();

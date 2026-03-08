@@ -6,11 +6,12 @@ import { useShiftStore } from '@/store/shiftStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { useWorkGroupStore } from '@/store/workGroupStore';
 import { Employee, EmployeeStatus, Roles, SalaryType, ShiftType, StatutoryConfig } from '@/types';
-import { ArrowLeft, Save, User, Briefcase, CreditCard, Upload, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Save, User, Briefcase, CreditCard, Upload, ShieldCheck, ChevronDown, ChevronUp, Settings2 } from 'lucide-react';
 import { PasswordStrengthInput, isPasswordValid } from '@/components/ui/PasswordStrengthInput';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/config/permissions';
+import { useCustomFieldStore } from '@/store/customFieldStore';
 
 const DEFAULT_STATUTORY: StatutoryConfig = {
     pfApplicable: true,
@@ -121,6 +122,9 @@ export const EmployeeForm = () => {
     const { currentCompanyId } = useMultiCompanyStore();
     const { groups: workGroups, assignments: workAssignments, assignEmployee, unassignEmployee } = useWorkGroupStore();
     const { hasPermission } = useAuthStore();
+    const { fields } = useCustomFieldStore();
+
+    const activeCustomFields = fields.filter(f => f.module === 'employee' && f.isActive);
     const isEditMode = !!id;
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
@@ -141,7 +145,8 @@ export const EmployeeForm = () => {
         joiningDate: new Date().toISOString().split('T')[0],
         bankDetails: { accountNumber: '', ifscCode: '', bankName: '', panCard: '', aadharNumber: '' },
         documents: { aadharUrl: '', panUrl: '' },
-        statutoryConfig: { ...DEFAULT_STATUTORY }
+        statutoryConfig: { ...DEFAULT_STATUTORY },
+        customData: {}
     });
 
     useEffect(() => {
@@ -180,6 +185,15 @@ export const EmployeeForm = () => {
             setSubmitError('Password weak hai! Min 8 characters, 1 number aur 1 letter hona chahiye.');
             return;
         }
+
+        // Validate required custom fields
+        for (const cf of activeCustomFields) {
+            if (cf.required && (!formData.customData || !formData.customData[cf.id])) {
+                setSubmitError(`${cf.name} zaroori hai, please fill it.`);
+                return;
+            }
+        }
+
         setSubmitting(true);
         try {
             if (isEditMode && id) {
@@ -209,6 +223,13 @@ export const EmployeeForm = () => {
         ...prev,
         statutoryConfig: { ...prev.statutoryConfig!, [field]: value }
     }));
+
+    const handleCustomDataChange = (fieldId: string, value: any) => {
+        setFormData(prev => ({
+            ...prev,
+            customData: { ...(prev.customData || {}), [fieldId]: value }
+        }));
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, docType: 'aadharUrl' | 'panUrl') => {
         const file = e.target.files?.[0];
@@ -304,6 +325,62 @@ export const EmployeeForm = () => {
                         </div>
                     </div>
                 </AccordionSection>
+
+                {/* 1.5 Custom Fields */}
+                {activeCustomFields.length > 0 && (
+                    <AccordionSection icon={<Settings2 className="w-5 h-5 text-indigo-400" />} title="Additional Information (Custom)">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {activeCustomFields.map(field => (
+                                <div key={field.id} className="space-y-1">
+                                    <label className="text-xs text-dark-muted uppercase">
+                                        {field.name} {field.required && <span className="text-rose-500">*</span>}
+                                    </label>
+
+                                    {field.type === 'text' && (
+                                        <input
+                                            type="text"
+                                            required={field.required}
+                                            value={formData.customData?.[field.id] || ''}
+                                            onChange={e => handleCustomDataChange(field.id, e.target.value)}
+                                            className={inputCls}
+                                        />
+                                    )}
+                                    {field.type === 'number' && (
+                                        <input
+                                            type="number"
+                                            required={field.required}
+                                            value={formData.customData?.[field.id] || ''}
+                                            onChange={e => handleCustomDataChange(field.id, e.target.value)}
+                                            className={inputCls}
+                                        />
+                                    )}
+                                    {field.type === 'date' && (
+                                        <input
+                                            type="date"
+                                            required={field.required}
+                                            value={formData.customData?.[field.id] || ''}
+                                            onChange={e => handleCustomDataChange(field.id, e.target.value)}
+                                            className={inputCls}
+                                        />
+                                    )}
+                                    {field.type === 'select' && (
+                                        <select
+                                            required={field.required}
+                                            value={formData.customData?.[field.id] || ''}
+                                            onChange={e => handleCustomDataChange(field.id, e.target.value)}
+                                            className={inputCls}
+                                        >
+                                            <option value="">Select Option</option>
+                                            {field.options?.map((opt, i) => (
+                                                <option key={i} value={opt}>{opt}</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionSection>
+                )}
 
                 {/* 2. Employment Details */}
                 <AccordionSection icon={<Briefcase className="w-5 h-5 text-warning" />} title="Employment Details">
