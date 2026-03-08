@@ -475,8 +475,8 @@ app.post('/api/companies', async (req, res) => {
 
         // Auto-create Admin if provided
         if (req.body.admin) {
-            const { name, phone, email, password } = req.body.admin;
-            const adminCode = `${newCompany.code}-01`;
+            const { name, loginId, email, password } = req.body.admin;
+            const adminCode = loginId ? loginId.trim() : `${newCompany.code}-01`;
             const hashed = await bcrypt.hash(password, 10);
 
             await Employee.create({
@@ -484,7 +484,7 @@ app.post('/api/companies', async (req, res) => {
                 companyId: newCompany.id,
                 code: adminCode,
                 name: name || 'Admin',
-                phone: phone || null,
+                phone: null,
                 email: email || null,
                 role: 'ADMIN',
                 password: hashed,

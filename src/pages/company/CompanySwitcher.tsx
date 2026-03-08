@@ -21,7 +21,7 @@ export const CompanySwitcher = () => {
     });
     // Admin Creation State
     const [createAdmin, setCreateAdmin] = useState(true);
-    const [adminData, setAdminData] = useState({ name: '', phone: '', password: '' });
+    const [adminData, setAdminData] = useState({ name: '', loginId: '', password: '' });
     const [isSaving, setIsSaving] = useState(false);
 
     const handleSwitch = (companyId: string) => {
@@ -39,7 +39,7 @@ export const CompanySwitcher = () => {
         setEditingId(null);
         setFormData({ name: '', code: '', address: '', gstNumber: '', panNumber: '', isActive: true });
         setCreateAdmin(true);
-        setAdminData({ name: '', phone: '', password: '' });
+        setAdminData({ name: '', loginId: '', password: '' });
         setIsModalOpen(true);
         setIsOpen(false);
     };
@@ -53,8 +53,8 @@ export const CompanySwitcher = () => {
     const handleSave = async () => {
         if (!formData.name || !formData.code) return toast('Name and Code are required', 'error');
         if (!editingId && createAdmin) {
-            if (!adminData.name || !adminData.phone || !adminData.password) {
-                return toast('Admin Name, Phone, and Password are required', 'error');
+            if (!adminData.name || !adminData.loginId || !adminData.password) {
+                return toast('Admin Name, Login ID, and Password are required', 'error');
             }
         }
         setIsSaving(true);
@@ -401,15 +401,15 @@ export const CompanySwitcher = () => {
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
-                                                    <label className="text-xs text-blue-300 uppercase block mb-1">Login ID (Phone) *</label>
-                                                    <input value={adminData.phone} onChange={e => setAdminData(p => ({ ...p, phone: e.target.value }))} className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2 text-white focus:border-blue-500 transition-colors" placeholder="10-digit number" />
+                                                    <label className="text-xs text-blue-300 uppercase block mb-1">Login ID *</label>
+                                                    <input value={adminData.loginId} onChange={e => setAdminData(p => ({ ...p, loginId: e.target.value }))} className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2 text-white focus:border-blue-500 transition-colors" placeholder="e.g. ADMIN_USER" />
                                                 </div>
                                                 <div>
                                                     <label className="text-xs text-blue-300 uppercase block mb-1">Password *</label>
                                                     <input type="password" value={adminData.password} onChange={e => setAdminData(p => ({ ...p, password: e.target.value }))} className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2 text-white focus:border-blue-500 transition-colors" placeholder="Admin password" />
                                                 </div>
                                             </div>
-                                            <p className="text-xs text-dark-muted flex gap-2"><Info className="w-4 h-4 shrink-0" /> Employee code will automatically be set to the Company Code (e.g., CODE-01).</p>
+                                            <p className="text-xs text-dark-muted flex gap-2"><Info className="w-4 h-4 shrink-0" /> Employee code will automatically be set to this Login ID.</p>
                                         </div>
                                     )}
                                 </>
