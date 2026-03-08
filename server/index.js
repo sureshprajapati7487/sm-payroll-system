@@ -472,6 +472,27 @@ app.post('/api/companies', async (req, res) => {
             } catch (uniqueErr) { if (uniqueErr.name !== 'SequelizeUniqueConstraintError') throw uniqueErr; }
         }
         if (!newCompany) throw new Error('Could not create company — code conflict');
+
+        // Auto-create Admin if provided
+        if (req.body.admin) {
+            const { name, phone, email, password } = req.body.admin;
+            const adminCode = `${newCompany.code}-01`;
+            const hashed = await bcrypt.hash(password, 10);
+
+            await Employee.create({
+                id: `emp-${Date.now()}-${uuidv4().substring(0, 4)}`,
+                companyId: newCompany.id,
+                code: adminCode,
+                name: name || 'Admin',
+                phone: phone || null,
+                email: email || null,
+                role: 'ADMIN',
+                password: hashed,
+                status: 'ACTIVE',
+                baseSalary: 0
+            });
+        }
+
         res.status(201).json(newCompany);
     } catch (e) { addError(e, 'POST /api/companies'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });

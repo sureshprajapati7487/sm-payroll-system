@@ -11,13 +11,15 @@ export interface Company {
     panNumber?: string;
     employeeCount: number;
     isActive: boolean;
+    admin?: { name: string; phone: string; password: string }; // Optional for creation
 }
 
 interface MultiCompanyState {
     companies: Company[];
     currentCompanyId: string | null;
     addCompany: (company: Omit<Company, 'id'>) => Promise<Company | null>;
-    updateCompany: (id: string, updates: Partial<Company>) => void;
+    updateCompany: (id: string, updates: Partial<Company>) => Promise<void>;
+    deleteCompany: (id: string) => Promise<boolean>;
     switchCompany: (id: string) => void;
     getCurrentCompany: () => Company | undefined;
     getAllCompanies: () => Company[];
@@ -83,10 +85,15 @@ export const useMultiCompanyStore = create<MultiCompanyState>()(
                     }
 
                     const savedCompany = await res.json();
+
+                    // Remove the admin object from the local stored company as it shouldn't persist in company state
+                    const localCompany = { ...savedCompany };
+                    delete localCompany.admin;
+
                     set(state => ({
-                        companies: [...(Array.isArray(state.companies) ? state.companies : []), savedCompany]
+                        companies: [...(Array.isArray(state.companies) ? state.companies : []), localCompany]
                     }));
-                    return savedCompany as Company;
+                    return localCompany as Company;
                 } catch (error) {
                     console.error('Failed to add company:', error);
                     return null;
@@ -110,6 +117,31 @@ export const useMultiCompanyStore = create<MultiCompanyState>()(
                     });
                 } catch (error) {
                     console.error('Failed to update company:', error);
+                }
+            },
+
+            deleteCompany: async (id) => {
+                try {
+                    const res = await apiFetch(`/companies/${id}`, { method: 'DELETE' });
+                    if (!res.ok) {
+                        console.error('Failed to delete company from server');
+                        // Still delete locally as fallback
+                    }
+
+                    set(state => {
+                        const newCompanies = (Array.isArray(state.companies) ? state.companies : []).filter(c => c.id !== id);
+                        return {
+                            companies: newCompanies,
+                            // If current company was deleted, switch to another or null
+                            currentCompanyId: state.currentCompanyId === id
+                                ? (newCompanies.length > 0 ? newCompanies[0].id : null)
+                                : state.currentCompanyId
+                        };
+                    });
+                    return true;
+                } catch (error) {
+                    console.error('Failed to delete company:', error);
+                    return false;
                 }
             },
 
