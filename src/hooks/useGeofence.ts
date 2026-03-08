@@ -223,6 +223,41 @@ export function useGeofence({
                 });
             }
         }
+
+        // ── PROACTIVE AUTO CHECK-OUT (App Restart / Background Resume) ──
+        // Agar app band thi aur salesman radius se bahar aa gaya, toh upar wala 'currentInside' null hoga
+        // aur standard EXITED event nahi chalega. Yeh block explicitly distance napta hai aur checkout karta hai.
+        const avCurrent = activeVisitRef.current;
+        if (avCurrent && avCurrent.client?.latitude && avCurrent.client?.longitude && !processingRef.current) {
+            const distToAv = haversineDistance(myLat, myLng, avCurrent.client.latitude, avCurrent.client.longitude);
+            if (distToAv > effectiveRadius) {
+                processingRef.current = true;
+                try {
+                    await checkOut(avCurrent.visit.id, {
+                        lat: myLat,
+                        lng: myLng,
+                        outcome: 'NO_ORDER',
+                        notes: `Auto check-out via GPS (outside ${effectiveRadius}m radius).`,
+                        nextVisitDate: undefined,
+                    });
+                    addEvent({
+                        id: `exit-proactive-${Date.now()}`,
+                        type: 'EXITED',
+                        clientName: avCurrent.client.name,
+                        shopName: avCurrent.client.shopName,
+                        timestamp: new Date().toISOString(),
+                    });
+                    if (lastInsideClientRef.current === avCurrent.visit.clientId) {
+                        lastInsideClientRef.current = null;
+                        checkInAtRef.current = null;
+                    }
+                } catch (e) {
+                    console.warn('🌍 Geofence proactive auto check-out failed:', e);
+                } finally {
+                    processingRef.current = false;
+                }
+            }
+        }
     }, [salesmanId, companyId, clients, effectiveRadius, checkIn, checkOut, fetchActiveVisit, salesmanName, addEvent]);
 
     const handleError = useCallback((err: GeolocationPositionError) => {
