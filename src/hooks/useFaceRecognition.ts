@@ -150,7 +150,7 @@ export function useFaceRecognition() {
 
         const loop = async () => {
             if (!videoEl || videoEl.readyState < 2) {
-                matchLoopRef.current = window.setTimeout(loop, 500);
+                matchLoopRef.current = window.setTimeout(loop, 500) as any;
                 return;
             }
             try {
@@ -174,7 +174,7 @@ export function useFaceRecognition() {
                         consecutiveHitsRef.current = 0;
                         setStatus('too_far');
                         setConfidence(0);
-                        matchLoopRef.current = window.setTimeout(loop, LOOP_INTERVAL_MS);
+                        matchLoopRef.current = window.setTimeout(loop, LOOP_INTERVAL_MS) as any;
                         return;
                     }
 
@@ -202,7 +202,7 @@ export function useFaceRecognition() {
             } catch {
                 // Ignore transient frame errors
             }
-            matchLoopRef.current = window.setTimeout(loop, LOOP_INTERVAL_MS);
+            matchLoopRef.current = window.setTimeout(loop, LOOP_INTERVAL_MS) as any;
         };
         loop();
     }, [modelsLoaded, stopMatchLoop]);

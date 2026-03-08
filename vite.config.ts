@@ -89,6 +89,7 @@ export default defineConfig(async () => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
+        '@capacitor-community/background-geolocation': path.resolve(__dirname, './src/mock-background-geolocation.js')
       },
     },
     server: {
