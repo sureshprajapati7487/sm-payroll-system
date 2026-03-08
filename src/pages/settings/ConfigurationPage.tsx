@@ -841,128 +841,88 @@ export const ConfigurationPage = () => {
                 </div>
             </div>
 
-            {/* Tabs — horizontally scrollable on mobile */}
-            <div className="overflow-x-auto w-full pb-1">
-                <div className="flex gap-1 p-1 bg-slate-900/50 rounded-xl border border-slate-700/50 w-fit min-w-full md:min-w-0">
-                    <button
-                        onClick={() => setActiveTab('departments')}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'departments'
-                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        <Building2 className="w-4 h-4" /> <span>Departments</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('workAllocation')}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'workAllocation'
-                            ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        🏭 <span>Work Allocation</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('shifts')}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'shifts'
-                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        <Clock className="w-4 h-4" /> <span>Shifts</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('rules')}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'rules'
-                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        <Gavel className="w-4 h-4" /> <span>Payroll Rules</span>
-                    </button>
+            {/* ── Tab Bar — Clean Grouped Design ──────────────────────────────── */}
+            <div className="space-y-2">
+                {/* Row 1: Core Settings */}
+                <div className="flex flex-wrap gap-1.5">
+                    {[
+                        { id: 'departments', label: 'Departments', icon: <Building2 className="w-3.5 h-3.5" />, color: 'primary' },
+                        { id: 'workAllocation', label: 'Work Allocation', icon: <span className="text-xs">🏭</span>, color: 'violet' },
+                        { id: 'shifts', label: 'Shifts', icon: <Clock className="w-3.5 h-3.5" />, color: 'primary' },
+                        { id: 'rules', label: 'Payroll Rules', icon: <Gavel className="w-3.5 h-3.5" />, color: 'primary' },
+                        { id: 'salaryTypes', label: 'Salary Types', icon: <IndianRupee className="w-3.5 h-3.5" />, color: 'primary' },
+                        { id: 'attendance', label: 'Attendance', icon: <CalendarCheck className="w-3.5 h-3.5" />, color: 'primary' },
+                        { id: 'holidays', label: 'Holidays', icon: <Calendar className="w-3.5 h-3.5" />, color: 'primary' },
+                        { id: 'salesman', label: 'Salesman', icon: <span className="text-xs">🛒</span>, color: 'orange' },
+                        { id: 'punch', label: 'Punch System', icon: <Camera className="w-3.5 h-3.5" />, color: 'emerald' },
+                        { id: 'statutory', label: 'Statutory', icon: <Shield className="w-3.5 h-3.5" />, color: 'primary' },
+                    ].map(tab => {
+                        const isActive = activeTab === tab.id;
+                        const colorMap: Record<string, string> = {
+                            primary: 'bg-primary-600 text-white shadow-primary-600/30',
+                            violet: 'bg-violet-600 text-white shadow-violet-600/30',
+                            orange: 'bg-orange-600 text-white shadow-orange-600/30',
+                            emerald: 'bg-emerald-600 text-white shadow-emerald-600/30',
+                        };
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${isActive
+                                        ? `${colorMap[tab.color]} shadow-md`
+                                        : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
+                                    }`}
+                            >
+                                {tab.icon}
+                                {tab.label}
+                            </button>
+                        );
+                    })}
+                </div>
 
+                {/* Row 2: System / Admin tabs */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider mr-1">Admin:</span>
+
+                    {/* System Keys */}
                     <button
-                        onClick={() => setActiveTab('salaryTypes')}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'salaryTypes'
-                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        onClick={() => isSuperAdmin && setActiveTab('keys')}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${activeTab === 'keys'
+                                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
+                                : isSuperAdmin
+                                    ? 'bg-slate-800 text-amber-400 border border-amber-500/30 hover:bg-amber-500/10'
+                                    : 'bg-slate-800/40 text-slate-600 border border-slate-800 cursor-not-allowed'
                             }`}
-                    >
-                        <IndianRupee className="w-4 h-4" /> <span>Salary Types</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('attendance')}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'attendance'
-                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        <CalendarCheck className="w-4 h-4" /> <span>Attendance Actions</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('keys')}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'keys'
-                            ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            } ${!isSuperAdmin ? 'opacity-40 cursor-not-allowed' : ''}`}
-                        disabled={!isSuperAdmin}
                         title={!isSuperAdmin ? 'Super Admin only' : 'System Keys'}
                     >
-                        <Key className="w-4 h-4" /> <span>System Keys</span> {!isSuperAdmin && <Lock className="w-3 h-3" />}
+                        <Key className="w-3.5 h-3.5" />
+                        System Keys
+                        {!isSuperAdmin && <Lock className="w-3 h-3 ml-0.5 opacity-60" />}
                     </button>
-                    <button
-                        onClick={() => setActiveTab('punch')}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'punch'
-                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        <Camera className="w-4 h-4" /> <span>Punch System</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('holidays')}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'holidays'
-                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        <Calendar className="w-4 h-4" /> <span>Holidays</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('salesman')}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'salesman'
-                            ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        🛒 <span>Salesman</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('statutory')}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'statutory'
-                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        <Shield className="w-4 h-4" /> <span>Statutory</span>
-                    </button>
+
+                    {/* Audit Logs */}
                     <button
                         onClick={() => window.location.href = '/admin/audit-logs'}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 border border-cyan-500/30`}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap bg-slate-800 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/10"
                         title="View System Audit Trail"
                     >
-                        <FileCheck className="w-4 h-4" /> <span>Audit Logs</span>
+                        <FileCheck className="w-3.5 h-3.5" />
+                        Audit Logs
                     </button>
+
+                    {/* Role Access — Super Admin only */}
                     {isSuperAdmin && (
                         <button
                             onClick={() => setActiveTab('roles')}
-                            className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'roles'
-                                ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/20'
-                                : 'text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/30'
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${activeTab === 'roles'
+                                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                                    : 'bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20'
                                 }`}
-                            title="Role Access Control (Super Admin Only)"
+                            title="Role Access Control — Super Admin Only"
                         >
-                            <Shield className="w-4 h-4" /> <span>Role Access</span>
+                            <Shield className="w-3.5 h-3.5" />
+                            Role Access
+                            <span className="ml-0.5 text-[9px] bg-rose-500/30 text-rose-300 px-1 py-0.5 rounded font-bold">SA</span>
                         </button>
                     )}
                 </div>
