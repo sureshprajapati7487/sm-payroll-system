@@ -14,6 +14,7 @@ import {
     ChevronDown, IndianRupee, Radar, Zap, History, List
 } from 'lucide-react';
 import { useDialog } from '@/components/DialogProvider';
+import { InfoTip } from '@/components/ui/InfoTip';
 // ── Vanilla Leaflet Map (no react-leaflet — avoids render2 crash with React 18) ─
 const ClientMap = ({ clients }: { clients: SalesClient[] }) => {
     const mapRef = useRef<HTMLDivElement>(null);
@@ -291,49 +292,49 @@ const ClientModal = ({ client, salesEmployees, onClose, onSave }: {
                     {err && <div className="bg-red-500/15 border border-red-500/30 rounded-lg px-3 py-2 text-red-300 text-sm">{err}</div>}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Party/Client Name *</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientName" label="PARTY/CLIENT NAME *" /></label>
                             <input value={form.name || ''} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className={inp} placeholder="e.g. Sharma Traders" /></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Shop Name</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientShopName" label="SHOP NAME" /></label>
                             <input value={form.shopName || ''} onChange={e => setForm(p => ({ ...p, shopName: e.target.value }))} className={inp} placeholder="Dukan ka naam" /></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Owner Name</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientOwnerName" label="OWNER NAME" /></label>
                             <input value={form.ownerName || ''} onChange={e => setForm(p => ({ ...p, ownerName: e.target.value }))} className={inp} placeholder="Malik ka naam" /></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Mobile Number</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientMobile" label="MOBILE NUMBER" /></label>
                             <input value={form.phone || ''} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} className={inp} placeholder="+91 98765..." /></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Alt. Mobile</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientAltMobile" label="ALT. MOBILE" /></label>
                             <input value={form.phone2 || ''} onChange={e => setForm(p => ({ ...p, phone2: e.target.value }))} className={inp} /></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Category</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientCategory" label="CATEGORY" /></label>
                             <input value={form.category || ''} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className={inp} placeholder="e.g. Grocery, Pharmacy" /></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Party Type</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientType" label="PARTY TYPE" /></label>
                             <select value={form.type || 'RETAIL'} onChange={e => setForm(p => ({ ...p, type: e.target.value as any }))} className={inp}>
                                 <option value="RETAIL">🏪 Retail</option>
                                 <option value="WHOLESALE">📦 Wholesale</option>
                                 <option value="DISTRIBUTOR">🚚 Distributor</option>
                                 <option value="INSTITUTION">🏢 Institution</option>
                             </select></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Status</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientStatus" label="STATUS" /></label>
                             <select value={form.status || 'ACTIVE'} onChange={e => setForm(p => ({ ...p, status: e.target.value as any }))} className={inp}>
                                 <option value="ACTIVE">🟢 Active</option>
                                 <option value="PROSPECT">🟡 Prospect</option>
                                 <option value="INACTIVE">⚫ Inactive</option>
                                 <option value="BLOCKED">🔴 Blocked</option>
                             </select></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Assign To Salesman</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientAssignTo" label="ASSIGN TO SALESMAN" /></label>
                             <select value={form.assignedTo || ''} onChange={e => setForm(p => ({ ...p, assignedTo: e.target.value || undefined, assignedToName: salesEmployees.find(s => s.id === e.target.value)?.name }))} className={inp}>
                                 <option value="">-- Unassigned --</option>
                                 {salesEmployees.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                             </select></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Credit Limit (₹)</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientCreditLimit" label="CREDIT LIMIT (₹)" /></label>
                             <input type="number" value={form.creditLimit || 0} onChange={e => setForm(p => ({ ...p, creditLimit: +e.target.value }))} className={inp} /></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Outstanding Amount (₹)</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientOutstanding" label="OUTSTANDING AMOUNT (₹)" /></label>
                             <input type="number" value={form.outstandingAmount || 0} onChange={e => setForm(p => ({ ...p, outstandingAmount: +e.target.value }))} className={inp} /></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">City</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientCity" label="CITY" /></label>
                             <input value={form.city || ''} onChange={e => setForm(p => ({ ...p, city: e.target.value }))} className={inp} /></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">State</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientState" label="STATE" /></label>
                             <input value={form.state || ''} onChange={e => setForm(p => ({ ...p, state: e.target.value }))} className={inp} /></div>
                     </div>
-                    <div><label className="text-xs text-dark-muted uppercase block mb-1">Full Address</label>
+                    <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientFullAddress" label="FULL ADDRESS" /></label>
                         <textarea value={form.address || ''} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} rows={2} className={`${inp} resize-none`} placeholder="Shop no, street, area..." /></div>
-                    <div><label className="text-xs text-dark-muted uppercase block mb-1">Notes</label>
+                    <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="clientNotes" label="NOTES" /></label>
                         <textarea value={form.notes || ''} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} rows={2} className={`${inp} resize-none`} /></div>
 
                     <div className="flex gap-3 pt-2">
@@ -379,7 +380,7 @@ const CheckOutModal = ({ visit, onClose, onCheckOut }: { visit: ClientVisitRecor
                         <p className="text-2xl font-bold text-green-400">{fmtDuration(elapsed)}</p>
                         <p className="text-xs text-dark-muted">Check-in: {fmtTime(visit.checkInAt)}</p>
                     </div>
-                    <div><label className="text-xs text-dark-muted uppercase block mb-1">Visit Outcome</label>
+                    <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="checkoutOutcome" label="VISIT OUTCOME" /></label>
                         <select value={form.outcome} onChange={e => setForm(p => ({ ...p, outcome: e.target.value as VisitOutcome }))} className={inp}>
                             <option value="ORDER_PLACED">✅ Order Placed</option>
                             <option value="NO_ORDER">⬜ No Order</option>
@@ -388,14 +389,14 @@ const CheckOutModal = ({ visit, onClose, onCheckOut }: { visit: ClientVisitRecor
                             <option value="COMPLAINT_RESOLVED">✅ Complaint Resolved</option>
                         </select></div>
                     <div className="grid grid-cols-2 gap-3">
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Order Amount (₹)</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="checkoutOrderAmount" label="ORDER AMOUNT (₹)" /></label>
                             <input type="number" value={form.orderAmount} onChange={e => setForm(p => ({ ...p, orderAmount: +e.target.value }))} className={inp} /></div>
-                        <div><label className="text-xs text-dark-muted uppercase block mb-1">Collection (₹)</label>
+                        <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="checkoutCollection" label="COLLECTION (₹)" /></label>
                             <input type="number" value={form.collectionAmount} onChange={e => setForm(p => ({ ...p, collectionAmount: +e.target.value }))} className={inp} /></div>
                     </div>
-                    <div><label className="text-xs text-dark-muted uppercase block mb-1">Next Visit Date</label>
+                    <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="checkoutNextVisit" label="NEXT VISIT DATE" /></label>
                         <input type="date" value={form.nextVisitDate} onChange={e => setForm(p => ({ ...p, nextVisitDate: e.target.value }))} className={inp} /></div>
-                    <div><label className="text-xs text-dark-muted uppercase block mb-1">Notes / Remarks</label>
+                    <div><label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="checkoutNotes" label="NOTES / REMARKS" /></label>
                         <textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} rows={2} className={`${inp} resize-none`} placeholder="Visit ke baare mein..." /></div>
                     <button onClick={handleCheckOut} disabled={saving} className="w-full py-2.5 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2 transition-colors">
                         {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />} Check Out & Save

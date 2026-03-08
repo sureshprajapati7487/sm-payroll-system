@@ -1,8 +1,9 @@
-import { useMemo, useEffect, Suspense, lazy, Component } from 'react';
+import { useMemo, useEffect, useState, Suspense, lazy, Component } from 'react';
 import type { ReactNode } from 'react';
 import { useClientStore, ClientVisitRecord } from '@/store/clientStore';
 import { useEmployeeStore } from '@/store/employeeStore';
-import { MapPin, Navigation, Clock, AlertTriangle } from 'lucide-react';
+import { MapPin, Navigation, Clock, AlertTriangle, FileDown } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 // ── Lazy-load the map to prevent react-leaflet SSR/context crashes ─────────────
 const LeafletMap = lazy(() => import('./RouteMap'));
@@ -42,6 +43,9 @@ export const RouteTab = ({ salesmanId, companyId }: { salesmanId?: string, compa
         if (clients.length === 0) fetchClients();
     }, [fetchVisits, fetchClients, rawVisits.length, clients.length]);
 
+    const [filterSalesman, setFilterSalesman] = useState<string>('');
+    const [filterClient, setFilterClient] = useState<string>('');
+
     // Today's boundaries
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -56,9 +60,14 @@ export const RouteTab = ({ salesmanId, companyId }: { salesmanId?: string, compa
             const isToday = vDate >= today && vDate < tomorrow;
             const isTargetSalesman = !salesmanId || v.salesmanId === salesmanId;
             const hasLocation = v.checkInLat != null && v.checkInLng != null;
-            return isToday && isTargetSalesman && hasLocation;
+
+            // Apply UI Filters
+            const matchesSalesman = !filterSalesman || v.salesmanId === filterSalesman;
+            const matchesClient = !filterClient || v.clientId === filterClient;
+
+            return isToday && isTargetSalesman && hasLocation && matchesSalesman && matchesClient;
         }).sort((a, b) => new Date(a.checkInAt).getTime() - new Date(b.checkInAt).getTime());
-    }, [rawVisits, salesmanId, companyId]);
+    }, [rawVisits, salesmanId, companyId, filterSalesman, filterClient, today, tomorrow]);
 
     const routesBySalesman = useMemo(() => {
         const groups: Record<string, ClientVisitRecord[]> = {};
@@ -68,6 +77,75 @@ export const RouteTab = ({ salesmanId, companyId }: { salesmanId?: string, compa
         });
         return groups;
     }, [visits]);
+
+    const handleExportExcel = () => {
+        const headers = [
+            'Date',
+            'Salesman Name',
+            'Party/Client Name',
+            'Category',
+            'Daily Sequence',
+            'Total Lifetime Visits',
+            'Check-In Time',
+            'Check-Out Time',
+            'Time Spent (Mins)',
+            'Purpose',
+            'Outcome',
+            'Order Amount (Rs)',
+            'Collection (Rs)',
+            'Notes / Feedback',
+            'GPS Lat',
+            'GPS Lng'
+        ];
+
+        const rows = visits.map((v: ClientVisitRecord, idx: number) => {
+            const emp = employees.find(e => e.id === v.salesmanId);
+            const client = clients.find(c => c.id === v.clientId);
+
+            return [
+                new Date(v.checkInAt).toLocaleDateString('en-IN'),
+                emp?.name || 'Unknown Salesman',
+                client?.name || 'Unknown Client',
+                client?.category || '—',
+                idx + 1,
+                client?.totalVisits || v.visitNumber || 1,
+                new Date(v.checkInAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+                v.checkOutAt ? new Date(v.checkOutAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Active',
+                v.durationMins || '—',
+                v.purpose || '—',
+                v.outcome || '—',
+                v.orderAmount || 0,
+                v.collectionAmount || 0,
+                v.notes || '',
+                v.checkInLat || '',
+                v.checkInLng || ''
+            ];
+        });
+
+        const wsData = [headers, ...rows.map(r => r.map(v => v ?? ''))];
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+        ws['!cols'] = headers.map((h, i) => {
+            const maxLen = Math.max(h.length, ...rows.map(r => String(r[i] ?? '').length));
+            return { wch: Math.min(maxLen + 4, 40) };
+        });
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Journey Timeline');
+
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const dateStr = new Date().toLocaleDateString('en-IN').replace(/\//g, '-');
+        a.download = `Salesman_Route_${dateStr}.xlsx`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+    };
 
     return (
         <div className="flex flex-col lg:flex-row gap-6">
@@ -103,63 +181,102 @@ export const RouteTab = ({ salesmanId, companyId }: { salesmanId?: string, compa
             </div>
 
             {/* Sidebar / Journey Timeline */}
-            <div className="w-full lg:w-80 glass rounded-2xl border border-dark-border p-5 h-[600px] overflow-y-auto">
-                <div className="flex items-center gap-2 mb-6">
-                    <Navigation className="w-5 h-5 text-orange-400" />
-                    <h2 className="text-white font-bold text-base">Journey Timeline</h2>
+            <div className="w-full lg:w-80 glass rounded-2xl border border-dark-border p-5 h-[600px] flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <Navigation className="w-5 h-5 text-orange-400" />
+                        <h2 className="text-white font-bold text-base">Journey Timeline</h2>
+                    </div>
+                    {visits.length > 0 && (
+                        <button onClick={handleExportExcel} className="p-1.5 hover:bg-white/10 rounded-lg text-dark-muted hover:text-green-400 transition-colors" title="Export Route to Excel">
+                            <FileDown className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
 
-                {visits.length === 0 ? (
-                    <p className="text-sm text-dark-muted text-center py-10">No visits tracked today.</p>
-                ) : (
-                    <div className="relative pl-6 space-y-6">
-                        <div className="absolute top-2 bottom-2 left-[11px] w-0.5 bg-dark-border z-0" />
+                {/* Filters */}
+                <div className="mb-4 space-y-3 shrink-0">
+                    {!salesmanId && (
+                        <select
+                            value={filterSalesman}
+                            onChange={(e) => setFilterSalesman(e.target.value)}
+                            className="w-full rounded-lg px-3 py-2 text-xs bg-dark-bg border border-dark-border text-white"
+                        >
+                            <option value="">-- All Salesmen --</option>
+                            {employees.filter(e => {
+                                const d = (e.department || '').toUpperCase();
+                                return d.includes('SALES') || d.includes('SALESMAN');
+                            }).map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                        </select>
+                    )}
+                    <select
+                        value={filterClient}
+                        onChange={(e) => setFilterClient(e.target.value)}
+                        className="w-full rounded-lg px-3 py-2 text-xs bg-dark-bg border border-dark-border text-white"
+                    >
+                        <option value="">-- All Parties --</option>
+                        {Array.from(new Set(visits.map((v: ClientVisitRecord) => v.clientId))).map(id => {
+                            const c = clients.find(cl => cl.id === id);
+                            return c ? <option key={id} value={id as string}>{c.name}</option> : null;
+                        })}
+                    </select>
+                </div>
 
-                        {visits.map((v: ClientVisitRecord, idx: number) => {
-                            const emp = employees.find(e => e.id === v.salesmanId);
-                            const client = clients.find(c => c.id === v.clientId);
-                            const isFirst = idx === 0;
-                            const isLast = idx === visits.length - 1;
+                <div className="flex-1 overflow-y-auto">
+                    {visits.length === 0 ? (
+                        <p className="text-sm text-dark-muted text-center py-10">No visits tracked today.</p>
+                    ) : (
+                        <div className="relative pl-6 space-y-6">
+                            <div className="absolute top-2 bottom-2 left-[11px] w-0.5 bg-dark-border z-0" />
 
-                            return (
-                                <div key={v.id} className="relative z-10">
-                                    <div className={`absolute -left-6 w-3 h-3 rounded-full border-2 border-dark-bg mt-1.5 ${isFirst ? 'bg-green-500' : isLast ? 'bg-red-500' : 'bg-orange-500'}`} />
+                            {visits.map((v: ClientVisitRecord, idx: number) => {
+                                const emp = employees.find(e => e.id === v.salesmanId);
+                                const client = clients.find(c => c.id === v.clientId);
+                                const isFirst = idx === 0;
+                                const isLast = idx === visits.length - 1;
 
-                                    <div className="bg-white/5 rounded-xl p-3 border border-dark-border hover:bg-white/10 transition-colors">
-                                        <p className="text-white text-sm font-semibold">{client?.name || 'Unknown Client'}</p>
-                                        <p className="text-xs text-dark-muted mt-1">{v.purpose}</p>
+                                return (
+                                    <div key={v.id} className="relative z-10">
+                                        <div className={`absolute -left-6 w-3 h-3 rounded-full border-2 border-dark-bg mt-1.5 ${isFirst ? 'bg-green-500' : isLast ? 'bg-red-500' : 'bg-orange-500'}`} />
 
-                                        <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
-                                            <span className="flex items-center gap-1.5 text-xs text-dark-muted bg-dark-bg px-2 py-1 rounded-md">
-                                                <Clock className="w-3 h-3" />
-                                                {new Date(v.checkInAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                                            </span>
+                                        <div className="bg-white/5 rounded-xl p-3 border border-dark-border hover:bg-white/10 transition-colors">
+                                            <p className="text-white text-sm font-semibold">{client?.name || 'Unknown Client'}</p>
+                                            <p className="text-xs text-dark-muted mt-1">{v.purpose}</p>
 
-                                            {v.outcome && (
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase ${v.outcome === 'ORDER_PLACED' ? 'bg-green-500/20 text-green-400' :
-                                                    v.outcome === 'CLOSED' ? 'bg-blue-500/20 text-blue-400' :
-                                                        v.outcome === 'COMPLAINT_RESOLVED' ? 'bg-red-500/20 text-red-400' :
-                                                            'bg-orange-500/20 text-orange-400'
-                                                    }`}>
-                                                    {v.outcome.replace('_', ' ')}
+                                            <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+                                                <span className="flex items-center gap-1.5 text-xs text-dark-muted bg-dark-bg px-2 py-1 rounded-md">
+                                                    <Clock className="w-3 h-3" />
+                                                    {new Date(v.checkInAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                                                 </span>
+
+                                                {v.outcome && (
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase ${v.outcome === 'ORDER_PLACED' ? 'bg-green-500/20 text-green-400' :
+                                                        v.outcome === 'CLOSED' ? 'bg-blue-500/20 text-blue-400' :
+                                                            v.outcome === 'COMPLAINT_RESOLVED' ? 'bg-red-500/20 text-red-400' :
+                                                                'bg-orange-500/20 text-orange-400'
+                                                        }`}>
+                                                        {v.outcome.replace('_', ' ')}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {!salesmanId && emp && (
+                                                <div className="mt-2 pt-2 border-t border-dark-border/50 flex items-center gap-2">
+                                                    <div className="w-5 h-5 rounded-full bg-dark-bg overflow-hidden flex items-center justify-center text-[10px] font-bold text-white uppercase border border-dark-border">
+                                                        {emp.name.substring(0, 2)}
+                                                    </div>
+                                                    <span className="text-[11px] text-dark-muted">{emp.name}</span>
+                                                </div>
                                             )}
                                         </div>
-
-                                        {!salesmanId && emp && (
-                                            <div className="mt-2 pt-2 border-t border-dark-border/50 flex items-center gap-2">
-                                                <div className="w-5 h-5 rounded-full bg-dark-bg overflow-hidden flex items-center justify-center text-[10px] font-bold text-white uppercase border border-dark-border">
-                                                    {emp.name.substring(0, 2)}
-                                                </div>
-                                                <span className="text-[11px] text-dark-muted">{emp.name}</span>
-                                            </div>
-                                        )}
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
             </div>
 
         </div>

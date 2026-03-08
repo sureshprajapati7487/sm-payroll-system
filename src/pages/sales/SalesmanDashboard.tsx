@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ClientListPage } from './ClientListPage';
 import { RouteTab } from './RouteTab';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 import { useSalesTaskStore, SalesTask, TaskPriority, TaskStatus } from '@/store/salesTaskStore';
 
@@ -64,7 +65,7 @@ const TaskModal = ({
 
                 <div className="p-6 space-y-4">
                     <div>
-                        <label className="text-xs text-dark-muted uppercase block mb-1">Task Title *</label>
+                        <label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="taskTitle" label="TASK TITLE *" /></label>
                         <input
                             autoFocus
                             value={form.title || ''}
@@ -75,7 +76,7 @@ const TaskModal = ({
                         />
                     </div>
                     <div>
-                        <label className="text-xs text-dark-muted uppercase block mb-1">Description (Optional)</label>
+                        <label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="taskDesc" label="DESCRIPTION (OPTIONAL)" /></label>
                         <textarea
                             value={form.description || ''}
                             onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
@@ -86,7 +87,7 @@ const TaskModal = ({
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="text-xs text-dark-muted uppercase block mb-1">Priority</label>
+                            <label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="taskPriority" label="PRIORITY" /></label>
                             <select
                                 value={form.priority || 'MEDIUM'}
                                 onChange={e => setForm(p => ({ ...p, priority: e.target.value as TaskPriority }))}
@@ -98,7 +99,7 @@ const TaskModal = ({
                             </select>
                         </div>
                         <div>
-                            <label className="text-xs text-dark-muted uppercase block mb-1">Due Date</label>
+                            <label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="taskDueDate" label="DUE DATE" /></label>
                             <input
                                 type="date"
                                 value={form.dueDate || ''}
@@ -109,7 +110,7 @@ const TaskModal = ({
                     </div>
                     {salesEmployees.length > 0 && (
                         <div>
-                            <label className="text-xs text-dark-muted uppercase block mb-1">Assign To</label>
+                            <label className="text-xs text-dark-muted block mb-1 flex items-center gap-1"><InfoTip id="taskAssignTo" label="ASSIGN TO" /></label>
                             <select
                                 value={form.salesmanId || ''}
                                 onChange={e => setForm(p => ({ ...p, salesmanId: e.target.value || undefined }))}

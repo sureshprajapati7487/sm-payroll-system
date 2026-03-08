@@ -709,5 +709,90 @@ export const allTips: Record<string, TipEntry> = {
     sysKeySecret: {
         meaning: 'Security mask: dusre (non-admin) users se chupayega.',
     },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SALESMAN TASKS (SalesmanDashboard)
+    // ─────────────────────────────────────────────────────────────────────────
+    taskTitle: {
+        meaning: 'Task ka chota naam. (Ye kya kaam karna hai)',
+        example: '10 naye dukano par visit karna hai',
+    },
+    taskDesc: {
+        meaning: 'Task ke baare mein puri detail (agar chahiye toh).',
+    },
+    taskPriority: {
+        meaning: 'Kaam kitna zaroori hai (High, Medium, Low).',
+    },
+    taskDueDate: {
+        meaning: 'Kis tareekh tak yeh task poora hona chahiye.',
+    },
+    taskAssignTo: {
+        meaning: 'Kis employee (salesman) ko yeh task karna hai.',
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CLIENT MANAGEMENT (ClientListPage)
+    // ─────────────────────────────────────────────────────────────────────────
+    clientName: {
+        meaning: 'Party ya dukan / office ka main naam.',
+        example: 'Sharma Traders',
+    },
+    clientShopName: {
+        meaning: 'Board par jo Dukan ka naam likha ho.',
+    },
+    clientOwnerName: {
+        meaning: 'Jo Dukan chalate hain unka purna naam.',
+    },
+    clientMobile: {
+        meaning: 'WhatsApp number ya primary calling number.',
+    },
+    clientAltMobile: {
+        meaning: 'Koi doosra number agar pehla nahi lag raha.',
+    },
+    clientCategory: {
+        meaning: 'Industry ya kisme deal karte hain.',
+        example: 'Grocery, Pharmacy, Hardware',
+    },
+    clientType: {
+        meaning: 'Party ka type kaisa hai.',
+        example: 'Retail, Wholesale, Distributor',
+    },
+    clientStatus: {
+        meaning: 'Party abhi active hai ya inactive.',
+        note: 'INACTIVE ko visit allow nahi hoti.',
+    },
+    clientCreditLimit: {
+        meaning: 'Maximum kitne baki payment tak maal de sakte hain.',
+        example: '₹50,000 agar set kiya, toh 50,000 se upar balance nahi hona chahiye.',
+    },
+    clientOutstanding: {
+        meaning: 'Party ke upar abhi kitna paisa udhar hai.',
+    },
+    clientFullAddress: {
+        meaning: 'Pura pata bill aur GPS verification ke liye.',
+    },
+    clientNotes: {
+        meaning: 'Baki koi extra jaankaari (Time, preference etc.).',
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CHECK-OUT MODAL
+    // ─────────────────────────────────────────────────────────────────────────
+    checkoutOutcome: {
+        meaning: 'Visit ka natija (kya hua).',
+        example: 'Order Milla, Koi Order Nahi, Follow Up Chahiye etc.',
+    },
+    checkoutOrderAmount: {
+        meaning: 'Agar order mila toh kitne rupaye ka mila.',
+    },
+    checkoutCollection: {
+        meaning: 'Agar purana udhar/payment receive hua toh kitna liya.',
+    },
+    checkoutNextVisit: {
+        meaning: 'Agli baar inn-se kab milna hai?',
+    },
+    checkoutNotes: {
+        meaning: 'Salesman ka input ke visit kaisa raha. (Feedback)',
+    },
 };
 
