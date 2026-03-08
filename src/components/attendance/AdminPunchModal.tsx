@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAttendanceStore } from '@/store/attendanceStore';
+import { InfoTip } from '@/components/ui/InfoTip';
 import { useAuthStore } from '@/store/authStore';
 import { AttendanceRecord } from '@/types';
 
@@ -257,7 +258,7 @@ export const AdminPunchModal = ({
                             ) : (
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
-                                        <User className="w-3 h-3" /> Employee
+                                        <User className="w-3 h-3" /> <InfoTip id="attendanceStatus" label="Employee" />
                                     </label>
                                     <select
                                         value={employeeId}
@@ -302,7 +303,7 @@ export const AdminPunchModal = ({
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
-                                        <Calendar className="w-3 h-3" /> Date
+                                        <Calendar className="w-3 h-3" /> <InfoTip id="punchInTime" label="Date" />
                                     </label>
                                     <input
                                         type="date"
@@ -313,7 +314,7 @@ export const AdminPunchModal = ({
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
-                                        <Clock className="w-3 h-3" /> {mode === 'adjust' ? 'New Time' : 'Time'}
+                                        <Clock className="w-3 h-3" /> <InfoTip id={mode === 'adjust' ? 'punchOutTime' : 'punchInTime'} label={mode === 'adjust' ? 'New Time' : 'Time'} />
                                     </label>
                                     <input
                                         type="time"
@@ -327,7 +328,7 @@ export const AdminPunchModal = ({
                             {/* Reason */}
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
-                                    <FileText className="w-3 h-3" /> Reason / Note <span className="text-red-400">*</span>
+                                    <FileText className="w-3 h-3" /> <InfoTip id="remarksField" label="Reason / Note" /> <span className="text-red-400">*</span>
                                 </label>
                                 <textarea
                                     rows={2}

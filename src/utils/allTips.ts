@@ -632,4 +632,82 @@ export const allTips: Record<string, TipEntry> = {
         meaning: 'Report mein kaunse columns dikhane hain — tick karo jo chahiye.',
         example: 'Name ✓ | Department ✓ | Gross ✓ | PF ✗ (nahi chahiye toh untick)',
     },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CONFIGURATION TABS (A-Z)
+    // ─────────────────────────────────────────────────────────────────────────
+    deptName: {
+        meaning: 'Department ka naam, jaise Production ya Sales.',
+    },
+    deptDescription: {
+        meaning: 'Department ke baare mein short detail.',
+    },
+    deptSalaryBasis: {
+        meaning: 'Yahan chunen ki salary kaise calculate hogi (Monthly, Daily, etc.).',
+    },
+    deptDefaultSalaryType: {
+        meaning: 'Naye employee join karne par konsa format lagega.',
+    },
+    deptCostCenter: {
+        meaning: 'Accounts ke liye internal track code.',
+    },
+    deptHeadCount: {
+        meaning: 'Is department mein kitne log chahiye (Target).',
+    },
+
+    ruleZeroPresence: {
+        meaning: 'Agar mahine me 0 attendance ho, toh koi salary/allowance nahi milegi.',
+    },
+    ruleSandwich: {
+        meaning: 'Holidays ka paisa tabhi milega agar ek din pehle aur baad me present ho.',
+    },
+
+    attActionLabel: {
+        meaning: 'Naya custom attendance action ka naam.',
+    },
+    attActionIcon: {
+        meaning: 'Pehchan ke liye ek chhota icon (emoji).',
+    },
+    attActionKey: {
+        meaning: 'System uses this code internally (e.g. WFH).',
+    },
+    attActionColor: {
+        meaning: 'UI mein dikhne wala color.',
+    },
+
+    holidayName: {
+        meaning: 'Chhutti ka naam (e.g. Diwali).',
+    },
+    holidayDate: {
+        meaning: 'Kis din chhutti hai.',
+    },
+    holidayType: {
+        meaning: 'Festival, National ya Optional holiday.',
+    },
+
+    punchMethods: {
+        meaning: 'Employee kaise haziri lagaega (Face, GPS, Photo).',
+    },
+    punchLocationName: {
+        meaning: 'Office ya branch ka naam jahan se haziri lagani hai.',
+    },
+    punchRadius: {
+        meaning: 'Kitne meter ke andar se haziri lagana allowed hai.',
+    },
+
+    sysKeyLabel: {
+        meaning: 'System variable ka user-friendly naam.',
+        example: 'Max OT Hours',
+    },
+    sysKeyVal: {
+        meaning: 'Is key ki required value.',
+        example: '50 (hours)',
+    },
+    sysKeyCat: {
+        meaning: 'Kis module / category ke liye hai.',
+    },
+    sysKeySecret: {
+        meaning: 'Security mask: dusre (non-admin) users se chupayega.',
+    },
 };
+

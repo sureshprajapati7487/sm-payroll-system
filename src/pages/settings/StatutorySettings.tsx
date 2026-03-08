@@ -3,6 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { Save, Trash2, CalendarCheck, Shield } from 'lucide-react';
 import { Roles } from '@/types';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 interface StatutoryRule {
     id: string;
@@ -131,22 +132,22 @@ export const StatutorySettings = () => {
 
                     <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-700/50">
                         <div>
-                            <label className="text-xs font-semibold text-slate-400 uppercase">PF Rate (%)</label>
+                            <label className="text-xs font-semibold text-slate-400 uppercase"><InfoTip id="pfWages" label="PF Rate (%)" /></label>
                             <input type="number" step="0.1" required value={form.pfRate} onChange={e => setForm({ ...form, pfRate: parseFloat(e.target.value) })} className={inp} />
                         </div>
                         <div>
-                            <label className="text-xs font-semibold text-slate-400 uppercase">PF Cap (₹)</label>
+                            <label className="text-xs font-semibold text-slate-400 uppercase"><InfoTip id="pfWages" label="PF Cap (₹)" /></label>
                             <input type="number" step="100" required value={form.pfCappedAmount} onChange={e => setForm({ ...form, pfCappedAmount: parseFloat(e.target.value) })} className={inp} />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-700/50">
                         <div>
-                            <label className="text-xs font-semibold text-slate-400 uppercase">ESI Rate (%)</label>
+                            <label className="text-xs font-semibold text-slate-400 uppercase"><InfoTip id="esiWages" label="ESI Rate (%)" /></label>
                             <input type="number" step="0.01" required value={form.esicRate} onChange={e => setForm({ ...form, esicRate: parseFloat(e.target.value) })} className={inp} />
                         </div>
                         <div>
-                            <label className="text-xs font-semibold text-slate-400 uppercase">ESI Max Grs (₹)</label>
+                            <label className="text-xs font-semibold text-slate-400 uppercase"><InfoTip id="esiWages" label="ESI Max Grs (₹)" /></label>
                             <input type="number" step="100" required value={form.esicThreshold} onChange={e => setForm({ ...form, esicThreshold: parseFloat(e.target.value) })} className={inp} />
                         </div>
                     </div>

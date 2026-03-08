@@ -8,6 +8,7 @@ import {
 import { clsx } from 'clsx';
 import { SkeletonPage } from '@/components/SkeletonLoaders';
 import { useDialog } from '@/components/DialogProvider';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 export const ExpensesDashboard = () => {
     const { user } = useAuthStore();
@@ -149,7 +150,7 @@ export const ExpensesDashboard = () => {
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-xs text-dark-muted mb-1">Date</label>
+                                <label className="block text-xs text-dark-muted mb-1"><InfoTip id="expenseDate" label="Date" /></label>
                                 <input
                                     type="date"
                                     value={form.date}
@@ -159,7 +160,7 @@ export const ExpensesDashboard = () => {
                             </div>
 
                             <div>
-                                <label className="block text-xs text-dark-muted mb-1">Category</label>
+                                <label className="block text-xs text-dark-muted mb-1"><InfoTip id="expenseCategory" label="Category" /></label>
                                 <select
                                     value={form.category}
                                     onChange={e => setForm({ ...form, category: e.target.value as any })}
@@ -174,7 +175,7 @@ export const ExpensesDashboard = () => {
                             </div>
 
                             <div>
-                                <label className="block text-xs text-dark-muted mb-1">Amount (₹)</label>
+                                <label className="block text-xs text-dark-muted mb-1"><InfoTip id="billAmount" label="Amount (₹)" /></label>
                                 <input
                                     type="number"
                                     value={form.amount}

@@ -14,6 +14,7 @@ import { PERMISSIONS } from '@/config/permissions';
 import { Roles, Role } from '@/types';
 import type { PermissionValue } from '@/config/permissions';
 import { WarningModal } from '@/components/ui/WarningModal';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 // ─── Permission Groups with full hierarchy ────────────────────────────────────
 const PERMISSION_GROUPS: {
@@ -438,7 +439,7 @@ export const RoleAccessConfig = () => {
                 <div className="mb-4">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
                         <Eye className="w-5 h-5 text-blue-400" />
-                        Data Visibility Level
+                        <InfoTip id="roleScope" label="Data Visibility Level" />
                     </h3>
                     <p className="text-xs text-slate-400 mt-1">
                         Whose data can the <strong>{activeRoleMeta.label}</strong> role see across the system?
@@ -457,8 +458,8 @@ export const RoleAccessConfig = () => {
                                 key={scope}
                                 onClick={() => setScope(selectedRole, scope)}
                                 className={`text-left p-4 rounded-xl border transition-all ${isSelected
-                                        ? `${bg} ${border} ring-1 ring-white/10 shadow-lg scale-[1.02]`
-                                        : 'bg-slate-900/50 border-slate-700 hover:border-slate-500 opacity-60 hover:opacity-100 cursor-pointer'
+                                    ? `${bg} ${border} ring-1 ring-white/10 shadow-lg scale-[1.02]`
+                                    : 'bg-slate-900/50 border-slate-700 hover:border-slate-500 opacity-60 hover:opacity-100 cursor-pointer'
                                     }`}
                             >
                                 <div className="flex items-center justify-between mb-2">
@@ -537,6 +538,9 @@ export const RoleAccessConfig = () => {
             </div>
 
             {/* Permission Groups */}
+            <div className="flex items-center gap-2 mb-3">
+                <InfoTip id="permissionToggle" label="Permission Groups" />
+            </div>
             <div className="space-y-3">
                 {PERMISSION_GROUPS.filter(groupMatchesSearch).map(group => {
                     const isExpanded = expandedGroups.includes(group.id);

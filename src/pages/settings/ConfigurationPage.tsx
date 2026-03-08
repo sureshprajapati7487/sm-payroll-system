@@ -989,7 +989,7 @@ export const ConfigurationPage = () => {
                                             <AlertOctagon className="w-6 h-6 text-red-400" />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-white">Zero-Presence Rule</h3>
+                                            <h3 className="text-lg font-bold text-white flex items-center gap-2"><InfoTip id="ruleZeroPresence" label="Zero-Presence Rule" /></h3>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <div className={`w-2 h-2 rounded-full ${config.enableZeroPresenceRule ? 'bg-green-500' : 'bg-slate-600'}`} />
                                                 <span className="text-sm text-slate-400">{config.enableZeroPresenceRule ? 'Enabled' : 'Disabled'}</span>
@@ -1016,7 +1016,7 @@ export const ConfigurationPage = () => {
                                             <FileCheck className="w-6 h-6 text-orange-400" />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-white">Sandwich Rule (Adjacency)</h3>
+                                            <h3 className="text-lg font-bold text-white flex items-center gap-2"><InfoTip id="ruleSandwich" label="Sandwich Rule (Adjacency)" /></h3>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <div className={`w-2 h-2 rounded-full ${config.enableSandwichRule ? 'bg-green-500' : 'bg-slate-600'}`} />
                                                 <span className="text-sm text-slate-400">{config.enableSandwichRule ? 'Enabled' : 'Disabled'}</span>
@@ -1057,7 +1057,7 @@ export const ConfigurationPage = () => {
                                     {activeTab === 'workAllocation' ? (
                                         <form onSubmit={handleDeptSubmit} className="space-y-4">
                                             <div className="space-y-1">
-                                                <label className="text-xs font-medium text-slate-400 uppercase">Department Name</label>
+                                                <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="deptName" label="Department Name" /></label>
                                                 <input
                                                     required
                                                     type="text"
@@ -1068,7 +1068,7 @@ export const ConfigurationPage = () => {
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <label className="text-xs font-medium text-slate-400 uppercase">Description</label>
+                                                <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="deptDescription" label="Description" /></label>
                                                 <textarea
                                                     value={deptForm.description}
                                                     onChange={e => setDeptForm({ ...deptForm, description: e.target.value })}
@@ -1079,7 +1079,7 @@ export const ConfigurationPage = () => {
 
                                             {/* Salary Basis */}
                                             <div className="space-y-1">
-                                                <label className="text-xs font-medium text-slate-400 uppercase">💰 Salary Basis</label>
+                                                <label className="text-xs font-medium text-slate-400 uppercase flex items-center gap-1"><InfoTip id="deptSalaryBasis" label="💰 Salary Basis" /></label>
                                                 <p className="text-xs text-slate-500 mb-2">How is salary calculated for employees in this department?</p>
                                                 <div className="space-y-2">
                                                     {SALARY_BASIS_OPTIONS.map(opt => (
@@ -1106,7 +1106,7 @@ export const ConfigurationPage = () => {
 
                                             {/* Default Salary Type */}
                                             <div className="space-y-1">
-                                                <label className="text-xs font-medium text-slate-400 uppercase">📋 Default Salary Type (for new employees)</label>
+                                                <label className="text-xs font-medium text-slate-400 uppercase flex items-center gap-1"><InfoTip id="deptDefaultSalaryType" label="📋 Default Salary Type (for new employees)" /></label>
                                                 <select
                                                     value={deptForm.defaultSalaryType}
                                                     onChange={e => setDeptForm({ ...deptForm, defaultSalaryType: e.target.value as 'MONTHLY' | 'DAILY' | 'PER_UNIT' })}
@@ -1121,7 +1121,7 @@ export const ConfigurationPage = () => {
                                             {/* Cost Center & Head Count */}
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div className="space-y-1">
-                                                    <label className="text-xs font-medium text-slate-400 uppercase">Cost Center Code</label>
+                                                    <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="deptCostCenter" label="Cost Center Code" /></label>
                                                     <input
                                                         type="text"
                                                         value={deptForm.costCenter}
@@ -1131,7 +1131,7 @@ export const ConfigurationPage = () => {
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-xs font-medium text-slate-400 uppercase">Target Headcount</label>
+                                                    <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="deptHeadCount" label="Target Headcount" /></label>
                                                     <input
                                                         type="number"
                                                         min="0"
@@ -1167,7 +1167,7 @@ export const ConfigurationPage = () => {
                                     ) : activeTab === 'shifts' ? (
                                         <form onSubmit={handleShiftSubmit} className="space-y-4">
                                             <div className="space-y-1">
-                                                <label className="text-xs font-medium text-slate-400 uppercase">Shift Name</label>
+                                                <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="shiftName" label="Shift Name" /></label>
                                                 <input
                                                     required
                                                     type="text"
@@ -1179,7 +1179,7 @@ export const ConfigurationPage = () => {
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-1">
-                                                    <label className="text-xs font-medium text-slate-400 uppercase">Start Time</label>
+                                                    <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="shiftStartTime" label="Start Time" /></label>
                                                     <input
                                                         required
                                                         type="time"
@@ -1189,7 +1189,7 @@ export const ConfigurationPage = () => {
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-xs font-medium text-slate-400 uppercase">End Time</label>
+                                                    <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="shiftEndTime" label="End Time" /></label>
                                                     <input
                                                         required
                                                         type="time"
@@ -1200,7 +1200,7 @@ export const ConfigurationPage = () => {
                                                 </div>
                                             </div>
                                             <div className="space-y-1">
-                                                <label className="text-xs font-medium text-slate-400 uppercase">Grace Time (Minutes)</label>
+                                                <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="shiftGraceMins" label="Grace Time (Minutes)" /></label>
                                                 <input
                                                     type="number"
                                                     value={shiftForm.graceTimeMinutes}
@@ -1354,7 +1354,7 @@ export const ConfigurationPage = () => {
                                 </h2>
                                 <form onSubmit={handleStSubmit} className="space-y-4">
                                     <div className="space-y-1">
-                                        <label className="text-xs font-medium text-slate-400 uppercase">Display Label *</label>
+                                        <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="salaryTypeLabel" label="Display Label *" /></label>
                                         <input
                                             required
                                             type="text"
@@ -1365,7 +1365,7 @@ export const ConfigurationPage = () => {
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-xs font-medium text-slate-400 uppercase">Key / Code (auto)</label>
+                                        <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="salaryTypeKey" label="Key / Code (auto)" /></label>
                                         <input
                                             type="text"
                                             value={stForm.key}
@@ -1385,7 +1385,7 @@ export const ConfigurationPage = () => {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-medium text-slate-400 uppercase">Basis / Cycle</label>
+                                        <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="salaryTypeBasis" label="Basis / Cycle" /></label>
                                         <div className="grid grid-cols-1 gap-2">
                                             {BASIS_OPTIONS.map(opt => (
                                                 <label key={opt.value} className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${stForm.basis === opt.value
@@ -1509,19 +1509,19 @@ export const ConfigurationPage = () => {
                                             (e.target as HTMLFormElement).reset();
                                         }} className="space-y-4">
                                             <div className="space-y-1">
-                                                <label className="text-xs font-medium text-slate-400 uppercase">Action Label *</label>
+                                                <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="attActionLabel" label="Action Label *" /></label>
                                                 <input required name="label" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none" placeholder="e.g. Work From Home" />
                                             </div>
                                             <div className="space-y-1">
-                                                <label className="text-xs font-medium text-slate-400 uppercase">Icon (Emoji)</label>
+                                                <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="attActionIcon" label="Icon (Emoji)" /></label>
                                                 <input name="icon" type="text" maxLength={2} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none text-2xl" placeholder="🏠" defaultValue="📋" />
                                             </div>
                                             <div className="space-y-1">
-                                                <label className="text-xs font-medium text-slate-400 uppercase">Key Code</label>
+                                                <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="attActionKey" label="Key Code" /></label>
                                                 <input name="key" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none font-mono text-sm" placeholder="WFH (auto)" />
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-xs font-medium text-slate-400 uppercase">Color</label>
+                                                <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="attActionColor" label="Color" /></label>
                                                 <select name="color" defaultValue="blue" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none">
                                                     {COLOR_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                                                 </select>
@@ -1668,7 +1668,7 @@ export const ConfigurationPage = () => {
                                         (e.target as HTMLFormElement).reset();
                                     }} className="space-y-3">
                                         <div>
-                                            <label className="text-xs font-medium text-slate-400 uppercase">Label *</label>
+                                            <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="sysKeyLabel" label="Label *" /></label>
                                             <input required name="label" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 outline-none mt-1" placeholder="e.g. Max OT Hours" />
                                         </div>
                                         <div>
@@ -1676,11 +1676,11 @@ export const ConfigurationPage = () => {
                                             <input required name="key" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm font-mono focus:border-amber-500 outline-none mt-1" placeholder="MAX_OT_HOURS" />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-medium text-slate-400 uppercase">Value *</label>
+                                            <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="sysKeyVal" label="Value *" /></label>
                                             <input required name="value" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 outline-none mt-1" placeholder="50" />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-medium text-slate-400 uppercase">Category</label>
+                                            <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="sysKeyCat" label="Category" /></label>
                                             <select name="category" defaultValue="GENERAL" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 outline-none mt-1">
                                                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                             </select>
@@ -1691,7 +1691,7 @@ export const ConfigurationPage = () => {
                                         </div>
                                         <label className="flex items-center gap-3 cursor-pointer pt-1">
                                             <input name="isSecret" type="checkbox" className="accent-amber-500 w-4 h-4" />
-                                            <span className="text-sm text-slate-300">Secret Value (mask from non-admins)</span>
+                                            <span className="text-sm text-slate-300 flex items-center gap-2"><InfoTip id="sysKeySecret" label="Secret Value (mask from non-admins)" /></span>
                                         </label>
                                         <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 mt-2">
                                             <Save className="w-4 h-4" /> Save Key
@@ -1748,7 +1748,7 @@ export const ConfigurationPage = () => {
                                 {!canManageHolidays && <p className="text-yellow-400 text-sm mb-4">⚠️ View only — Holiday manage karne ki permission nahi hai.</p>}
                                 <form onSubmit={handleHSubmit} className="space-y-4">
                                     <div>
-                                        <label className="text-xs font-medium text-slate-400 uppercase">Holiday Name *</label>
+                                        <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="holidayName" label="Holiday Name *" /></label>
                                         <input
                                             disabled={!canManageHolidays}
                                             type="text"
@@ -1759,7 +1759,7 @@ export const ConfigurationPage = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-medium text-slate-400 uppercase">Date *</label>
+                                        <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="holidayDate" label="Date *" /></label>
                                         <input
                                             disabled={!canManageHolidays}
                                             type="date"
@@ -1769,7 +1769,7 @@ export const ConfigurationPage = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-medium text-slate-400 uppercase">Type</label>
+                                        <label className="text-xs font-medium text-slate-400 uppercase"><InfoTip id="holidayType" label="Type" /></label>
                                         <select
                                             disabled={!canManageHolidays}
                                             value={hForm.type}
@@ -1864,7 +1864,7 @@ export const ConfigurationPage = () => {
                                         <Camera className="w-4.5 h-4.5 text-blue-400" />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-white text-sm">Punch Methods</h3>
+                                        <h3 className="font-bold text-white text-sm flex items-center gap-1"><InfoTip id="punchMethods" label="Punch Methods" /></h3>
                                         <p className="text-xs text-slate-500">Employee punch ke liye kaun sa method allow hai</p>
                                     </div>
                                 </div>
@@ -1961,7 +1961,7 @@ export const ConfigurationPage = () => {
                                         <div className="space-y-4">
                                             {/* Location name */}
                                             <div>
-                                                <label className="text-xs text-slate-400 font-medium mb-1.5 block">Location Name</label>
+                                                <label className="text-xs text-slate-400 font-medium mb-1.5 block flex items-center gap-1"><InfoTip id="punchLocationName" label="Location Name" /></label>
                                                 <input
                                                     value={locDraft.name}
                                                     onChange={e => setLocDraft(d => ({ ...d, name: e.target.value }))}
@@ -2011,7 +2011,7 @@ export const ConfigurationPage = () => {
                                             {/* Radius */}
                                             <div>
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <label className="text-xs text-slate-400 font-medium">Allowed Radius</label>
+                                                    <label className="text-xs text-slate-400 font-medium flex items-center gap-1"><InfoTip id="punchRadius" label="Allowed Radius" /></label>
                                                     <span className="text-sm font-bold text-emerald-400 font-mono">{locDraft.radiusMeters}m</span>
                                                 </div>
                                                 <input

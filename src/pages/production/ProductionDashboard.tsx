@@ -21,6 +21,7 @@ import {
 import { clsx } from 'clsx';
 import { SearchableSelect as ItemSelect } from '@/components/ui/SearchableSelect';
 import { EmployeeSearchableSelect } from '@/components/ui/EmployeeSearchableSelect';
+import { InfoTip } from '@/components/ui/InfoTip';
 import { useRateStore } from '@/store/rateStore';
 import { RateManager } from './RateManager';
 import { BulkEntryForm } from './BulkEntryForm';
@@ -487,7 +488,7 @@ export const ProductionDashboard = () => {
                         </h3>
                         <form onSubmit={handleSubmit} className="space-y-3">
                             <div>
-                                <label className="block text-[10px] text-dark-muted mb-1 uppercase tracking-wider font-bold">Work Date</label>
+                                <label className="block text-[10px] text-dark-muted mb-1 uppercase tracking-wider font-bold"><InfoTip id="productionDate" label="Work Date" /></label>
                                 <input required type="date" value={form.date}
                                     onChange={e => setForm({ ...form, date: e.target.value })}
                                     className={clsx('w-full bg-dark-bg border rounded-md px-2 py-1.5 text-xs text-white focus:border-primary-500 outline-none',
@@ -495,7 +496,7 @@ export const ProductionDashboard = () => {
                             </div>
                             {!isEmployee && (
                                 <div>
-                                    <label className="block text-[10px] text-dark-muted mb-1 uppercase tracking-wider font-bold">Employee</label>
+                                    <label className="block text-[10px] text-dark-muted mb-1 uppercase tracking-wider font-bold"><InfoTip id="productionWorker" label="Employee" /></label>
                                     <div className={clsx('rounded-md', errors.includes('employeeId') && 'border border-danger')}>
                                         <EmployeeSearchableSelect
                                             employees={employees.filter(e =>
@@ -513,7 +514,7 @@ export const ProductionDashboard = () => {
                             )}
                             <div>
                                 <div className="flex justify-between items-center mb-1">
-                                    <label className="block text-[10px] text-dark-muted uppercase tracking-wider font-bold">Item / Work</label>
+                                    <label className="block text-[10px] text-dark-muted uppercase tracking-wider font-bold"><InfoTip id="productionUnits" label="Item / Work" /></label>
                                     <button type="button" onClick={() => { setIsManual(!isManual); setForm(p => ({ ...p, item: '', itemId: '', rate: '' })); }}
                                         className="text-[9px] text-primary-400 hover:text-primary-300 underline">
                                         {isManual ? 'Use Master List' : 'Manual Entry'}
@@ -535,14 +536,14 @@ export const ProductionDashboard = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-[10px] text-dark-muted mb-1 uppercase tracking-wider font-bold">Quantity</label>
+                                    <label className="block text-[10px] text-dark-muted mb-1 uppercase tracking-wider font-bold"><InfoTip id="productionUnits" label="Quantity" /></label>
                                     <input type="number" placeholder="0" value={form.qty}
                                         onChange={e => setForm({ ...form, qty: e.target.value })}
                                         className={clsx('w-full bg-dark-bg border rounded-md px-2 py-1.5 text-xs text-white focus:border-primary-500 outline-none',
                                             errors.includes('qty') ? 'border-danger' : 'border-dark-border')} />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] text-dark-muted mb-1 uppercase tracking-wider font-bold">Rate (₹)</label>
+                                    <label className="block text-[10px] text-dark-muted mb-1 uppercase tracking-wider font-bold"><InfoTip id="ratePerUnit" label="Rate (₹)" /></label>
                                     <input type="number" placeholder="0" value={form.rate}
                                         onChange={e => setForm({ ...form, rate: e.target.value })}
                                         className={clsx('w-full bg-dark-bg border rounded-md px-2 py-1.5 text-xs text-white focus:border-primary-500 outline-none',
