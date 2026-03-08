@@ -382,15 +382,33 @@ function loadSalesCfg(): SalesConfig {
 }
 
 const SalesmanConfigPanel = () => {
-    const [cfg, setCfg] = useState<SalesConfig>(loadSalesCfg);
+    const { settings, updateSetting } = useInternalSystemSettingStore();
+
+    // Load from DB first (so all devices get same config), fall back to localStorage
+    const [cfg, setCfg] = useState<SalesConfig>(() => {
+        const dbCfg = settings.SALESMAN_CONFIG;
+        if (dbCfg) return { ...DEFAULT_SALES_CFG, ...dbCfg };
+        return loadSalesCfg();
+    });
     const [saved, setSaved] = useState(false);
     const [newPurpose, setNewPurpose] = useState({ key: '', label: '', emoji: '📌' });
+
+    // Sync from DB whenever settings load (handles page refresh / phone first load)
+    useEffect(() => {
+        if (settings.SALESMAN_CONFIG) {
+            setCfg(prev => ({ ...DEFAULT_SALES_CFG, ...settings.SALESMAN_CONFIG, ...prev }));
+            // Keep localStorage in sync too (for offline fallback)
+            try { localStorage.setItem(LS_SALES_CFG, JSON.stringify({ ...DEFAULT_SALES_CFG, ...settings.SALESMAN_CONFIG })); } catch { }
+        }
+    }, [settings.SALESMAN_CONFIG]);
 
     const update = <K extends keyof SalesConfig>(key: K, val: SalesConfig[K]) =>
         setCfg(p => ({ ...p, [key]: val }));
 
-    const save = () => {
-        localStorage.setItem(LS_SALES_CFG, JSON.stringify(cfg));
+    const save = async () => {
+        // Save to DB (all devices) AND localStorage (offline fallback)
+        await updateSetting('SALESMAN_CONFIG', cfg);
+        try { localStorage.setItem(LS_SALES_CFG, JSON.stringify(cfg)); } catch { }
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
     };
@@ -617,13 +635,12 @@ const SalesmanConfigPanel = () => {
                     </div>
                 </div>
 
-                {/* Info Box */}
-                <div className="bg-orange-500/5 border border-orange-500/20 rounded-xl px-5 py-4 flex gap-3 lg:col-span-2">
-                    <span className="text-orange-400 text-lg shrink-0">💡</span>
+                {/* Info Box — DB backed */}
+                <div className="bg-green-500/5 border border-green-500/20 rounded-xl px-5 py-4 flex gap-3 lg:col-span-2">
+                    <span className="text-green-400 text-lg shrink-0">✅</span>
                     <p className="text-sm text-slate-400">
-                        Yeh settings abhi <strong className="text-white">localStorage</strong> mein save hoti hain.
-                        Backend integration ke baad yeh settings automatically sabhi salesmen ke devices par sync hongi.
-                        <span className="text-orange-400 font-medium"> Save Changes</span> button dabana zaroori hai.
+                        Yeh settings <strong className="text-white">database</strong> mein save hoti hain.
+                        <span className="text-green-400 font-medium"> Save karne ke baad sabhi devices (phone, tablet) par automatically apply hongi.</span>
                     </p>
                 </div>
             </div>

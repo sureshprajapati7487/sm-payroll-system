@@ -66,3 +66,7 @@ export const useInternalSystemSettingStore = create<SystemSettingState>((set) =>
 export const useSystemSettingStore = () => {
     return useInternalSystemSettingStore();
 };
+
+// Global accessor for salesmanConfig.ts (avoids circular import)
+// Returns the current settings object from the store
+(globalThis as any).__smSettingsStore = () => useInternalSystemSettingStore.getState().settings;
