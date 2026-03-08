@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Edit2, Save, Settings2 } from 'lucide-react';
 import { useCustomFieldStore, CustomFieldType, CustomField } from '@/store/customFieldStore';
 import { useAuthStore } from '@/store/authStore';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 export const CustomFieldsConfig: React.FC = () => {
     const { fields, addField, updateField, deleteField } = useCustomFieldStore();
@@ -90,7 +91,7 @@ export const CustomFieldsConfig: React.FC = () => {
                     <h3 className="text-sm font-bold text-indigo-400 mb-4 flex items-center gap-2">✨ New Custom Field</h3>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                         <div className="col-span-1">
-                            <label className="text-xs text-slate-400 block mb-1">Field Name (Label)</label>
+                            <InfoTip id="customFieldLabel" label="Field Name (Label)" />
                             <input
                                 autoFocus
                                 value={draft.name || ''}
@@ -100,7 +101,7 @@ export const CustomFieldsConfig: React.FC = () => {
                             />
                         </div>
                         <div className="col-span-1">
-                            <label className="text-xs text-slate-400 block mb-1">Field Type</label>
+                            <InfoTip id="customFieldType" label="Field Type" />
                             <select
                                 value={draft.type || 'text'}
                                 onChange={e => setDraft({ ...draft, type: e.target.value as CustomFieldType })}
@@ -132,6 +133,7 @@ export const CustomFieldsConfig: React.FC = () => {
                                     className="rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500/20"
                                 />
                                 <span className="text-sm font-medium text-slate-300">Zaroori (Required)</span>
+                                <InfoTip id="customFieldRequired" />
                             </label>
                         </div>
                     </div>

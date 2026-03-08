@@ -1,4 +1,4 @@
-/**
+﻿/**
  * allTips.ts — Poore Project ke liye Centralized Tips Registry
  *
  * Har tip mein:
@@ -430,5 +430,206 @@ export const allTips: Record<string, TipEntry> = {
     remarksField: {
         meaning: 'Approve/reject karte waqt reason ya note likhne ki jagah.',
         example: 'Rejection reason: "Medical certificate nahi diya"',
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // LEAVE FORM FIELDS
+    // ─────────────────────────────────────────────────────────────────────────
+    leaveTypeField: {
+        meaning: 'Konsa type ki leave apply kar rahe hain.',
+        example: 'CASUAL = Routine kaam | SICK = Beemari | PAID = Paid vacation | UNPAID = Bina pay ke',
+        note: 'Casual leave balance zero ho toh UNPAID lagega.',
+    },
+    leaveStartDate: {
+        meaning: 'Leave kis date se shuru hogi.',
+        example: 'startDate = 2025-03-10 = 10 March se leave start',
+    },
+    leaveEndDate: {
+        meaning: 'Leave kab khatam hogi. Multiple days ke liye end date set karo.',
+        example: '10 March se 12 March = 3 din ki leave',
+    },
+    halfDayLeave: {
+        meaning: 'Aadhe din ki leave — 0.5 day count hogi. Sirf ek date pe hoti hai.',
+        example: 'Half day = subah jaao dopahar baad chhutthi',
+        note: 'Half Day select karne par End Date auto-fill ho jaati hai.',
+    },
+    leaveReason: {
+        meaning: 'Leave kyun chahiye — manager is reason ko dekhkar approve ya reject karta hai.',
+        example: 'Fever hai | Shaadi mein jaana | Doctor appointment',
+    },
+    leaveEmployee: {
+        meaning: 'Kis employee ke liye leave apply ho rahi hai.',
+        example: 'Admin ya Manager dusre employee ki taraf se bhi apply kar sakte hain.',
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // LOAN FORM EXTRAS
+    // ─────────────────────────────────────────────────────────────────────────
+    loanTypeField: {
+        meaning: 'Loan kis kaam ke liye hai.',
+        example: 'PF_LOAN = PF fund advance | ADVANCE_CASH = Urgent cash | FOOD = Canteen dues | FINE = Company penalty',
+    },
+    loanReason: {
+        meaning: 'Loan kyun chahiye — Manager ko dikhta hai approval ke waqt.',
+        example: 'Ghar ki repair | Medical emergency | Bachche ki fees | Vehicle breakdown',
+    },
+    loanApprover: {
+        meaning: 'Kaun approve karega yeh loan. WhatsApp notification isi ko jaati hai.',
+        example: 'Senior Manager ya HR Admin select karo',
+    },
+    loanCheckingApprover: {
+        meaning: 'Pehle ye verify karega documents aur amount, phir final approver ke paas jaayega.',
+        example: 'Accounts pehle check karega, HR final approve karega',
+    },
+    loanIssuedDate: {
+        meaning: 'Kab loan diya gaya ya kab se EMI shuru hogi.',
+        example: 'March 1 issue kiya, April se EMI katna shuru hoga',
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SHIFT CONFIGURATION
+    // ─────────────────────────────────────────────────────────────────────────
+    shiftName: {
+        meaning: 'Shift ka naam — reports aur employee profiles mein pehchana jaayega.',
+        example: 'Morning Shift | Night Shift | General | Rotational A',
+    },
+    shiftStartTime: {
+        meaning: 'Is shift ka official start time. Iske baad aana late maana jaayega.',
+        example: '09:00 = Subah 9 baje kaam shuru',
+    },
+    shiftEndTime: {
+        meaning: 'Is shift ka official end time. Iske baad kaam karna overtime count hoga.',
+        example: '18:00 = Shaam 6 baje shift khatam',
+    },
+    shiftGraceMins: {
+        meaning: 'Itne minute late aana allowed bina penalty ke. Isse zyada der pe late mark.',
+        example: '10 min = 9:10 tak on-time. 9:11 pe Late Entry.',
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SALARY TYPE CONFIG
+    // ─────────────────────────────────────────────────────────────────────────
+    salaryTypeLabel: {
+        meaning: 'Payslip mein dikhne wala naam is salary component ka.',
+        example: 'House Rent Allowance | Transport Allowance | Medical Allowance',
+    },
+    salaryTypeKey: {
+        meaning: 'System ka unique internal code — spaces allowed nahi.',
+        example: 'houseRentAllowance | transportAllowance',
+        note: 'Baad mein change karna purana payroll data affect kar sakta hai.',
+    },
+    salaryTypeBasis: {
+        meaning: 'Yeh component kaise calculate hota hai.',
+        example: 'FIXED = ₹3,000 hamesha | PERCENTAGE = Basic ka 40% = ₹8,000 (Basic ₹20K pe)',
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CUSTOM FIELDS CONFIG
+    // ─────────────────────────────────────────────────────────────────────────
+    customFieldLabel: {
+        meaning: 'Form mein dikhne wala field ka naam.',
+        example: 'Blood Group | Emergency Contact | Aadhaar Number | Vehicle Number',
+    },
+    customFieldType: {
+        meaning: 'Is field mein kya type ka data enter hoga.',
+        example: 'TEXT = Koi bhi text | NUMBER = Sirf number | DATE = Calendar date | SELECT = Dropdown choice',
+    },
+    customFieldRequired: {
+        meaning: 'Mandatory hai ya optional.',
+        example: 'ON = Bina bhare save nahi hoga | OFF = Chhod sakte hain',
+    },
+    customFieldPlaceholder: {
+        meaning: 'Khaali field mein hint text — user ko guide karta hai.',
+        example: 'Enter A+/B-/O+  or  DD-MM-YYYY',
+    },
+    customFieldModule: {
+        meaning: 'Yeh field kaun se module ke form mein dikhega.',
+        example: 'EMPLOYEE = Employee add/edit form mein dikhega',
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // WORKFLOW CONFIG
+    // ─────────────────────────────────────────────────────────────────────────
+    workflowName: {
+        meaning: 'Is approval workflow ka naam.',
+        example: 'Standard Leave Approval | Fast-Track Loan | 3-Level HR Review',
+    },
+    workflowModule: {
+        meaning: 'Yeh workflow kaunse module ki requests par apply hoga.',
+        example: 'leave = Leave requests | loan = Loan requests',
+    },
+    workflowStep: {
+        meaning: 'Ek approval step — kaun approve karega is stage pe.',
+        example: 'Step 1: Manager → Step 2: HR → Step 3: Director\nHar step pe us role wala user approve karega.',
+    },
+    workflowActive: {
+        meaning: 'ON karo toh nayi requests isi chain se jaayengi.',
+        example: 'OFF = Direct approve | ON = Manager → HR → Super Admin sab approve karein',
+        note: 'Ek module pe ek hi workflow active ho sakta hai.',
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // STATUTORY SETTINGS
+    // ─────────────────────────────────────────────────────────────────────────
+    pfWages: {
+        meaning: 'PF deduction ke liye salary limit. Isse upar PF nahi katega.',
+        example: 'Limit ₹15,000 = Basic ₹20K ho toh bhi PF sirf ₹15K pe = ₹1,800',
+        formula: 'PF = 12% × min(Basic, PF Wage Limit)',
+    },
+    esiWages: {
+        meaning: 'ESI ke liye Gross salary ki limit. Isse zyada Gross pe ESI band.',
+        example: 'Limit ₹21,000 = Gross ₹22K hone pe ESI automatically stop',
+        note: 'Yeh limit government set karta hai.',
+    },
+    ptApplicable: {
+        meaning: 'Professional Tax — state government ka salary tax. Har state mein alag slab.',
+        example: 'Maharashtra: ₹200/month (salary ₹10K+)',
+        note: 'Kuch states mein PT nahi hota (Delhi etc.).',
+    },
+    labourWelfareFund: {
+        meaning: 'State Labour Welfare Fund contribution — semi-annual ya annual.',
+        example: 'Maharashtra LWF: Employee ₹6 + Employer ₹12 = ₹18 per 6 months',
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ROLE ACCESS CONFIG
+    // ─────────────────────────────────────────────────────────────────────────
+    roleScope: {
+        meaning: 'Yeh role kitna data dekh sakta hai.',
+        example: 'OWN = Sirf apna | TEAM = Apne dept ke sabka | ALL = Poori company ka',
+        note: 'Super Admin ka scope hamesha ALL hota hai, change nahi hota.',
+    },
+    permissionToggle: {
+        meaning: 'Is role ko yeh kaam karne ki permission hai ya nahi.',
+        example: 'ON = User yeh action kar sakta hai | OFF = Button dikhega hi nahi',
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PRODUCTION ENTRY
+    // ─────────────────────────────────────────────────────────────────────────
+    productionDate: {
+        meaning: 'Kaunse din ka production entry kar rahe hain.',
+        example: '2025-03-08 = Aaj ke din ki units record karein',
+        note: 'Aage ki date ka entry nahi kar sakte.',
+    },
+    productionWorker: {
+        meaning: 'Kaunse employee ne yeh production units banaye.',
+        example: 'Ram Kumar — Stitching Group A',
+    },
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // REPORT BUILDER
+    // ─────────────────────────────────────────────────────────────────────────
+    reportDateRange: {
+        meaning: 'Report kis period ka data dikhayegi.',
+        example: '1 Jan – 31 Jan = January ka poora data report mein',
+    },
+    reportModule: {
+        meaning: 'Kaunse module ka data report mein chahiye.',
+        example: 'ATTENDANCE = Punch data | PAYROLL = Salary | LOANS = Loan balances',
+    },
+    reportColumns: {
+        meaning: 'Report mein kaunse columns dikhane hain — tick karo jo chahiye.',
+        example: 'Name ✓ | Department ✓ | Gross ✓ | PF ✗ (nahi chahiye toh untick)',
     },
 };

@@ -332,7 +332,7 @@ export const LoanDashboard = () => {
                             </div>
 
                             <div>
-                                <label className="block text-xs text-dark-muted mb-1">Type</label>
+                                <InfoTip id="loanTypeField" label="Type" />
                                 <select
                                     value={form.type}
                                     onChange={e => setForm({ ...form, type: e.target.value as LoanType })}
@@ -348,7 +348,7 @@ export const LoanDashboard = () => {
 
                             {/* Approver Selection (Auto-filled but editable by Admin) */}
                             <div>
-                                <label className="block text-xs text-dark-muted mb-1">Approver (WhatsApp)</label>
+                                <InfoTip id="loanApprover" label="Approver (WhatsApp)" />
                                 <select
                                     value={form.approverId}
                                     onChange={e => setForm({ ...form, approverId: e.target.value })}
@@ -368,7 +368,7 @@ export const LoanDashboard = () => {
 
                             {/* Checking Approver (New) */}
                             <div>
-                                <label className="block text-xs text-dark-muted mb-1">Checking Approver</label>
+                                <InfoTip id="loanCheckingApprover" label="Checking Approver" />
                                 <select
                                     value={form.checkingApproverId}
                                     onChange={e => setForm({ ...form, checkingApproverId: e.target.value })}
@@ -385,7 +385,7 @@ export const LoanDashboard = () => {
 
                             {/* Date Picker (New) */}
                             <div>
-                                <label className="block text-xs text-dark-muted mb-1">Issue / Request Date</label>
+                                <InfoTip id="loanIssuedDate" label="Issue / Request Date" />
                                 <input
                                     type="date"
                                     value={form.issuedDate}

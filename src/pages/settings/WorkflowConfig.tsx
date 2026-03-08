@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Network, Plus, Trash2, Save, X } from 'lucide-react';
 import { useWorkflowStore, WorkflowConfig, WorkflowStep } from '@/store/workflowStore';
 import { useAuthStore } from '@/store/authStore';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 const ROLES = [
     { id: 'MANAGER', label: 'Manager' },
@@ -113,6 +114,7 @@ export const WorkflowBuilder = () => {
 
                             <div className="flex items-center gap-2">
                                 {/* Toggle Active */}
+                                <InfoTip id="workflowActive" />
                                 <button
                                     onClick={() => toggleWorkflow(w.id)}
                                     className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors ${w.isActive ? 'bg-success' : 'bg-dark-border'}`}
@@ -136,7 +138,7 @@ export const WorkflowBuilder = () => {
                             {editingId === w.id ? (
                                 <>
                                     <div className="mb-3">
-                                        <label className="text-xs text-dark-muted mb-1 block">Module</label>
+                                        <InfoTip id="workflowModule" label="Module" />
                                         <select
                                             value={editForm.module}
                                             onChange={e => setEditForm({ ...editForm, module: e.target.value as any })}
@@ -147,7 +149,7 @@ export const WorkflowBuilder = () => {
                                         </select>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs text-dark-muted mb-1 block">Approval Levels (In Order)</label>
+                                        <InfoTip id="workflowStep" label="Approval Levels (In Order)" />
                                         {(editForm.steps || []).map((step, idx) => (
                                             <div key={step.id} className="flex items-center gap-2 bg-dark-bg/50 border border-dark-border p-2 rounded-lg">
                                                 <div className="w-6 h-6 rounded-full bg-dark-surface flex items-center justify-center text-xs text-dark-muted font-mono shrink-0">

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { SkeletonList, SkeletonForm } from '@/components/SkeletonLoaders';
+import { InfoTip } from '@/components/ui/InfoTip';
 
 // --- Custom Searchable Select Component ---
 const EmployeeSearchableSelect = ({ employees, selectedId, currentUserId, onSelect }: {
@@ -220,7 +221,7 @@ export const LeaveDashboard = () => {
                             {/* Employee Selector (Only for Admins/Managers) */}
                             {canManageLeaves && (
                                 <div className="relative">
-                                    <label className="block text-xs text-dark-muted mb-1">Employee</label>
+                                    <InfoTip id="leaveEmployee" label="Employee" />
                                     <EmployeeSearchableSelect
                                         employees={employees}
                                         selectedId={targetEmployeeId}
@@ -231,7 +232,7 @@ export const LeaveDashboard = () => {
                             )}
 
                             <div>
-                                <label className="block text-xs text-dark-muted mb-1">Leave Type</label>
+                                <InfoTip id="leaveTypeField" label="Leave Type" />
                                 <select
                                     value={form.type}
                                     onChange={e => setForm({ ...form, type: e.target.value as LeaveType })}
@@ -245,7 +246,7 @@ export const LeaveDashboard = () => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs text-dark-muted mb-1">From</label>
+                                    <InfoTip id="leaveStartDate" label="From" />
                                     <input
                                         type="date"
                                         value={form.startDate}
@@ -254,7 +255,7 @@ export const LeaveDashboard = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs text-dark-muted mb-1">To</label>
+                                    <InfoTip id="leaveEndDate" label="To" />
                                     <input
                                         type="date"
                                         value={form.endDate}
@@ -273,10 +274,11 @@ export const LeaveDashboard = () => {
                                     className="accent-primary-500 w-4 h-4 rounded"
                                 />
                                 <label htmlFor="halfDay" className="text-sm text-white cursor-pointer select-none">Half Day Leave (0.5)</label>
+                                <InfoTip id="halfDayLeave" />
                             </div>
 
                             <div>
-                                <label className="block text-xs text-dark-muted mb-1">Reason</label>
+                                <InfoTip id="leaveReason" label="Reason" />
                                 <textarea
                                     required
                                     value={form.reason}
