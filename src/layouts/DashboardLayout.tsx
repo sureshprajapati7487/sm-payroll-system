@@ -125,24 +125,24 @@ const NAV_GROUPS = [
 ];
 
 
-// ── Mobile Bottom Nav (5 primary tabs) ────────────────────────────────────────────
+// ── Mobile Bottom Nav — with permission keys (same store as desktop) ────────
 const BOTTOM_NAV = [
-    { label: 'Home', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Attend', path: '/attendance', icon: CalendarClock },
-    { label: 'Payroll', path: '/payroll', icon: Banknote },
-    { label: 'Salesman', path: '/salesman', icon: ShoppingBag },
+    { label: 'Home', path: '/dashboard', icon: LayoutDashboard, perm: PERMISSIONS.NAV_DASHBOARD },
+    { label: 'Attend', path: '/attendance', icon: CalendarClock, perm: PERMISSIONS.NAV_ATTENDANCE },
+    { label: 'Payroll', path: '/payroll', icon: Banknote, perm: PERMISSIONS.NAV_PAYROLL },
+    { label: 'Salesman', path: '/salesman', icon: ShoppingBag, perm: PERMISSIONS.NAV_SALESMAN },
 ];
 
-// ── More menu items ────────────────────────────────────────────────
+// ── More menu items — with permission keys (same store as desktop) ────────────
 const MORE_ITEMS = [
-    { label: 'Staff', path: '/employees', icon: Users },
-    { label: 'Leaves', path: '/leaves', icon: CalendarClock },
-    { label: 'Loans', path: '/loans', icon: Wallet },
-    { label: 'Expenses', path: '/expenses', icon: Wallet },
-    { label: 'Production', path: '/production', icon: Factory },
-    { label: 'Approvals', path: '/approvals', icon: UserCheck },
-    { label: 'Settings', path: '/settings', icon: Settings },
-    { label: 'Reports', path: '/reports/builder', icon: ShieldCheck },
+    { label: 'Staff', path: '/employees', icon: Users, perm: PERMISSIONS.NAV_EMPLOYEES },
+    { label: 'Leaves', path: '/leaves', icon: CalendarClock, perm: PERMISSIONS.NAV_LEAVES },
+    { label: 'Loans', path: '/loans', icon: Wallet, perm: PERMISSIONS.NAV_LOANS },
+    { label: 'Expenses', path: '/expenses', icon: Wallet, perm: PERMISSIONS.NAV_EXPENSES },
+    { label: 'Production', path: '/production', icon: Factory, perm: PERMISSIONS.NAV_PRODUCTION },
+    { label: 'Approvals', path: '/approvals', icon: UserCheck, perm: PERMISSIONS.NAV_APPROVALS },
+    { label: 'Settings', path: '/settings', icon: Settings, perm: PERMISSIONS.MANAGE_SETTINGS },
+    { label: 'Reports', path: '/reports/builder', icon: ShieldCheck, perm: PERMISSIONS.NAV_REPORTS },
 ];
 
 // ── Translation keys ───────────────────────────────────────────────────────
@@ -432,9 +432,11 @@ export const DashboardLayout = () => {
                             transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                             className="fixed bottom-[64px] left-2 right-2 z-50 md:hidden rounded-2xl bg-dark-card border border-dark-border shadow-2xl overflow-hidden"
                         >
-                            {/* Grid of extra pages */}
+                            {/* Grid of extra pages — filtered by role permissions */}
                             <div className="p-3 grid grid-cols-3 gap-1.5">
-                                {MORE_ITEMS.map(item => {
+                                {MORE_ITEMS.filter(item =>
+                                    hasPermission(item.perm as Parameters<typeof hasPermission>[0])
+                                ).map(item => {
                                     const isActive = location.pathname.startsWith(item.path);
                                     return (
                                         <button
@@ -512,7 +514,9 @@ export const DashboardLayout = () => {
                 style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
             >
                 <div className="flex items-stretch h-[60px]">
-                    {BOTTOM_NAV.map(item => {
+                    {BOTTOM_NAV.filter(item =>
+                        hasPermission(item.perm as Parameters<typeof hasPermission>[0])
+                    ).map(item => {
                         const isActive = location.pathname === item.path ||
                             (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
                         return (
