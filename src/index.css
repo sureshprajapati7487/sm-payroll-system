@@ -325,6 +325,28 @@ textarea:focus {
   .hover-glow:hover {
     box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
   }
+
+  /* ── Mobile Utilities ────────────────────────────────────────────────────── */
+  /* Wrap wide tables in a horizontal-scroll container on mobile */
+  .mobile-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent content ever breaking out of viewport on mobile */
+  @media (max-width: 767px) {
+    body {
+      overflow-x: hidden;
+    }
+    /* Modals: additional safe-area padding for iOS home indicator */
+    .modal-safe {
+      padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    }
+    /* Touch targets: ensure minimum 44px tap target on mobile */
+    button, a {
+      min-height: 36px;
+    }
+  }
 }
 
 /* PRINT STYLES - ROBUST CONFIGURATION */

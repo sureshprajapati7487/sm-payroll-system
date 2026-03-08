@@ -288,7 +288,7 @@ const ClientModal = ({ client, salesEmployees, onClose, onSave }: {
                 <div className="p-6 space-y-4">
                     {err && <div className="bg-red-500/15 border border-red-500/30 rounded-lg px-3 py-2 text-red-300 text-sm">{err}</div>}
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div><label className="text-xs text-dark-muted uppercase block mb-1">Party/Client Name *</label>
                             <input value={form.name || ''} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className={inp} placeholder="e.g. Sharma Traders" /></div>
                         <div><label className="text-xs text-dark-muted uppercase block mb-1">Shop Name</label>
@@ -891,29 +891,26 @@ export const ClientListPage = () => {
             )}
 
             {/* Header */}
-            <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-start justify-between flex-wrap gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center"><Building2 className="w-5 h-5 text-blue-400" /></div>
+                    <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+                        <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-blue-500/20 flex items-center justify-center shrink-0"><Building2 className="w-4 h-4 md:w-5 md:h-5 text-blue-400" /></div>
                         Client / Party List
                     </h1>
-                    <p className="text-dark-muted mt-1">Salesman-wise client tracking with GPS & visit history</p>
+                    <p className="text-dark-muted mt-1 text-sm hidden md:block">Salesman-wise client tracking with GPS &amp; visit history</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                    {/* Demo Download */}
-                    <button onClick={downloadDemoExcel} title="Demo Excel file download karo — isi format mein data bharo aur import karo" className="flex items-center gap-2 px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-xl text-sm font-semibold border border-purple-500/30 transition-all">
-                        <FileDown className="w-4 h-4" /> Demo File
+                    <button onClick={downloadDemoExcel} title="Demo Excel" className="flex items-center gap-1.5 px-2.5 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-xl text-xs font-semibold border border-purple-500/30 transition-all">
+                        <FileDown className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Demo File</span>
                     </button>
-                    {/* Export Excel */}
-                    <button onClick={() => exportClientsToExcel(clients, { companyId: currentCompanyId || undefined, assignedTo: filterAssigned || undefined, status: filterStatus })} disabled={filtered.length === 0} title="Current filtered clients ko Excel mein export karo" className="flex items-center gap-2 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 disabled:opacity-40 text-green-400 rounded-xl text-sm font-semibold border border-green-500/30 transition-all">
-                        <FileDown className="w-4 h-4" /> Export Excel
+                    <button onClick={() => exportClientsToExcel(clients, { companyId: currentCompanyId || undefined, assignedTo: filterAssigned || undefined, status: filterStatus })} disabled={filtered.length === 0} className="flex items-center gap-1.5 px-2.5 py-2 bg-green-500/20 hover:bg-green-500/30 disabled:opacity-40 text-green-400 rounded-xl text-xs font-semibold border border-green-500/30 transition-all">
+                        <FileDown className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Export</span>
                     </button>
-                    {/* Bulk Import */}
-                    <button onClick={() => setShowBulk(true)} className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-xl text-sm font-semibold border border-blue-500/30 transition-all">
-                        <Upload className="w-4 h-4" /> Bulk Import
+                    <button onClick={() => setShowBulk(true)} className="flex items-center gap-1.5 px-2.5 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-xl text-xs font-semibold border border-blue-500/30 transition-all">
+                        <Upload className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Import</span>
                     </button>
-                    <button onClick={() => setModalClient(null)} className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-400 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-orange-500/20">
-                        <Plus className="w-4 h-4" /> Add Client
+                    <button onClick={() => setModalClient(null)} className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 hover:bg-orange-400 text-white rounded-xl text-xs font-semibold transition-all shadow-lg shadow-orange-500/20">
+                        <Plus className="w-3.5 h-3.5" /> Add Client
                     </button>
                 </div>
             </div>
@@ -934,23 +931,23 @@ export const ClientListPage = () => {
             </div>
 
             {/* Search + Filters */}
-            <div className="glass rounded-xl border border-dark-border p-4 flex gap-3 flex-wrap">
-                <div className="flex-1 min-w-[200px] relative">
+            <div className="glass rounded-xl border border-dark-border p-3 md:p-4 flex gap-2 md:gap-3 flex-wrap">
+                <div className="flex-1 min-w-[140px] relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-muted" />
-                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search client, shop, phone, city..." className="w-full pl-9 pr-3 py-2 rounded-lg text-sm" />
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search client, shop, phone..." className="w-full pl-9 pr-3 py-2 rounded-lg text-sm" />
                 </div>
-                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="rounded-lg px-3 py-2 text-sm">
+                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="rounded-lg px-3 py-2 text-sm flex-1 min-w-[110px]">
                     <option value="ALL">All Status</option>
                     <option value="ACTIVE">Active</option>
                     <option value="PROSPECT">Prospect</option>
                     <option value="INACTIVE">Inactive</option>
                     <option value="BLOCKED">Blocked</option>
                 </select>
-                <select value={filterAssigned} onChange={e => setFilterAssigned(e.target.value)} className="rounded-lg px-3 py-2 text-sm">
+                <select value={filterAssigned} onChange={e => setFilterAssigned(e.target.value)} className="rounded-lg px-3 py-2 text-sm flex-1 min-w-[110px]">
                     <option value="">All Salesmen</option>
                     {salesEmployees.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
-                <button onClick={() => fetchClients({ companyId: currentCompanyId! })} className="px-3 py-2 rounded-lg bg-dark-border/30 hover:bg-dark-border/50 text-dark-muted hover:text-white transition-colors">
+                <button onClick={() => fetchClients({ companyId: currentCompanyId! })} className="px-3 py-2 rounded-lg bg-dark-border/30 hover:bg-dark-border/50 text-dark-muted hover:text-white transition-colors shrink-0">
                     <RefreshCw className="w-4 h-4" />
                 </button>
             </div>
