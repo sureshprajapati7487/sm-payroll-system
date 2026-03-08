@@ -19,6 +19,8 @@ const ClientMap = ({ clients }: { clients: SalesClient[] }) => {
 
     useEffect(() => {
         if (!mapRef.current || leafletMapRef.current) return;
+        // React 18 StrictMode runs effects twice — skip if Leaflet already initialized this container
+        if ((mapRef.current as any)._leaflet_id) return;
 
         // Load Leaflet CSS dynamically
         if (!document.getElementById('leaflet-css-cl')) {
@@ -802,7 +804,7 @@ export const ClientListPage = () => {
 
     // ── Geofence Hook ─────────────────────────────────────────────────────────
     const [geofenceEnabled, setGeofenceEnabled] = useState(true);
-    const { isTracking, nearbyClient, nearbyDistanceM, events: geoEvents, clearEvents, gpsError } = useGeofence({
+    const { isTracking, nearbyClient, nearbyDistanceM, geofenceRadius, events: geoEvents, clearEvents, gpsError } = useGeofence({
         salesmanId: user?.id,
         salesmanName: user?.name,
         companyId: currentCompanyId || undefined,
@@ -842,12 +844,12 @@ export const ClientListPage = () => {
                                     Auto: {nearbyClient.name}
                                     {nearbyDistanceM != null && <span className="text-green-400/70 font-normal text-xs">({nearbyDistanceM}m)</span>}
                                 </p>
-                                <p className="text-green-200/70 text-xs">{nearbyClient.shopName || nearbyClient.city || ''} — 50m radius mein ho</p>
+                                <p className="text-green-200/70 text-xs">{nearbyClient.shopName || nearbyClient.city || ''} — {geofenceRadius}m radius mein ho</p>
                             </>
                         ) : (
                             <>
                                 <p className="text-purple-300 font-semibold text-sm">🛰️ Geofence Active — Koi client paas nahi</p>
-                                <p className="text-purple-200/60 text-xs">50m radius mein aate hi auto check-in ho jayega</p>
+                                <p className="text-purple-200/60 text-xs">{geofenceRadius}m radius mein aate hi auto check-in ho jayega</p>
                             </>
                         )
                     ) : (

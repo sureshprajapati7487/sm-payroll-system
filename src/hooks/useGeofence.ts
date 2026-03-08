@@ -52,6 +52,7 @@ interface UseGeofenceReturn {
     currentPosition: { lat: number; lng: number } | null;
     nearbyClient: SalesClient | null;
     nearbyDistanceM: number | null;
+    geofenceRadius: number;
     events: GeofenceEvent[];
     clearEvents: () => void;
     gpsError: string | null;
@@ -268,5 +269,5 @@ export function useGeofence({
         clients.filter(c => c.latitude).map(c => `${c.id}:${c.latitude},${c.longitude}`).join('|'),
     ]);
 
-    return { isTracking, currentPosition, nearbyClient, nearbyDistanceM, events, clearEvents, gpsError };
+    return { isTracking, currentPosition, nearbyClient, nearbyDistanceM, geofenceRadius: effectiveRadius, events, clearEvents, gpsError };
 }

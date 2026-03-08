@@ -39,6 +39,7 @@ export default function RouteMap({ visits, routesBySalesman, clients }: RouteMap
             }
 
             if (!containerRef.current || mapRef.current) return;
+            if ((containerRef.current as any)._leaflet_id) return; // StrictMode guard
 
             const defaultCenter: [number, number] = [20.5937, 78.9629];
             const center = visits.length > 0
