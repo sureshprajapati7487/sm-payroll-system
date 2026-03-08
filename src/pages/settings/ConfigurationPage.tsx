@@ -14,7 +14,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useHolidayStore } from '@/store/holidayStore';
 import { PERMISSIONS } from '@/config/permissions';
 import { Roles } from '@/types';
-import { Building2, Clock, Plus, Trash2, Edit2, Save, X, Briefcase, Gavel, FileCheck, AlertOctagon, Wallet, IndianRupee, CalendarCheck, Key, Lock, Eye, EyeOff, Calendar, Camera, MapPin, Fingerprint, ScanFace, Navigation, ToggleLeft, ToggleRight, Crosshair, Shield } from 'lucide-react';
+import { Building2, Clock, Plus, Trash2, Edit2, Save, X, Briefcase, Gavel, FileCheck, AlertOctagon, IndianRupee, CalendarCheck, Key, Lock, Eye, EyeOff, Calendar, Camera, MapPin, Fingerprint, ScanFace, Navigation, ToggleLeft, ToggleRight, Crosshair, Shield } from 'lucide-react';
 import { WarningModal } from '@/components/ui/WarningModal';
 import { StatutorySettings } from './StatutorySettings';
 
@@ -650,7 +650,7 @@ const SalesmanConfigPanel = () => {
 
 export const ConfigurationPage = () => {
 
-    const [activeTab, setActiveTab] = useState<'departments' | 'workAllocation' | 'shifts' | 'rules' | 'loanTypes' | 'salaryTypes' | 'attendance' | 'keys' | 'holidays' | 'punch' | 'salesman' | 'statutory'>('departments');
+    const [activeTab, setActiveTab] = useState<'departments' | 'workAllocation' | 'shifts' | 'rules' | 'salaryTypes' | 'attendance' | 'keys' | 'holidays' | 'punch' | 'salesman' | 'statutory'>('departments');
     const { departments, addDepartment, updateDepartment, deleteDepartment } = useDepartmentStore();
     const { shifts, addShift, updateShift, removeShift } = useShiftStore();
     const { groups: workGroups, assignments, addGroup, removeGroup, getGroupEmployees } = useWorkGroupStore();
@@ -766,8 +766,6 @@ export const ConfigurationPage = () => {
     const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
 
     // Loan Type Form State
-    const [loanTypeForm, setLoanTypeForm] = useState({ key: '', label: '' });
-    const [editingLoanTypeId, setEditingLoanTypeId] = useState<string | null>(null);
 
     // Holiday Form State (must be at top level — Rules of Hooks)
     const [hForm, setHForm] = useState({ name: '', date: '', type: 'FESTIVAL' as 'FESTIVAL' | 'NATIONAL' | 'OPTIONAL' });
@@ -808,17 +806,6 @@ export const ConfigurationPage = () => {
             addShift(shiftForm);
         }
         setShiftForm({ name: '', startTime: '09:00', endTime: '18:00', graceTimeMinutes: 15 });
-    };
-
-    const handleLoanTypeSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (editingLoanTypeId) {
-            config.updateLoanType(editingLoanTypeId, loanTypeForm.key, loanTypeForm.label);
-            setEditingLoanTypeId(null);
-        } else {
-            config.addLoanType(loanTypeForm.key, loanTypeForm.label);
-        }
-        setLoanTypeForm({ key: '', label: '' });
     };
 
     // Salary Type Form
@@ -891,16 +878,6 @@ export const ConfigurationPage = () => {
                             }`}
                     >
                         <Gavel className="w-4 h-4" /> <span>Payroll Rules</span>
-                    </button>
-
-                    <button
-                        onClick={() => setActiveTab('loanTypes')}
-                        className={`px-3 md:px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'loanTypes'
-                            ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                            : 'text-slate-400 hover:text-white hover:bg-white/5'
-                            }`}
-                    >
-                        <Wallet className="w-4 h-4" /> <span>Loan Types</span>
                     </button>
 
                     <button
@@ -1061,16 +1038,12 @@ export const ConfigurationPage = () => {
                                     <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                                         {activeTab === 'workAllocation' ? (
                                             editingDeptId ? <Edit2 className="w-5 h-5 text-warning" /> : <Plus className="w-5 h-5 text-primary-400" />
-                                        ) : activeTab === 'shifts' ? (
-                                            editingShiftId ? <Edit2 className="w-5 h-5 text-warning" /> : <Plus className="w-5 h-5 text-primary-400" />
                                         ) : (
-                                            editingLoanTypeId ? <Edit2 className="w-5 h-5 text-warning" /> : <Plus className="w-5 h-5 text-primary-400" />
+                                            editingShiftId ? <Edit2 className="w-5 h-5 text-warning" /> : <Plus className="w-5 h-5 text-primary-400" />
                                         )}
                                         {activeTab === 'workAllocation'
                                             ? (editingDeptId ? 'Edit Work Allocation' : 'Add Work Allocation')
-                                            : activeTab === 'shifts'
-                                                ? (editingShiftId ? 'Edit Shift' : 'Add Shift')
-                                                : (editingLoanTypeId ? 'Edit Loan Type' : 'Add Loan Type')
+                                            : (editingShiftId ? 'Edit Shift' : 'Add Shift')
                                         }
                                     </h2>
 
@@ -1249,53 +1222,6 @@ export const ConfigurationPage = () => {
                                                 )}
                                             </div>
                                         </form>
-                                    ) : activeTab === 'loanTypes' ? (
-                                        <form onSubmit={handleLoanTypeSubmit} className="space-y-4">
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-medium text-slate-400 uppercase">Key / Code</label>
-                                                <input
-                                                    required
-                                                    type="text"
-                                                    value={loanTypeForm.key}
-                                                    onChange={e => setLoanTypeForm({ ...loanTypeForm, key: e.target.value })}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
-                                                    placeholder="e.g. VEHICLE_LOAN"
-                                                />
-                                                <p className="text-xs text-slate-500">Internal identifier (will be auto-formatted)</p>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-xs font-medium text-slate-400 uppercase">Display Label</label>
-                                                <input
-                                                    required
-                                                    type="text"
-                                                    value={loanTypeForm.label}
-                                                    onChange={e => setLoanTypeForm({ ...loanTypeForm, label: e.target.value })}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
-                                                    placeholder="e.g. Vehicle Loan"
-                                                />
-                                                <p className="text-xs text-slate-500">Name shown in forms and reports</p>
-                                            </div>
-                                            <div className="flex gap-3 pt-2">
-                                                <button
-                                                    type="submit"
-                                                    className="flex-1 bg-primary-600 hover:bg-primary-500 text-white font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
-                                                >
-                                                    <Save className="w-4 h-4" /> {editingLoanTypeId ? 'Update' : 'Save'}
-                                                </button>
-                                                {editingLoanTypeId && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setEditingLoanTypeId(null);
-                                                            setLoanTypeForm({ key: '', label: '' });
-                                                        }}
-                                                        className="px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-all"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </form>
                                     ) : null}
                                 </div>
                             </div>
@@ -1399,1060 +1325,1011 @@ export const ConfigurationPage = () => {
                                                 </div>
                                             </div>
                                         ))
-                                    ) : (
-                                        <>
-                                            {config.loanTypes.map(loanType => (
-                                                <div key={loanType.id} className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-5 hover:border-primary-500/50 transition-all group flex flex-col justify-between">
-                                                    <div>
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
-                                                                <Wallet className="w-5 h-5 text-yellow-400" />
-                                                            </div>
-                                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setEditingLoanTypeId(loanType.id);
-                                                                        setLoanTypeForm({
-                                                                            key: loanType.key,
-                                                                            label: loanType.label
-                                                                        });
-                                                                    }}
-                                                                    className="p-2 bg-slate-800 hover:bg-warning/20 hover:text-warning rounded-lg transition-all"
-                                                                >
-                                                                    <Edit2 className="w-4 h-4" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => setWarning({
-                                                                        isOpen: true,
-                                                                        title: 'Delete Loan Type?',
-                                                                        message: `Are you sure you want to delete "${loanType.label}"? This definition will be removed from the system. Existing loans using this type might lose their label formatting.`,
-                                                                        severity: 'danger',
-                                                                        confirmText: 'Yes, Delete',
-                                                                        onConfirm: () => config.deleteLoanType(loanType.id)
-                                                                    })}
-                                                                    className="p-2 bg-slate-800 hover:bg-red-500/20 hover:text-red-500 rounded-lg transition-all"
-                                                                >
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        <h3 className="text-lg font-bold text-white">{loanType.label}</h3>
-                                                        <div className="text-xs bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-400 mt-2 inline-block">
-                                                            KEY: {loanType.key}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            <div className="md:col-span-2 flex justify-center mt-4">
-                                                <button
-                                                    onClick={() => setWarning({
-                                                        isOpen: true,
-                                                        title: 'Reset Loan Types?',
-                                                        message: 'This will reset all loan definitions to system defaults. Any custom loan types you created will be lost. This action cannot be undone.',
-                                                        severity: 'danger',
-                                                        confirmText: 'Reset to Defaults',
-                                                        onConfirm: () => config.resetLoanTypes()
-                                                    })}
-                                                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-all"
-                                                >
-                                                    Reset to Defaults
-                                                </button>
-                                            </div>
-                                        </>
-                                    )}
+                                    ) : null}
                                 </div>
                             </div>
                         </>
                     )}
                 </div>
-            )}
+            )
+            }
 
             {/* ─── Salary Types ─── */}
-            {activeTab === 'salaryTypes' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Form */}
-                    <div className="lg:col-span-1">
-                        <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700 rounded-2xl p-6 sticky top-24">
-                            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                                {editingStId ? <Edit2 className="w-5 h-5 text-warning" /> : <Plus className="w-5 h-5 text-primary-400" />}
-                                {editingStId ? 'Edit Salary Type' : 'Add Salary Type'}
-                            </h2>
-                            <form onSubmit={handleStSubmit} className="space-y-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-slate-400 uppercase">Display Label *</label>
-                                    <input
-                                        required
-                                        type="text"
-                                        value={stForm.label}
-                                        onChange={e => setStForm({ ...stForm, label: e.target.value })}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
-                                        placeholder="e.g. Monthly Fixed"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-slate-400 uppercase">Key / Code (auto)</label>
-                                    <input
-                                        type="text"
-                                        value={stForm.key}
-                                        onChange={e => setStForm({ ...stForm, key: e.target.value })}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none font-mono text-sm"
-                                        placeholder="e.g. MONTHLY_FIXED (auto-filled)"
-                                    />
-                                    <p className="text-xs text-slate-500">Leave blank to auto-generate from label</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-medium text-slate-400 uppercase">Description</label>
-                                    <textarea
-                                        value={stForm.description}
-                                        onChange={e => setStForm({ ...stForm, description: e.target.value })}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none min-h-[70px]"
-                                        placeholder="How is this salary type calculated?"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-400 uppercase">Basis / Cycle</label>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {BASIS_OPTIONS.map(opt => (
-                                            <label key={opt.value} className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${stForm.basis === opt.value
-                                                ? 'border-primary-500/60 bg-primary-500/10'
-                                                : 'border-slate-700 hover:border-slate-600'
-                                                }`}>
-                                                <input
-                                                    type="radio"
-                                                    name="stBasis"
-                                                    value={opt.value}
-                                                    checked={stForm.basis === opt.value}
-                                                    onChange={() => setStForm({ ...stForm, basis: opt.value })}
-                                                    className="accent-primary-500"
-                                                />
-                                                <span className="text-sm font-medium text-white">{opt.label}</span>
-                                            </label>
-                                        ))}
+            {
+                activeTab === 'salaryTypes' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Form */}
+                        <div className="lg:col-span-1">
+                            <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700 rounded-2xl p-6 sticky top-24">
+                                <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                                    {editingStId ? <Edit2 className="w-5 h-5 text-warning" /> : <Plus className="w-5 h-5 text-primary-400" />}
+                                    {editingStId ? 'Edit Salary Type' : 'Add Salary Type'}
+                                </h2>
+                                <form onSubmit={handleStSubmit} className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-medium text-slate-400 uppercase">Display Label *</label>
+                                        <input
+                                            required
+                                            type="text"
+                                            value={stForm.label}
+                                            onChange={e => setStForm({ ...stForm, label: e.target.value })}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none"
+                                            placeholder="e.g. Monthly Fixed"
+                                        />
                                     </div>
-                                </div>
-                                <div className="flex gap-3 pt-2">
-                                    <button type="submit" className="flex-1 bg-primary-600 hover:bg-primary-500 text-white font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2">
-                                        <Save className="w-4 h-4" /> {editingStId ? 'Update' : 'Save'}
-                                    </button>
-                                    {editingStId && (
-                                        <button type="button" onClick={() => { setEditingStId(null); setStForm({ key: '', label: '', description: '', basis: 'MONTHLY' }); }}
-                                            className="px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-all">
-                                            <X className="w-4 h-4" />
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-medium text-slate-400 uppercase">Key / Code (auto)</label>
+                                        <input
+                                            type="text"
+                                            value={stForm.key}
+                                            onChange={e => setStForm({ ...stForm, key: e.target.value })}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none font-mono text-sm"
+                                            placeholder="e.g. MONTHLY_FIXED (auto-filled)"
+                                        />
+                                        <p className="text-xs text-slate-500">Leave blank to auto-generate from label</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-medium text-slate-400 uppercase">Description</label>
+                                        <textarea
+                                            value={stForm.description}
+                                            onChange={e => setStForm({ ...stForm, description: e.target.value })}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none min-h-[70px]"
+                                            placeholder="How is this salary type calculated?"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-medium text-slate-400 uppercase">Basis / Cycle</label>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {BASIS_OPTIONS.map(opt => (
+                                                <label key={opt.value} className={`flex items-center gap-3 p-2.5 rounded-xl border cursor-pointer transition-all ${stForm.basis === opt.value
+                                                    ? 'border-primary-500/60 bg-primary-500/10'
+                                                    : 'border-slate-700 hover:border-slate-600'
+                                                    }`}>
+                                                    <input
+                                                        type="radio"
+                                                        name="stBasis"
+                                                        value={opt.value}
+                                                        checked={stForm.basis === opt.value}
+                                                        onChange={() => setStForm({ ...stForm, basis: opt.value })}
+                                                        className="accent-primary-500"
+                                                    />
+                                                    <span className="text-sm font-medium text-white">{opt.label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3 pt-2">
+                                        <button type="submit" className="flex-1 bg-primary-600 hover:bg-primary-500 text-white font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2">
+                                            <Save className="w-4 h-4" /> {editingStId ? 'Update' : 'Save'}
                                         </button>
-                                    )}
-                                </div>
-                            </form>
+                                        {editingStId && (
+                                            <button type="button" onClick={() => { setEditingStId(null); setStForm({ key: '', label: '', description: '', basis: 'MONTHLY' }); }}
+                                                className="px-4 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-all">
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </form>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Cards */}
-                    <div className="lg:col-span-2">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {salaryTypes.map(st => (
-                                <div key={st.id} className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-5 hover:border-primary-500/50 transition-all group flex flex-col justify-between">
-                                    <div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="w-10 h-10 rounded-xl bg-primary-500/10 flex items-center justify-center">
-                                                <IndianRupee className="w-5 h-5 text-primary-400" />
+                        {/* Cards */}
+                        <div className="lg:col-span-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {salaryTypes.map(st => (
+                                    <div key={st.id} className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-5 hover:border-primary-500/50 transition-all group flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="w-10 h-10 rounded-xl bg-primary-500/10 flex items-center justify-center">
+                                                    <IndianRupee className="w-5 h-5 text-primary-400" />
+                                                </div>
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={() => { setEditingStId(st.id); setStForm({ key: st.key, label: st.label, description: st.description, basis: st.basis as 'MONTHLY' | 'DAILY' | 'PER_UNIT' | 'WEEKLY' | 'OTHER' }); }}
+                                                        className="p-2 bg-slate-800 hover:bg-warning/20 hover:text-warning rounded-lg transition-all"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setWarning({ isOpen: true, title: 'Delete Salary Type?', message: `\"${st.label}\" salary type delete ho jayega. Existing employees pe assigned data affect ho sakta hai.`, severity: 'danger', confirmText: 'Yes, Delete', onConfirm: () => deleteSalaryType(st.id) })}
+                                                        className="p-2 bg-slate-800 hover:bg-red-500/20 hover:text-red-500 rounded-lg transition-all"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => { setEditingStId(st.id); setStForm({ key: st.key, label: st.label, description: st.description, basis: st.basis as 'MONTHLY' | 'DAILY' | 'PER_UNIT' | 'WEEKLY' | 'OTHER' }); }}
-                                                    className="p-2 bg-slate-800 hover:bg-warning/20 hover:text-warning rounded-lg transition-all"
-                                                >
-                                                    <Edit2 className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => setWarning({ isOpen: true, title: 'Delete Salary Type?', message: `\"${st.label}\" salary type delete ho jayega. Existing employees pe assigned data affect ho sakta hai.`, severity: 'danger', confirmText: 'Yes, Delete', onConfirm: () => deleteSalaryType(st.id) })}
-                                                    className="p-2 bg-slate-800 hover:bg-red-500/20 hover:text-red-500 rounded-lg transition-all"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                            <h3 className="text-lg font-bold text-white">{st.label}</h3>
+                                            <p className="text-sm text-slate-400 line-clamp-2 mt-1">{st.description}</p>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className="text-xs bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400 font-mono">KEY: {st.key}</span>
+                                                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${st.basis === 'MONTHLY' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
+                                                    st.basis === 'DAILY' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' :
+                                                        st.basis === 'PER_UNIT' ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' :
+                                                            st.basis === 'WEEKLY' ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' :
+                                                                'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                                                    }`}>{BASIS_OPTIONS.find(b => b.value === st.basis)?.label ?? st.basis}</span>
                                             </div>
-                                        </div>
-                                        <h3 className="text-lg font-bold text-white">{st.label}</h3>
-                                        <p className="text-sm text-slate-400 line-clamp-2 mt-1">{st.description}</p>
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <span className="text-xs bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400 font-mono">KEY: {st.key}</span>
-                                            <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${st.basis === 'MONTHLY' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
-                                                st.basis === 'DAILY' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' :
-                                                    st.basis === 'PER_UNIT' ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' :
-                                                        st.basis === 'WEEKLY' ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' :
-                                                            'bg-slate-500/20 text-slate-300 border-slate-500/30'
-                                                }`}>{BASIS_OPTIONS.find(b => b.value === st.basis)?.label ?? st.basis}</span>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
 
             {/* ─── Attendance Actions ─── */}
-            {activeTab === 'attendance' && (() => {
-                const COLOR_OPTIONS = [
-                    { value: 'green', label: 'Green', cls: 'bg-green-500' },
-                    { value: 'red', label: 'Red', cls: 'bg-red-500' },
-                    { value: 'yellow', label: 'Yellow', cls: 'bg-yellow-500' },
-                    { value: 'orange', label: 'Orange', cls: 'bg-orange-500' },
-                    { value: 'blue', label: 'Blue', cls: 'bg-blue-500' },
-                    { value: 'purple', label: 'Purple', cls: 'bg-purple-500' },
-                    { value: 'slate', label: 'Grey', cls: 'bg-slate-500' },
-                ];
-                const colorBadge = (color: string) => ({
-                    green: 'bg-green-500/20 text-green-300 border-green-500/40',
-                    red: 'bg-red-500/20 text-red-300 border-red-500/40',
-                    yellow: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
-                    orange: 'bg-orange-500/20 text-orange-300 border-orange-500/40',
-                    blue: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
-                    purple: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
-                    slate: 'bg-slate-500/20 text-slate-300 border-slate-500/40',
-                }[color] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/40');
-                return (
-                    <div className="space-y-6">
+            {
+                activeTab === 'attendance' && (() => {
+                    const COLOR_OPTIONS = [
+                        { value: 'green', label: 'Green', cls: 'bg-green-500' },
+                        { value: 'red', label: 'Red', cls: 'bg-red-500' },
+                        { value: 'yellow', label: 'Yellow', cls: 'bg-yellow-500' },
+                        { value: 'orange', label: 'Orange', cls: 'bg-orange-500' },
+                        { value: 'blue', label: 'Blue', cls: 'bg-blue-500' },
+                        { value: 'purple', label: 'Purple', cls: 'bg-purple-500' },
+                        { value: 'slate', label: 'Grey', cls: 'bg-slate-500' },
+                    ];
+                    const colorBadge = (color: string) => ({
+                        green: 'bg-green-500/20 text-green-300 border-green-500/40',
+                        red: 'bg-red-500/20 text-red-300 border-red-500/40',
+                        yellow: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
+                        orange: 'bg-orange-500/20 text-orange-300 border-orange-500/40',
+                        blue: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+                        purple: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+                        slate: 'bg-slate-500/20 text-slate-300 border-slate-500/40',
+                    }[color] ?? 'bg-slate-500/20 text-slate-300 border-slate-500/40');
+                    return (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                {/* Form */}
+                                <div className="lg:col-span-1">
+                                    <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700 rounded-2xl p-6 sticky top-24">
+                                        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                                            <Plus className="w-5 h-5 text-primary-400" /> Add Custom Action
+                                        </h2>
+                                        <form onSubmit={e => {
+                                            e.preventDefault();
+                                            const fd = new FormData(e.currentTarget);
+                                            addAttendanceAction({
+                                                key: fd.get('key') as string,
+                                                label: fd.get('label') as string,
+                                                icon: fd.get('icon') as string,
+                                                color: fd.get('color') as string,
+                                                enabled: true
+                                            });
+                                            (e.target as HTMLFormElement).reset();
+                                        }} className="space-y-4">
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-medium text-slate-400 uppercase">Action Label *</label>
+                                                <input required name="label" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none" placeholder="e.g. Work From Home" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-medium text-slate-400 uppercase">Icon (Emoji)</label>
+                                                <input name="icon" type="text" maxLength={2} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none text-2xl" placeholder="🏠" defaultValue="📋" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-medium text-slate-400 uppercase">Key Code</label>
+                                                <input name="key" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none font-mono text-sm" placeholder="WFH (auto)" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium text-slate-400 uppercase">Color</label>
+                                                <select name="color" defaultValue="blue" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none">
+                                                    {COLOR_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                                </select>
+                                            </div>
+                                            <button type="submit" className="w-full bg-primary-600 hover:bg-primary-500 text-white font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2">
+                                                <Save className="w-4 h-4" /> Add Action
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+
+                                {/* Cards */}
+                                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 content-start">
+                                    {attendanceActions.map(action => (
+                                        <div key={action.id} className={`bg-slate-800/30 border rounded-2xl p-5 transition-all group ${action.enabled ? 'border-slate-700/50 hover:border-primary-500/50' : 'border-slate-700/20 opacity-60'}`}>
+                                            <div className="flex items-start justify-between mb-3">
+                                                {/* Preview button */}
+                                                <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm font-semibold ${colorBadge(action.color)}`}>
+                                                    <span className="text-base">{action.icon}</span> {action.label}
+                                                </span>
+                                                {/* Controls */}
+                                                <div className="flex items-center gap-2">
+                                                    {/* Toggle ON/OFF */}
+                                                    <button
+                                                        onClick={() => toggleAttendanceAction(action.id)}
+                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${action.enabled ? 'bg-primary-600' : 'bg-slate-700'}`}
+                                                        title={action.enabled ? 'Disable' : 'Enable'}
+                                                    >
+                                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${action.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                    </button>
+                                                    {!action.isDefault && (
+                                                        <button
+                                                            onClick={() => setWarning({ isOpen: true, title: 'Delete Action?', message: `"${action.label}" action permanently delete ho jayegi.`, severity: 'danger', confirmText: 'Delete', onConfirm: () => deleteAttendanceAction(action.id) })}
+                                                            className="p-1.5 bg-slate-800 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all text-slate-400"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className="text-xs font-mono bg-slate-900 border border-slate-700 px-2 py-0.5 rounded text-slate-400">KEY: {action.key}</span>
+                                                {action.isDefault && <span className="text-xs text-slate-500">🔒 Default</span>}
+                                                {!action.enabled && <span className="text-xs text-red-400 font-medium">● Disabled</span>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* ── Punch Method Config ────────────────────────── */}
+                                <div className="mt-8">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                            <Camera className="w-4 h-4 text-blue-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-white font-bold text-sm">Punch Methods</h3>
+                                            <p className="text-slate-400 text-xs">Jo methods enable hain woh Punch Widget mein dikhenge</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {([
+                                            { key: 'face' as const, icon: '🫥', desc: 'Webcam se live photo le ke punch karo' },
+                                            { key: 'fingerprint' as const, icon: '👆', desc: 'Device fingerprint/biometric se punch karo' },
+                                            { key: 'photoUpload' as const, icon: '📷', desc: 'Gallery se photo upload karke punch karo' },
+                                        ] as const).map(({ key, icon, desc }) => {
+                                            const m = punchMethods[key];
+                                            return (
+                                                <div key={key} className={`border rounded-2xl p-4 transition-all ${m.enabled ? 'border-blue-500/40 bg-blue-500/5' : 'border-slate-700/50 bg-slate-800/30 opacity-60'}`}>
+                                                    <div className="flex items-start justify-between mb-3">
+                                                        <span className="text-2xl">{icon}</span>
+                                                        <button
+                                                            onClick={() => _updatePunchMethod(key, { enabled: !m.enabled })}
+                                                            className={`w-11 h-6 rounded-full transition-all relative shrink-0 ${m.enabled ? 'bg-blue-500' : 'bg-slate-600'}`}
+                                                        >
+                                                            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all shadow-sm ${m.enabled ? 'left-[22px]' : 'left-0.5'}`} />
+                                                        </button>
+                                                    </div>
+                                                    <input
+                                                        value={m.label}
+                                                        onChange={e => _updatePunchMethod(key, { label: e.target.value })}
+                                                        className="w-full bg-transparent text-white font-bold text-sm border-b border-slate-700 focus:border-blue-500 outline-none pb-1 mb-1"
+                                                    />
+                                                    <p className="text-xs text-slate-500">{desc}</p>
+                                                    <span className={`mt-2 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${m.enabled ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-700 text-slate-500'}`}>
+                                                        {m.enabled ? '● ACTIVE' : '○ DISABLED'}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()
+            }
+
+
+            {/* ─── System Keys (Super Admin Only) ─── */}
+            {
+                activeTab === 'keys' && (() => {
+                    const CATEGORIES = ['PAYROLL', 'ATTENDANCE', 'LEAVES', 'GENERAL', 'SECURITY'] as const;
+                    const CAT_COLORS: Record<string, string> = {
+                        PAYROLL: 'bg-green-500/20 text-green-300 border-green-500/30',
+                        ATTENDANCE: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+                        LEAVES: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+                        GENERAL: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+                        SECURITY: 'bg-red-500/20 text-red-300 border-red-500/30',
+                    };
+
+                    if (!isSuperAdmin) {
+                        return (
+                            <div className="flex flex-col items-center justify-center py-24 gap-4">
+                                <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center">
+                                    <Lock className="w-10 h-10 text-red-400" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-white">Access Denied</h2>
+                                <p className="text-slate-400 text-center max-w-sm">Yeh section sirf <span className="text-amber-400 font-bold">Super Admin</span> ke liye hai. System Keys dekhne ya badalne ki permission nahi hai.</p>
+                            </div>
+                        );
+                    }
+
+                    return (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             {/* Form */}
                             <div className="lg:col-span-1">
-                                <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700 rounded-2xl p-6 sticky top-24">
-                                    <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                                        <Plus className="w-5 h-5 text-primary-400" /> Add Custom Action
+                                <div className="bg-slate-800/50 backdrop-blur-xl border border-amber-500/30 rounded-2xl p-6 sticky top-24">
+                                    <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                                        <Key className="w-5 h-5 text-amber-400" /> Add System Key
                                     </h2>
+                                    <p className="text-xs text-amber-400/70 mb-5">⚡ Super Admin Only — Yeh keys system-wide rules set karti hain</p>
                                     <form onSubmit={e => {
                                         e.preventDefault();
                                         const fd = new FormData(e.currentTarget);
-                                        addAttendanceAction({
+                                        addSystemKey({
                                             key: fd.get('key') as string,
                                             label: fd.get('label') as string,
-                                            icon: fd.get('icon') as string,
-                                            color: fd.get('color') as string,
-                                            enabled: true
+                                            value: fd.get('value') as string,
+                                            category: fd.get('category') as typeof CATEGORIES[number],
+                                            description: fd.get('description') as string,
+                                            isSecret: fd.get('isSecret') === 'on',
                                         });
                                         (e.target as HTMLFormElement).reset();
-                                    }} className="space-y-4">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-slate-400 uppercase">Action Label *</label>
-                                            <input required name="label" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none" placeholder="e.g. Work From Home" />
+                                    }} className="space-y-3">
+                                        <div>
+                                            <label className="text-xs font-medium text-slate-400 uppercase">Label *</label>
+                                            <input required name="label" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 outline-none mt-1" placeholder="e.g. Max OT Hours" />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-slate-400 uppercase">Icon (Emoji)</label>
-                                            <input name="icon" type="text" maxLength={2} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none text-2xl" placeholder="🏠" defaultValue="📋" />
+                                        <div>
+                                            <label className="text-xs font-medium text-slate-400 uppercase">Key Code *</label>
+                                            <input required name="key" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm font-mono focus:border-amber-500 outline-none mt-1" placeholder="MAX_OT_HOURS" />
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-slate-400 uppercase">Key Code</label>
-                                            <input name="key" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none font-mono text-sm" placeholder="WFH (auto)" />
+                                        <div>
+                                            <label className="text-xs font-medium text-slate-400 uppercase">Value *</label>
+                                            <input required name="value" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 outline-none mt-1" placeholder="50" />
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-medium text-slate-400 uppercase">Color</label>
-                                            <select name="color" defaultValue="blue" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none">
-                                                {COLOR_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                        <div>
+                                            <label className="text-xs font-medium text-slate-400 uppercase">Category</label>
+                                            <select name="category" defaultValue="GENERAL" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 outline-none mt-1">
+                                                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                             </select>
                                         </div>
-                                        <button type="submit" className="w-full bg-primary-600 hover:bg-primary-500 text-white font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2">
-                                            <Save className="w-4 h-4" /> Add Action
+                                        <div>
+                                            <label className="text-xs font-medium text-slate-400 uppercase">Description</label>
+                                            <input name="description" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 outline-none mt-1" placeholder="Short explanation" />
+                                        </div>
+                                        <label className="flex items-center gap-3 cursor-pointer pt-1">
+                                            <input name="isSecret" type="checkbox" className="accent-amber-500 w-4 h-4" />
+                                            <span className="text-sm text-slate-300">Secret Value (mask from non-admins)</span>
+                                        </label>
+                                        <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 mt-2">
+                                            <Save className="w-4 h-4" /> Save Key
                                         </button>
                                     </form>
                                 </div>
                             </div>
 
-                            {/* Cards */}
-                            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 content-start">
-                                {attendanceActions.map(action => (
-                                    <div key={action.id} className={`bg-slate-800/30 border rounded-2xl p-5 transition-all group ${action.enabled ? 'border-slate-700/50 hover:border-primary-500/50' : 'border-slate-700/20 opacity-60'}`}>
-                                        <div className="flex items-start justify-between mb-3">
-                                            {/* Preview button */}
-                                            <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm font-semibold ${colorBadge(action.color)}`}>
-                                                <span className="text-base">{action.icon}</span> {action.label}
-                                            </span>
-                                            {/* Controls */}
-                                            <div className="flex items-center gap-2">
-                                                {/* Toggle ON/OFF */}
-                                                <button
-                                                    onClick={() => toggleAttendanceAction(action.id)}
-                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${action.enabled ? 'bg-primary-600' : 'bg-slate-700'}`}
-                                                    title={action.enabled ? 'Disable' : 'Enable'}
-                                                >
-                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${action.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                                                </button>
-                                                {!action.isDefault && (
-                                                    <button
-                                                        onClick={() => setWarning({ isOpen: true, title: 'Delete Action?', message: `"${action.label}" action permanently delete ho jayegi.`, severity: 'danger', confirmText: 'Delete', onConfirm: () => deleteAttendanceAction(action.id) })}
-                                                        className="p-1.5 bg-slate-800 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all text-slate-400"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <span className="text-xs font-mono bg-slate-900 border border-slate-700 px-2 py-0.5 rounded text-slate-400">KEY: {action.key}</span>
-                                            {action.isDefault && <span className="text-xs text-slate-500">🔒 Default</span>}
-                                            {!action.enabled && <span className="text-xs text-red-400 font-medium">● Disabled</span>}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* ── Punch Method Config ────────────────────────── */}
-                            <div className="mt-8">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                                        <Camera className="w-4 h-4 text-blue-400" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-white font-bold text-sm">Punch Methods</h3>
-                                        <p className="text-slate-400 text-xs">Jo methods enable hain woh Punch Widget mein dikhenge</p>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {([
-                                        { key: 'face' as const, icon: '🫥', desc: 'Webcam se live photo le ke punch karo' },
-                                        { key: 'fingerprint' as const, icon: '👆', desc: 'Device fingerprint/biometric se punch karo' },
-                                        { key: 'photoUpload' as const, icon: '📷', desc: 'Gallery se photo upload karke punch karo' },
-                                    ] as const).map(({ key, icon, desc }) => {
-                                        const m = punchMethods[key];
-                                        return (
-                                            <div key={key} className={`border rounded-2xl p-4 transition-all ${m.enabled ? 'border-blue-500/40 bg-blue-500/5' : 'border-slate-700/50 bg-slate-800/30 opacity-60'}`}>
-                                                <div className="flex items-start justify-between mb-3">
-                                                    <span className="text-2xl">{icon}</span>
-                                                    <button
-                                                        onClick={() => _updatePunchMethod(key, { enabled: !m.enabled })}
-                                                        className={`w-11 h-6 rounded-full transition-all relative shrink-0 ${m.enabled ? 'bg-blue-500' : 'bg-slate-600'}`}
-                                                    >
-                                                        <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all shadow-sm ${m.enabled ? 'left-[22px]' : 'left-0.5'}`} />
-                                                    </button>
-                                                </div>
-                                                <input
-                                                    value={m.label}
-                                                    onChange={e => _updatePunchMethod(key, { label: e.target.value })}
-                                                    className="w-full bg-transparent text-white font-bold text-sm border-b border-slate-700 focus:border-blue-500 outline-none pb-1 mb-1"
-                                                />
-                                                <p className="text-xs text-slate-500">{desc}</p>
-                                                <span className={`mt-2 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${m.enabled ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-700 text-slate-500'}`}>
-                                                    {m.enabled ? '● ACTIVE' : '○ DISABLED'}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
-
-
-            {/* ─── System Keys (Super Admin Only) ─── */}
-            {activeTab === 'keys' && (() => {
-                const CATEGORIES = ['PAYROLL', 'ATTENDANCE', 'LEAVES', 'GENERAL', 'SECURITY'] as const;
-                const CAT_COLORS: Record<string, string> = {
-                    PAYROLL: 'bg-green-500/20 text-green-300 border-green-500/30',
-                    ATTENDANCE: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-                    LEAVES: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-                    GENERAL: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
-                    SECURITY: 'bg-red-500/20 text-red-300 border-red-500/30',
-                };
-
-                if (!isSuperAdmin) {
-                    return (
-                        <div className="flex flex-col items-center justify-center py-24 gap-4">
-                            <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center">
-                                <Lock className="w-10 h-10 text-red-400" />
-                            </div>
-                            <h2 className="text-2xl font-bold text-white">Access Denied</h2>
-                            <p className="text-slate-400 text-center max-w-sm">Yeh section sirf <span className="text-amber-400 font-bold">Super Admin</span> ke liye hai. System Keys dekhne ya badalne ki permission nahi hai.</p>
-                        </div>
-                    );
-                }
-
-                return (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* Form */}
-                        <div className="lg:col-span-1">
-                            <div className="bg-slate-800/50 backdrop-blur-xl border border-amber-500/30 rounded-2xl p-6 sticky top-24">
-                                <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                                    <Key className="w-5 h-5 text-amber-400" /> Add System Key
-                                </h2>
-                                <p className="text-xs text-amber-400/70 mb-5">⚡ Super Admin Only — Yeh keys system-wide rules set karti hain</p>
-                                <form onSubmit={e => {
-                                    e.preventDefault();
-                                    const fd = new FormData(e.currentTarget);
-                                    addSystemKey({
-                                        key: fd.get('key') as string,
-                                        label: fd.get('label') as string,
-                                        value: fd.get('value') as string,
-                                        category: fd.get('category') as typeof CATEGORIES[number],
-                                        description: fd.get('description') as string,
-                                        isSecret: fd.get('isSecret') === 'on',
-                                    });
-                                    (e.target as HTMLFormElement).reset();
-                                }} className="space-y-3">
-                                    <div>
-                                        <label className="text-xs font-medium text-slate-400 uppercase">Label *</label>
-                                        <input required name="label" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 outline-none mt-1" placeholder="e.g. Max OT Hours" />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-slate-400 uppercase">Key Code *</label>
-                                        <input required name="key" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm font-mono focus:border-amber-500 outline-none mt-1" placeholder="MAX_OT_HOURS" />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-slate-400 uppercase">Value *</label>
-                                        <input required name="value" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 outline-none mt-1" placeholder="50" />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-slate-400 uppercase">Category</label>
-                                        <select name="category" defaultValue="GENERAL" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 outline-none mt-1">
-                                            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-slate-400 uppercase">Description</label>
-                                        <input name="description" type="text" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-500 outline-none mt-1" placeholder="Short explanation" />
-                                    </div>
-                                    <label className="flex items-center gap-3 cursor-pointer pt-1">
-                                        <input name="isSecret" type="checkbox" className="accent-amber-500 w-4 h-4" />
-                                        <span className="text-sm text-slate-300">Secret Value (mask from non-admins)</span>
-                                    </label>
-                                    <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 mt-2">
-                                        <Save className="w-4 h-4" /> Save Key
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-
-                        {/* Keys Table */}
-                        <div className="lg:col-span-2 space-y-3">
-                            {CATEGORIES.map(cat => {
-                                const catKeys = systemKeys.filter(k => k.category === cat);
-                                if (catKeys.length === 0) return null;
-                                return (
-                                    <div key={cat} className="bg-slate-800/30 border border-slate-700/50 rounded-2xl overflow-hidden">
-                                        <div className={`px-4 py-2 flex items-center gap-2 border-b border-slate-700/50`}>
-                                            <span className={`text-xs font-bold px-2 py-0.5 rounded border ${CAT_COLORS[cat]}`}>{cat}</span>
-                                            <span className="text-xs text-slate-500">{catKeys.length} key{catKeys.length > 1 ? 's' : ''}</span>
-                                        </div>
-                                        {catKeys.map((sk, idx) => {
-                                            return (
-                                                <KeyRow
-                                                    key={sk.id}
-                                                    sk={sk}
-                                                    isLast={idx === catKeys.length - 1}
-                                                    onDelete={() => setWarning({ isOpen: true, title: 'Delete Key?', message: `"${sk.key}" key permanently delete ho jayegi. Is key ka use karne wali features break ho sakti hain.`, severity: 'danger', confirmText: 'Delete', onConfirm: () => deleteSystemKey(sk.id) })}
-                                                    onUpdate={(data) => updateSystemKey(sk.id, data)}
-                                                />
-                                            );
-                                        })}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                );
-            })()}
-
-
-            {/* ─── Holidays ─── */}
-            {activeTab === 'holidays' && (() => {
-                const sortedHolidays = [...holidays].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                // hForm, setHForm, canManageHolidays, handleHSubmit are hoisted to component top-level (Rules of Hooks)
-
-                return (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* Add Form */}
-                        <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700 rounded-2xl p-6 h-fit">
-                            <h3 className="font-bold text-white mb-5 flex items-center gap-2 border-b border-slate-700 pb-4">
-                                <Plus className="w-5 h-5 text-primary-400" /> Add New Holiday
-                            </h3>
-                            {!canManageHolidays && <p className="text-yellow-400 text-sm mb-4">⚠️ View only — Holiday manage karne ki permission nahi hai.</p>}
-                            <form onSubmit={handleHSubmit} className="space-y-4">
-                                <div>
-                                    <label className="text-xs font-medium text-slate-400 uppercase">Holiday Name *</label>
-                                    <input
-                                        disabled={!canManageHolidays}
-                                        type="text"
-                                        value={hForm.name}
-                                        onChange={e => setHForm({ ...hForm, name: e.target.value })}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none mt-1 disabled:opacity-50"
-                                        placeholder="e.g. Diwali, Independence Day"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-medium text-slate-400 uppercase">Date *</label>
-                                    <input
-                                        disabled={!canManageHolidays}
-                                        type="date"
-                                        value={hForm.date}
-                                        onChange={e => setHForm({ ...hForm, date: e.target.value })}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none mt-1 disabled:opacity-50"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-medium text-slate-400 uppercase">Type</label>
-                                    <select
-                                        disabled={!canManageHolidays}
-                                        value={hForm.type}
-                                        onChange={e => setHForm({ ...hForm, type: e.target.value as any })}
-                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none mt-1 disabled:opacity-50"
-                                    >
-                                        <option value="FESTIVAL">Festival</option>
-                                        <option value="NATIONAL">National Holiday</option>
-                                        <option value="OPTIONAL">Optional</option>
-                                    </select>
-                                </div>
-                                <button
-                                    type="submit"
-                                    disabled={!canManageHolidays}
-                                    className="w-full py-2.5 bg-primary-600 hover:bg-primary-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"
-                                >
-                                    <Calendar className="w-4 h-4" /> Add to Calendar
-                                </button>
-                            </form>
-                        </div>
-
-                        {/* Holidays List */}
-                        <div className="md:col-span-2 bg-slate-800/30 border border-slate-700/50 rounded-2xl overflow-hidden">
-                            <div className="p-4 border-b border-slate-700/50 bg-slate-800/40 flex items-center gap-2">
-                                <Calendar className="w-5 h-5 text-yellow-400" />
-                                <h3 className="font-bold text-white">Upcoming Holidays</h3>
-                                <span className="ml-auto text-xs text-slate-500">{sortedHolidays.length} total</span>
-                            </div>
-                            <div className="divide-y divide-slate-700/30">
-                                {sortedHolidays.length === 0 && (
-                                    <div className="flex flex-col items-center justify-center py-16 text-slate-500">
-                                        <Calendar className="w-10 h-10 mb-3 opacity-30" />
-                                        <p>Koi holiday add nahi ki gayi abhi tak.</p>
-                                    </div>
-                                )}
-                                {sortedHolidays.map(h => (
-                                    <div key={h.id} className="group flex items-center gap-4 p-4 hover:bg-slate-700/20 transition-all">
-                                        <div className="w-14 h-14 bg-slate-900 rounded-xl flex flex-col items-center justify-center border border-slate-700 shrink-0">
-                                            <span className="text-[10px] text-slate-500 uppercase font-bold">{new Date(h.date).toLocaleString('default', { month: 'short' })}</span>
-                                            <span className="text-xl font-bold text-white leading-none">{new Date(h.date).getDate()}</span>
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <p className="font-bold text-white">{h.name}</p>
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium uppercase ${h.type === 'NATIONAL' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                                    h.type === 'OPTIONAL' ? 'bg-slate-500/10 text-slate-400 border-slate-500/20' :
-                                                        'bg-purple-500/10 text-purple-400 border-purple-500/20'
-                                                    }`}>{h.type}</span>
-                                            </div>
-                                            <p className="text-sm text-slate-400">{new Date(h.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric' })}</p>
-                                        </div>
-                                        {canManageHolidays && (
-                                            <button
-                                                onClick={() => removeHoliday(h.id)}
-                                                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
-
-
-            {/* ─── Punch System (Methods + Location) ─── */}
-            {activeTab === 'punch' && (() => {
-
-                const METHOD_ICONS: Record<string, JSX.Element> = {
-                    face: <ScanFace className="w-5 h-5" />,
-                    fingerprint: <Fingerprint className="w-5 h-5" />,
-                    photoUpload: <Camera className="w-5 h-5" />,
-                };
-                const METHOD_COLORS: Record<string, string> = {
-                    face: 'text-blue-400',
-                    fingerprint: 'text-indigo-400',
-                    photoUpload: 'text-cyan-400',
-                };
-
-                return (
-                    <div className="space-y-8 max-w-3xl">
-
-                        {/* ── Punch Methods ── */}
-                        <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center border border-blue-500/20">
-                                    <Camera className="w-4.5 h-4.5 text-blue-400" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-white text-sm">Punch Methods</h3>
-                                    <p className="text-xs text-slate-500">Employee punch ke liye kaun sa method allow hai</p>
-                                </div>
-                            </div>
-                            <div className="space-y-3">
-                                {(['face', 'fingerprint', 'photoUpload'] as const).map(method => {
-                                    const m = punchMethods[method];
+                            {/* Keys Table */}
+                            <div className="lg:col-span-2 space-y-3">
+                                {CATEGORIES.map(cat => {
+                                    const catKeys = systemKeys.filter(k => k.category === cat);
+                                    if (catKeys.length === 0) return null;
                                     return (
-                                        <div key={method} className={`flex items-center gap-4 px-4 py-3 rounded-xl border transition-all ${m.enabled ? 'bg-slate-700/30 border-slate-600/40' : 'bg-slate-800/20 border-slate-700/20 opacity-60'
-                                            }`}>
-                                            <span className={`${METHOD_COLORS[method]}`}>{METHOD_ICONS[method]}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    {isAdmin ? (
-                                                        <input
-                                                            value={m.label}
-                                                            onChange={e => _updatePunchMethod(method, { label: e.target.value })}
-                                                            className="bg-transparent text-white text-sm font-semibold w-full outline-none border-b border-transparent focus:border-slate-500 transition-colors"
-                                                        />
-                                                    ) : (
-                                                        <span className="text-white font-bold text-sm">{m.label}</span>
-                                                    )}
-                                                    {!m.enabled && <span className="text-[10px] bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Disabled</span>}
-                                                </div>
-                                                <p className="text-xs text-slate-500 capitalize">{method === 'photoUpload' ? 'Live Camera Selfie' : method}</p>
+                                        <div key={cat} className="bg-slate-800/30 border border-slate-700/50 rounded-2xl overflow-hidden">
+                                            <div className={`px-4 py-2 flex items-center gap-2 border-b border-slate-700/50`}>
+                                                <span className={`text-xs font-bold px-2 py-0.5 rounded border ${CAT_COLORS[cat]}`}>{cat}</span>
+                                                <span className="text-xs text-slate-500">{catKeys.length} key{catKeys.length > 1 ? 's' : ''}</span>
                                             </div>
-                                            {isAdmin && (
-                                                <button
-                                                    onClick={() => _updatePunchMethod(method, { enabled: !m.enabled })}
-                                                    className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${m.enabled
-                                                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
-                                                        : 'bg-slate-700/50 text-slate-500 border border-slate-600/30 hover:bg-slate-700'
-                                                        }`}
-                                                >
-                                                    {m.enabled
-                                                        ? <><ToggleRight className="w-4 h-4" /> Enabled</>
-                                                        : <><ToggleLeft className="w-4 h-4" /> Disabled</>}
-                                                </button>
-                                            )}
+                                            {catKeys.map((sk, idx) => {
+                                                return (
+                                                    <KeyRow
+                                                        key={sk.id}
+                                                        sk={sk}
+                                                        isLast={idx === catKeys.length - 1}
+                                                        onDelete={() => setWarning({ isOpen: true, title: 'Delete Key?', message: `"${sk.key}" key permanently delete ho jayegi. Is key ka use karne wali features break ho sakti hain.`, severity: 'danger', confirmText: 'Delete', onConfirm: () => deleteSystemKey(sk.id) })}
+                                                        onUpdate={(data) => updateSystemKey(sk.id, data)}
+                                                    />
+                                                );
+                                            })}
                                         </div>
                                     );
                                 })}
                             </div>
                         </div>
+                    );
+                })()
+            }
 
-                        {/* ── GPS Location Restriction ── */}
-                        <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
-                            <div className="flex items-center justify-between mb-5">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center border border-emerald-500/20">
-                                        <MapPin className="w-4.5 h-4.5 text-emerald-400" />
+
+            {/* ─── Holidays ─── */}
+            {
+                activeTab === 'holidays' && (() => {
+                    const sortedHolidays = [...holidays].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                    // hForm, setHForm, canManageHolidays, handleHSubmit are hoisted to component top-level (Rules of Hooks)
+
+                    return (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {/* Add Form */}
+                            <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700 rounded-2xl p-6 h-fit">
+                                <h3 className="font-bold text-white mb-5 flex items-center gap-2 border-b border-slate-700 pb-4">
+                                    <Plus className="w-5 h-5 text-primary-400" /> Add New Holiday
+                                </h3>
+                                {!canManageHolidays && <p className="text-yellow-400 text-sm mb-4">⚠️ View only — Holiday manage karne ki permission nahi hai.</p>}
+                                <form onSubmit={handleHSubmit} className="space-y-4">
+                                    <div>
+                                        <label className="text-xs font-medium text-slate-400 uppercase">Holiday Name *</label>
+                                        <input
+                                            disabled={!canManageHolidays}
+                                            type="text"
+                                            value={hForm.name}
+                                            onChange={e => setHForm({ ...hForm, name: e.target.value })}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none mt-1 disabled:opacity-50"
+                                            placeholder="e.g. Diwali, Independence Day"
+                                        />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-white text-sm">GPS Location Restriction</h3>
-                                        <p className="text-xs text-slate-500">Sirf office ke andar se punch allow karo</p>
+                                        <label className="text-xs font-medium text-slate-400 uppercase">Date *</label>
+                                        <input
+                                            disabled={!canManageHolidays}
+                                            type="date"
+                                            value={hForm.date}
+                                            onChange={e => setHForm({ ...hForm, date: e.target.value })}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none mt-1 disabled:opacity-50"
+                                        />
                                     </div>
-                                </div>
-                                {isAdmin && (
+                                    <div>
+                                        <label className="text-xs font-medium text-slate-400 uppercase">Type</label>
+                                        <select
+                                            disabled={!canManageHolidays}
+                                            value={hForm.type}
+                                            onChange={e => setHForm({ ...hForm, type: e.target.value as any })}
+                                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:border-primary-500 outline-none mt-1 disabled:opacity-50"
+                                        >
+                                            <option value="FESTIVAL">Festival</option>
+                                            <option value="NATIONAL">National Holiday</option>
+                                            <option value="OPTIONAL">Optional</option>
+                                        </select>
+                                    </div>
                                     <button
-                                        onClick={() => _updatePunchLocationMaster({ enabled: !punchLocationMaster.enabled })}
-                                        className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all border ${punchLocationMaster.enabled
-                                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
-                                            : 'bg-slate-700/50 text-slate-400 border-slate-600/30 hover:bg-slate-700'
-                                            }`}
+                                        type="submit"
+                                        disabled={!canManageHolidays}
+                                        className="w-full py-2.5 bg-primary-600 hover:bg-primary-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"
                                     >
-                                        {punchLocationMaster.enabled
-                                            ? <><ToggleRight className="w-4 h-4" /> Location ON</>
-                                            : <><ToggleLeft className="w-4 h-4" /> Location OFF</>}
+                                        <Calendar className="w-4 h-4" /> Add to Calendar
                                     </button>
-                                )}
+                                </form>
                             </div>
 
-                            {punchLocationMaster.enabled && (() => {
-                                const detectMyLocation = () => {
-                                    setDetectingGps(true);
-                                    navigator.geolocation.getCurrentPosition(
-                                        (pos) => {
-                                            setLocDraft(d => ({ ...d, lat: pos.coords.latitude, lng: pos.coords.longitude }));
-                                            setDetectingGps(false);
-                                        },
-                                        (err) => {
-                                            console.error('GPS error:', err.message);
-                                            setDetectingGps(false);
-                                        },
-                                        { enableHighAccuracy: true }
-                                    );
-                                };
-
-                                const saveLocation = () => {
-                                    if (!locDraft.lat || !locDraft.lng) return alert('Pehli GPS Location set kijiye');
-                                    _updatePunchLocationMaster(locDraft);
-                                    alert('Master Location Save ho gayi');
-                                };
-                                return (
-                                    <div className="space-y-4">
-                                        {/* Location name */}
-                                        <div>
-                                            <label className="text-xs text-slate-400 font-medium mb-1.5 block">Location Name</label>
-                                            <input
-                                                value={locDraft.name}
-                                                onChange={e => setLocDraft(d => ({ ...d, name: e.target.value }))}
-                                                placeholder="e.g. Head Office"
-                                                disabled={!isAdmin}
-                                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
-                                            />
-                                        </div>
-
-                                        {/* Lat + Lng */}
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="text-xs text-slate-400 font-medium mb-1.5 block">Latitude</label>
-                                                <input
-                                                    type="number" step="0.000001"
-                                                    value={locDraft.lat}
-                                                    onChange={e => setLocDraft(d => ({ ...d, lat: +e.target.value }))}
-                                                    disabled={!isAdmin}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-slate-400 font-medium mb-1.5 block">Longitude</label>
-                                                <input
-                                                    type="number" step="0.000001"
-                                                    value={locDraft.lng}
-                                                    onChange={e => setLocDraft(d => ({ ...d, lng: +e.target.value }))}
-                                                    disabled={!isAdmin}
-                                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Detect GPS button */}
-                                        {isAdmin && (
-                                            <button
-                                                onClick={detectMyLocation}
-                                                disabled={detectingGps}
-                                                className="flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-all disabled:opacity-50"
-                                            >
-                                                {detectingGps
-                                                    ? <><Navigation className="w-3.5 h-3.5 animate-pulse" /> Detecting...</>
-                                                    : <><Crosshair className="w-3.5 h-3.5" /> My Current Location Detect Karo</>}
-                                            </button>
-                                        )}
-
-                                        {/* Radius */}
-                                        <div>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <label className="text-xs text-slate-400 font-medium">Allowed Radius</label>
-                                                <span className="text-sm font-bold text-emerald-400 font-mono">{locDraft.radiusMeters}m</span>
-                                            </div>
-                                            <input
-                                                type="range" min={25} max={2000} step={25}
-                                                value={locDraft.radiusMeters}
-                                                onChange={e => setLocDraft(d => ({ ...d, radiusMeters: +e.target.value }))}
-                                                disabled={!isAdmin}
-                                                className="w-full accent-emerald-500 disabled:opacity-50"
-                                            />
-                                            <div className="flex justify-between text-xs text-slate-600 mt-1">
-                                                <span>25m</span><span>500m</span><span>1km</span><span>2km</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Active zone preview */}
-                                        <div className="bg-slate-900/50 rounded-xl px-4 py-3 flex items-center gap-3 border border-slate-700/30">
-                                            <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
-                                            <div className="text-xs">
-                                                <p className="text-white font-semibold">{locDraft.name || 'Location not set'}</p>
-                                                <p className="text-slate-500 font-mono">{locDraft.lat}, {locDraft.lng} · {locDraft.radiusMeters}m radius</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Save button */}
-                                        {isAdmin && (
-                                            <button
-                                                onClick={saveLocation}
-                                                className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30"
-                                            >
-                                                <Save className="w-4 h-4" /> Location Save Karo
-                                            </button>
-                                        )}
-                                    </div>
-                                );
-                            })()}
-
-                            {!punchLocationMaster.enabled && (
-                                <div className="flex items-center gap-3 bg-slate-900/40 rounded-xl px-4 py-3 border border-slate-700/20">
-                                    <MapPin className="w-4 h-4 text-slate-600" />
-                                    <p className="text-xs text-slate-500">Location restriction disabled hai. Enable karo to office boundary se punch restrict karo.</p>
+                            {/* Holidays List */}
+                            <div className="md:col-span-2 bg-slate-800/30 border border-slate-700/50 rounded-2xl overflow-hidden">
+                                <div className="p-4 border-b border-slate-700/50 bg-slate-800/40 flex items-center gap-2">
+                                    <Calendar className="w-5 h-5 text-yellow-400" />
+                                    <h3 className="font-bold text-white">Upcoming Holidays</h3>
+                                    <span className="ml-auto text-xs text-slate-500">{sortedHolidays.length} total</span>
                                 </div>
-                            )}
+                                <div className="divide-y divide-slate-700/30">
+                                    {sortedHolidays.length === 0 && (
+                                        <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+                                            <Calendar className="w-10 h-10 mb-3 opacity-30" />
+                                            <p>Koi holiday add nahi ki gayi abhi tak.</p>
+                                        </div>
+                                    )}
+                                    {sortedHolidays.map(h => (
+                                        <div key={h.id} className="group flex items-center gap-4 p-4 hover:bg-slate-700/20 transition-all">
+                                            <div className="w-14 h-14 bg-slate-900 rounded-xl flex flex-col items-center justify-center border border-slate-700 shrink-0">
+                                                <span className="text-[10px] text-slate-500 uppercase font-bold">{new Date(h.date).toLocaleString('default', { month: 'short' })}</span>
+                                                <span className="text-xl font-bold text-white leading-none">{new Date(h.date).getDate()}</span>
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-bold text-white">{h.name}</p>
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium uppercase ${h.type === 'NATIONAL' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                                        h.type === 'OPTIONAL' ? 'bg-slate-500/10 text-slate-400 border-slate-500/20' :
+                                                            'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                                                        }`}>{h.type}</span>
+                                                </div>
+                                                <p className="text-sm text-slate-400">{new Date(h.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric' })}</p>
+                                            </div>
+                                            {canManageHolidays && (
+                                                <button
+                                                    onClick={() => removeHoliday(h.id)}
+                                                    className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
+                    );
+                })()
+            }
 
-                        {/* ── Multi-Location GPS Zones ── */}
-                        <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
-                            <div className="flex items-center justify-between mb-5">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-xl bg-teal-500/15 flex items-center justify-center border border-teal-500/20">
-                                        <MapPin className="w-4 h-4 text-teal-400" />
+
+            {/* ─── Punch System (Methods + Location) ─── */}
+            {
+                activeTab === 'punch' && (() => {
+
+                    const METHOD_ICONS: Record<string, JSX.Element> = {
+                        face: <ScanFace className="w-5 h-5" />,
+                        fingerprint: <Fingerprint className="w-5 h-5" />,
+                        photoUpload: <Camera className="w-5 h-5" />,
+                    };
+                    const METHOD_COLORS: Record<string, string> = {
+                        face: 'text-blue-400',
+                        fingerprint: 'text-indigo-400',
+                        photoUpload: 'text-cyan-400',
+                    };
+
+                    return (
+                        <div className="space-y-8 max-w-3xl">
+
+                            {/* ── Punch Methods ── */}
+                            <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
+                                <div className="flex items-center gap-3 mb-5">
+                                    <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center border border-blue-500/20">
+                                        <Camera className="w-4.5 h-4.5 text-blue-400" />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-white text-sm">Multi-Location GPS Zones</h3>
-                                        <p className="text-xs text-slate-500">Multiple branches / offices ke liye alag GPS zones</p>
+                                        <h3 className="font-bold text-white text-sm">Punch Methods</h3>
+                                        <p className="text-xs text-slate-500">Employee punch ke liye kaun sa method allow hai</p>
                                     </div>
                                 </div>
-                                {isAdmin && (
-                                    <button
-                                        onClick={() => {
-                                            const name = prompt('Zone name (e.g. Head Office, Branch A):');
-                                            if (!name) return;
-                                            const latStr = prompt('Latitude (e.g. 28.6139):');
-                                            const lngStr = prompt('Longitude (e.g. 77.2090):');
-                                            const lat = parseFloat(latStr || '0');
-                                            const lng = parseFloat(lngStr || '0');
-                                            if (isNaN(lat) || isNaN(lng)) return;
-                                            addPunchLocation({ name, lat, lng, radiusMeters: 100, enabled: true });
-                                        }}
-                                        className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-teal-500/15 text-teal-400 border border-teal-500/30 hover:bg-teal-500/25 transition-all"
-                                    >
-                                        <Plus className="w-3.5 h-3.5" /> Add Zone
-                                    </button>
+                                <div className="space-y-3">
+                                    {(['face', 'fingerprint', 'photoUpload'] as const).map(method => {
+                                        const m = punchMethods[method];
+                                        return (
+                                            <div key={method} className={`flex items-center gap-4 px-4 py-3 rounded-xl border transition-all ${m.enabled ? 'bg-slate-700/30 border-slate-600/40' : 'bg-slate-800/20 border-slate-700/20 opacity-60'
+                                                }`}>
+                                                <span className={`${METHOD_COLORS[method]}`}>{METHOD_ICONS[method]}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        {isAdmin ? (
+                                                            <input
+                                                                value={m.label}
+                                                                onChange={e => _updatePunchMethod(method, { label: e.target.value })}
+                                                                className="bg-transparent text-white text-sm font-semibold w-full outline-none border-b border-transparent focus:border-slate-500 transition-colors"
+                                                            />
+                                                        ) : (
+                                                            <span className="text-white font-bold text-sm">{m.label}</span>
+                                                        )}
+                                                        {!m.enabled && <span className="text-[10px] bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Disabled</span>}
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 capitalize">{method === 'photoUpload' ? 'Live Camera Selfie' : method}</p>
+                                                </div>
+                                                {isAdmin && (
+                                                    <button
+                                                        onClick={() => _updatePunchMethod(method, { enabled: !m.enabled })}
+                                                        className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${m.enabled
+                                                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
+                                                            : 'bg-slate-700/50 text-slate-500 border border-slate-600/30 hover:bg-slate-700'
+                                                            }`}
+                                                    >
+                                                        {m.enabled
+                                                            ? <><ToggleRight className="w-4 h-4" /> Enabled</>
+                                                            : <><ToggleLeft className="w-4 h-4" /> Disabled</>}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* ── GPS Location Restriction ── */}
+                            <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
+                                <div className="flex items-center justify-between mb-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center border border-emerald-500/20">
+                                            <MapPin className="w-4.5 h-4.5 text-emerald-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-white text-sm">GPS Location Restriction</h3>
+                                            <p className="text-xs text-slate-500">Sirf office ke andar se punch allow karo</p>
+                                        </div>
+                                    </div>
+                                    {isAdmin && (
+                                        <button
+                                            onClick={() => _updatePunchLocationMaster({ enabled: !punchLocationMaster.enabled })}
+                                            className={`flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all border ${punchLocationMaster.enabled
+                                                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                                                : 'bg-slate-700/50 text-slate-400 border-slate-600/30 hover:bg-slate-700'
+                                                }`}
+                                        >
+                                            {punchLocationMaster.enabled
+                                                ? <><ToggleRight className="w-4 h-4" /> Location ON</>
+                                                : <><ToggleLeft className="w-4 h-4" /> Location OFF</>}
+                                        </button>
+                                    )}
+                                </div>
+
+                                {punchLocationMaster.enabled && (() => {
+                                    const detectMyLocation = () => {
+                                        setDetectingGps(true);
+                                        navigator.geolocation.getCurrentPosition(
+                                            (pos) => {
+                                                setLocDraft(d => ({ ...d, lat: pos.coords.latitude, lng: pos.coords.longitude }));
+                                                setDetectingGps(false);
+                                            },
+                                            (err) => {
+                                                console.error('GPS error:', err.message);
+                                                setDetectingGps(false);
+                                            },
+                                            { enableHighAccuracy: true }
+                                        );
+                                    };
+
+                                    const saveLocation = () => {
+                                        if (!locDraft.lat || !locDraft.lng) return alert('Pehli GPS Location set kijiye');
+                                        _updatePunchLocationMaster(locDraft);
+                                        alert('Master Location Save ho gayi');
+                                    };
+                                    return (
+                                        <div className="space-y-4">
+                                            {/* Location name */}
+                                            <div>
+                                                <label className="text-xs text-slate-400 font-medium mb-1.5 block">Location Name</label>
+                                                <input
+                                                    value={locDraft.name}
+                                                    onChange={e => setLocDraft(d => ({ ...d, name: e.target.value }))}
+                                                    placeholder="e.g. Head Office"
+                                                    disabled={!isAdmin}
+                                                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
+                                                />
+                                            </div>
+
+                                            {/* Lat + Lng */}
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="text-xs text-slate-400 font-medium mb-1.5 block">Latitude</label>
+                                                    <input
+                                                        type="number" step="0.000001"
+                                                        value={locDraft.lat}
+                                                        onChange={e => setLocDraft(d => ({ ...d, lat: +e.target.value }))}
+                                                        disabled={!isAdmin}
+                                                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-slate-400 font-medium mb-1.5 block">Longitude</label>
+                                                    <input
+                                                        type="number" step="0.000001"
+                                                        value={locDraft.lng}
+                                                        onChange={e => setLocDraft(d => ({ ...d, lng: +e.target.value }))}
+                                                        disabled={!isAdmin}
+                                                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-emerald-500/50 transition-colors disabled:opacity-50"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Detect GPS button */}
+                                            {isAdmin && (
+                                                <button
+                                                    onClick={detectMyLocation}
+                                                    disabled={detectingGps}
+                                                    className="flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/15 transition-all disabled:opacity-50"
+                                                >
+                                                    {detectingGps
+                                                        ? <><Navigation className="w-3.5 h-3.5 animate-pulse" /> Detecting...</>
+                                                        : <><Crosshair className="w-3.5 h-3.5" /> My Current Location Detect Karo</>}
+                                                </button>
+                                            )}
+
+                                            {/* Radius */}
+                                            <div>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <label className="text-xs text-slate-400 font-medium">Allowed Radius</label>
+                                                    <span className="text-sm font-bold text-emerald-400 font-mono">{locDraft.radiusMeters}m</span>
+                                                </div>
+                                                <input
+                                                    type="range" min={25} max={2000} step={25}
+                                                    value={locDraft.radiusMeters}
+                                                    onChange={e => setLocDraft(d => ({ ...d, radiusMeters: +e.target.value }))}
+                                                    disabled={!isAdmin}
+                                                    className="w-full accent-emerald-500 disabled:opacity-50"
+                                                />
+                                                <div className="flex justify-between text-xs text-slate-600 mt-1">
+                                                    <span>25m</span><span>500m</span><span>1km</span><span>2km</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Active zone preview */}
+                                            <div className="bg-slate-900/50 rounded-xl px-4 py-3 flex items-center gap-3 border border-slate-700/30">
+                                                <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
+                                                <div className="text-xs">
+                                                    <p className="text-white font-semibold">{locDraft.name || 'Location not set'}</p>
+                                                    <p className="text-slate-500 font-mono">{locDraft.lat}, {locDraft.lng} · {locDraft.radiusMeters}m radius</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Save button */}
+                                            {isAdmin && (
+                                                <button
+                                                    onClick={saveLocation}
+                                                    className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30"
+                                                >
+                                                    <Save className="w-4 h-4" /> Location Save Karo
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+
+                                {!punchLocationMaster.enabled && (
+                                    <div className="flex items-center gap-3 bg-slate-900/40 rounded-xl px-4 py-3 border border-slate-700/20">
+                                        <MapPin className="w-4 h-4 text-slate-600" />
+                                        <p className="text-xs text-slate-500">Location restriction disabled hai. Enable karo to office boundary se punch restrict karo.</p>
+                                    </div>
                                 )}
                             </div>
 
-                            {punchLocations.length === 0 ? (
-                                <div className="flex items-center gap-3 bg-slate-900/40 rounded-xl px-4 py-3 border border-slate-700/20">
-                                    <MapPin className="w-4 h-4 text-slate-600" />
-                                    <p className="text-xs text-slate-500">Koi GPS zone add nahi kiya. "+ Add Zone" se new location add karo.</p>
+                            {/* ── Multi-Location GPS Zones ── */}
+                            <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
+                                <div className="flex items-center justify-between mb-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-teal-500/15 flex items-center justify-center border border-teal-500/20">
+                                            <MapPin className="w-4 h-4 text-teal-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-white text-sm">Multi-Location GPS Zones</h3>
+                                            <p className="text-xs text-slate-500">Multiple branches / offices ke liye alag GPS zones</p>
+                                        </div>
+                                    </div>
+                                    {isAdmin && (
+                                        <button
+                                            onClick={() => {
+                                                const name = prompt('Zone name (e.g. Head Office, Branch A):');
+                                                if (!name) return;
+                                                const latStr = prompt('Latitude (e.g. 28.6139):');
+                                                const lngStr = prompt('Longitude (e.g. 77.2090):');
+                                                const lat = parseFloat(latStr || '0');
+                                                const lng = parseFloat(lngStr || '0');
+                                                if (isNaN(lat) || isNaN(lng)) return;
+                                                addPunchLocation({ name, lat, lng, radiusMeters: 100, enabled: true });
+                                            }}
+                                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-teal-500/15 text-teal-400 border border-teal-500/30 hover:bg-teal-500/25 transition-all"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" /> Add Zone
+                                        </button>
+                                    )}
                                 </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {punchLocations.map(zone => {
-                                        const bssids: string[] = zone.allowedBSSIDs || [];
-                                        return (
-                                            <div key={zone.id} className={`rounded-xl border transition-all ${zone.enabled ? 'bg-slate-700/30 border-slate-600/40' : 'bg-slate-800/20 border-slate-700/20 opacity-50'}`}>
-                                                {/* Main Zone Row */}
-                                                <div className="flex items-center gap-3 px-4 py-3">
-                                                    <div className={`w-2 h-2 rounded-full shrink-0 ${zone.enabled ? 'bg-teal-400' : 'bg-slate-600'}`} />
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-semibold text-white truncate">{zone.name}</p>
-                                                        <p className="text-xs text-slate-500 font-mono">{zone.lat.toFixed(5)}, {zone.lng.toFixed(5)} · {zone.radiusMeters}m</p>
+
+                                {punchLocations.length === 0 ? (
+                                    <div className="flex items-center gap-3 bg-slate-900/40 rounded-xl px-4 py-3 border border-slate-700/20">
+                                        <MapPin className="w-4 h-4 text-slate-600" />
+                                        <p className="text-xs text-slate-500">Koi GPS zone add nahi kiya. "+ Add Zone" se new location add karo.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {punchLocations.map(zone => {
+                                            const bssids: string[] = zone.allowedBSSIDs || [];
+                                            return (
+                                                <div key={zone.id} className={`rounded-xl border transition-all ${zone.enabled ? 'bg-slate-700/30 border-slate-600/40' : 'bg-slate-800/20 border-slate-700/20 opacity-50'}`}>
+                                                    {/* Main Zone Row */}
+                                                    <div className="flex items-center gap-3 px-4 py-3">
+                                                        <div className={`w-2 h-2 rounded-full shrink-0 ${zone.enabled ? 'bg-teal-400' : 'bg-slate-600'}`} />
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-semibold text-white truncate">{zone.name}</p>
+                                                            <p className="text-xs text-slate-500 font-mono">{zone.lat.toFixed(5)}, {zone.lng.toFixed(5)} · {zone.radiusMeters}m</p>
+                                                        </div>
+                                                        {isAdmin && (
+                                                            <div className="flex items-center gap-1 shrink-0">
+                                                                {/* Radius quick edit */}
+                                                                <input
+                                                                    type="number"
+                                                                    value={zone.radiusMeters}
+                                                                    min={10} max={5000} step={10}
+                                                                    onChange={e => updatePunchLocation(zone.id, { radiusMeters: +e.target.value })}
+                                                                    className="w-16 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs font-mono text-center focus:outline-none focus:border-teal-500/50"
+                                                                    title="Radius (meters)"
+                                                                />
+                                                                <span className="text-xs text-slate-500">m</span>
+                                                                <button
+                                                                    onClick={() => togglePunchLocationZone(zone.id)}
+                                                                    className={`px-2 py-1 text-xs font-bold rounded-lg border transition-all ${zone.enabled ? 'bg-teal-500/15 text-teal-400 border-teal-500/30' : 'bg-slate-700/50 text-slate-500 border-slate-600/30'}`}
+                                                                >
+                                                                    {zone.enabled ? 'ON' : 'OFF'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => deletePunchLocation(zone.id)}
+                                                                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* ── BSSID (Wi-Fi Router) Binding Section ── */}
+                                                    <div className="mx-4 mb-3 px-3 pt-2 pb-3 bg-slate-900/50 rounded-lg border border-slate-700/30">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider">📶 Wi-Fi BSSID Binding</span>
+                                                            <span className="text-[10px] text-slate-600">Android App Only</span>
+                                                        </div>
+
+                                                        {/* Existing BSSIDs */}
+                                                        {bssids.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                                                {bssids.map((mac, idx) => (
+                                                                    <span key={idx} className="flex items-center gap-1 bg-violet-500/10 border border-violet-500/30 text-violet-300 text-[11px] font-mono px-2 py-0.5 rounded-full">
+                                                                        {mac}
+                                                                        {isAdmin && (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const updated = bssids.filter((_, i) => i !== idx);
+                                                                                    updatePunchLocation(zone.id, { allowedBSSIDs: updated } as any);
+                                                                                }}
+                                                                                className="text-violet-500 hover:text-red-400 transition-colors ml-0.5"
+                                                                                title="Remove this BSSID"
+                                                                            >×</button>
+                                                                        )}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-[11px] text-slate-600 mb-2">No BSSID restrictions — all Wi-Fi networks allowed.</p>
+                                                        )}
+
+                                                        {/* Add BSSID input */}
+                                                        {isAdmin && (
+                                                            <form
+                                                                onSubmit={e => {
+                                                                    e.preventDefault();
+                                                                    const input = (e.currentTarget.elements.namedItem('bssidInput') as HTMLInputElement);
+                                                                    const raw = input.value.trim().toUpperCase();
+                                                                    // Basic MAC address format validation
+                                                                    const macRegex = /^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$/;
+                                                                    if (!macRegex.test(raw)) {
+                                                                        input.setCustomValidity('Format: AA:BB:CC:DD:EE:FF');
+                                                                        input.reportValidity();
+                                                                        return;
+                                                                    }
+                                                                    if (bssids.includes(raw)) {
+                                                                        input.setCustomValidity('Already added');
+                                                                        input.reportValidity();
+                                                                        return;
+                                                                    }
+                                                                    input.setCustomValidity('');
+                                                                    updatePunchLocation(zone.id, { allowedBSSIDs: [...bssids, raw] } as any);
+                                                                    input.value = '';
+                                                                }}
+                                                                className="flex gap-2"
+                                                            >
+                                                                <input
+                                                                    name="bssidInput"
+                                                                    type="text"
+                                                                    placeholder="AA:BB:CC:DD:EE:FF"
+                                                                    maxLength={17}
+                                                                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/60 transition-colors placeholder-slate-600"
+                                                                    onChange={e => {
+                                                                        (e.target as HTMLInputElement).setCustomValidity('');
+                                                                    }}
+                                                                />
+                                                                <button
+                                                                    type="submit"
+                                                                    className="px-3 py-1.5 bg-violet-500/15 border border-violet-500/30 text-violet-400 hover:bg-violet-500/25 text-xs font-bold rounded-lg transition-all"
+                                                                >
+                                                                    + Add
+                                                                </button>
+                                                            </form>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                <p className="text-[11px] text-slate-600 mt-3">💡 Punch ke waqt employee ki location sabse kareeb wale enabled zone se match hoti hai.</p>
+                                <p className="text-[11px] text-slate-600 mt-1">📶 BSSID binding sirf Android app users pe apply hoti hai. Regular browser pe skip hoti hai.</p>
+
+                            </div>
+
+                            {/* ── Shift-wise Punch Windows ── */}
+                            <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
+                                <div className="flex items-center justify-between mb-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-violet-500/15 flex items-center justify-center border border-violet-500/20">
+                                            <Clock className="w-4 h-4 text-violet-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-white text-sm">Shift-wise Punch Windows</h3>
+                                            <p className="text-xs text-slate-500">Har shift ke liye allowed check-in / check-out time</p>
+                                        </div>
+                                    </div>
+                                    {isAdmin && (
+                                        <button
+                                            onClick={() => {
+                                                const shiftName = prompt('Shift name (e.g. Morning Shift):');
+                                                if (!shiftName) return;
+                                                _addShiftPunchWindow({
+                                                    shiftId: shiftName.toUpperCase().replace(/\s+/g, '_'),
+                                                    shiftName,
+                                                    checkInFrom: '07:30',
+                                                    checkInTo: '10:30',
+                                                    checkOutFrom: '16:00',
+                                                    checkOutTo: '21:00',
+                                                    enabled: true,
+                                                });
+                                            }}
+                                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-violet-500/15 text-violet-400 border border-violet-500/30 hover:bg-violet-500/25 transition-all"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" /> Add Window
+                                        </button>
+                                    )}
+                                </div>
+
+                                {shiftPunchWindows.length === 0 ? (
+                                    <div className="flex items-center gap-3 bg-slate-900/40 rounded-xl px-4 py-3 border border-slate-700/20">
+                                        <Clock className="w-4 h-4 text-slate-600" />
+                                        <p className="text-xs text-slate-500">Koi punch window set nahi. "+ Add Window" se shift-wise time restrict karo.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {shiftPunchWindows.map((win: any) => (
+                                            <div key={win.id} className={`rounded-xl border p-4 transition-all ${win.enabled ? 'bg-slate-700/30 border-slate-600/40' : 'bg-slate-800/20 border-slate-700/20 opacity-50'}`}>
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-2 h-2 rounded-full ${win.enabled ? 'bg-violet-400' : 'bg-slate-600'}`} />
+                                                        <p className="text-sm font-bold text-white">{win.shiftName}</p>
+                                                        <span className="text-xs text-slate-500 font-mono">({win.shiftId})</span>
                                                     </div>
                                                     {isAdmin && (
-                                                        <div className="flex items-center gap-1 shrink-0">
-                                                            {/* Radius quick edit */}
-                                                            <input
-                                                                type="number"
-                                                                value={zone.radiusMeters}
-                                                                min={10} max={5000} step={10}
-                                                                onChange={e => updatePunchLocation(zone.id, { radiusMeters: +e.target.value })}
-                                                                className="w-16 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs font-mono text-center focus:outline-none focus:border-teal-500/50"
-                                                                title="Radius (meters)"
-                                                            />
-                                                            <span className="text-xs text-slate-500">m</span>
+                                                        <div className="flex items-center gap-1">
                                                             <button
-                                                                onClick={() => togglePunchLocationZone(zone.id)}
-                                                                className={`px-2 py-1 text-xs font-bold rounded-lg border transition-all ${zone.enabled ? 'bg-teal-500/15 text-teal-400 border-teal-500/30' : 'bg-slate-700/50 text-slate-500 border-slate-600/30'}`}
+                                                                onClick={() => _updateShiftPunchWindow(win.id, { enabled: !win.enabled })}
+                                                                className={`px-2 py-0.5 text-xs font-bold rounded border transition-all ${win.enabled ? 'bg-violet-500/15 text-violet-400 border-violet-500/30' : 'bg-slate-700/50 text-slate-500 border-slate-600/30'}`}
                                                             >
-                                                                {zone.enabled ? 'ON' : 'OFF'}
+                                                                {win.enabled ? 'ON' : 'OFF'}
                                                             </button>
-                                                            <button
-                                                                onClick={() => deletePunchLocation(zone.id)}
-                                                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                                                            >
+                                                            <button onClick={() => _removeShiftPunchWindow(win.id)} className="p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all">
                                                                 <Trash2 className="w-3.5 h-3.5" />
                                                             </button>
                                                         </div>
                                                     )}
                                                 </div>
-
-                                                {/* ── BSSID (Wi-Fi Router) Binding Section ── */}
-                                                <div className="mx-4 mb-3 px-3 pt-2 pb-3 bg-slate-900/50 rounded-lg border border-slate-700/30">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider">📶 Wi-Fi BSSID Binding</span>
-                                                        <span className="text-[10px] text-slate-600">Android App Only</span>
-                                                    </div>
-
-                                                    {/* Existing BSSIDs */}
-                                                    {bssids.length > 0 ? (
-                                                        <div className="flex flex-wrap gap-1.5 mb-2">
-                                                            {bssids.map((mac, idx) => (
-                                                                <span key={idx} className="flex items-center gap-1 bg-violet-500/10 border border-violet-500/30 text-violet-300 text-[11px] font-mono px-2 py-0.5 rounded-full">
-                                                                    {mac}
-                                                                    {isAdmin && (
-                                                                        <button
-                                                                            onClick={() => {
-                                                                                const updated = bssids.filter((_, i) => i !== idx);
-                                                                                updatePunchLocation(zone.id, { allowedBSSIDs: updated } as any);
-                                                                            }}
-                                                                            className="text-violet-500 hover:text-red-400 transition-colors ml-0.5"
-                                                                            title="Remove this BSSID"
-                                                                        >×</button>
-                                                                    )}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-[11px] text-slate-600 mb-2">No BSSID restrictions — all Wi-Fi networks allowed.</p>
-                                                    )}
-
-                                                    {/* Add BSSID input */}
-                                                    {isAdmin && (
-                                                        <form
-                                                            onSubmit={e => {
-                                                                e.preventDefault();
-                                                                const input = (e.currentTarget.elements.namedItem('bssidInput') as HTMLInputElement);
-                                                                const raw = input.value.trim().toUpperCase();
-                                                                // Basic MAC address format validation
-                                                                const macRegex = /^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$/;
-                                                                if (!macRegex.test(raw)) {
-                                                                    input.setCustomValidity('Format: AA:BB:CC:DD:EE:FF');
-                                                                    input.reportValidity();
-                                                                    return;
-                                                                }
-                                                                if (bssids.includes(raw)) {
-                                                                    input.setCustomValidity('Already added');
-                                                                    input.reportValidity();
-                                                                    return;
-                                                                }
-                                                                input.setCustomValidity('');
-                                                                updatePunchLocation(zone.id, { allowedBSSIDs: [...bssids, raw] } as any);
-                                                                input.value = '';
-                                                            }}
-                                                            className="flex gap-2"
-                                                        >
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <p className="text-[10px] text-slate-500 uppercase font-bold mb-1.5 flex items-center gap-1">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" /> Check-In Window
+                                                        </p>
+                                                        <div className="flex items-center gap-2">
                                                             <input
-                                                                name="bssidInput"
-                                                                type="text"
-                                                                placeholder="AA:BB:CC:DD:EE:FF"
-                                                                maxLength={17}
-                                                                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/60 transition-colors placeholder-slate-600"
-                                                                onChange={e => {
-                                                                    (e.target as HTMLInputElement).setCustomValidity('');
-                                                                }}
+                                                                type="time"
+                                                                value={win.checkInFrom}
+                                                                disabled={!isAdmin}
+                                                                onChange={e => _updateShiftPunchWindow(win.id, { checkInFrom: e.target.value })}
+                                                                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
                                                             />
-                                                            <button
-                                                                type="submit"
-                                                                className="px-3 py-1.5 bg-violet-500/15 border border-violet-500/30 text-violet-400 hover:bg-violet-500/25 text-xs font-bold rounded-lg transition-all"
-                                                            >
-                                                                + Add
-                                                            </button>
-                                                        </form>
-                                                    )}
+                                                            <span className="text-slate-500 text-xs">→</span>
+                                                            <input
+                                                                type="time"
+                                                                value={win.checkInTo}
+                                                                disabled={!isAdmin}
+                                                                onChange={e => _updateShiftPunchWindow(win.id, { checkInTo: e.target.value })}
+                                                                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] text-slate-500 uppercase font-bold mb-1.5 flex items-center gap-1">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" /> Check-Out Window
+                                                        </p>
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="time"
+                                                                value={win.checkOutFrom}
+                                                                disabled={!isAdmin}
+                                                                onChange={e => _updateShiftPunchWindow(win.id, { checkOutFrom: e.target.value })}
+                                                                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
+                                                            />
+                                                            <span className="text-slate-500 text-xs">→</span>
+                                                            <input
+                                                                type="time"
+                                                                value={win.checkOutTo}
+                                                                disabled={!isAdmin}
+                                                                onChange={e => _updateShiftPunchWindow(win.id, { checkOutTo: e.target.value })}
+                                                                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                            <p className="text-[11px] text-slate-600 mt-3">💡 Punch ke waqt employee ki location sabse kareeb wale enabled zone se match hoti hai.</p>
-                            <p className="text-[11px] text-slate-600 mt-1">📶 BSSID binding sirf Android app users pe apply hoti hai. Regular browser pe skip hoti hai.</p>
-
-                        </div>
-
-                        {/* ── Shift-wise Punch Windows ── */}
-                        <div className="bg-slate-800/30 border border-slate-700/50 rounded-2xl p-6">
-                            <div className="flex items-center justify-between mb-5">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-xl bg-violet-500/15 flex items-center justify-center border border-violet-500/20">
-                                        <Clock className="w-4 h-4 text-violet-400" />
+                                        ))}
                                     </div>
-                                    <div>
-                                        <h3 className="font-bold text-white text-sm">Shift-wise Punch Windows</h3>
-                                        <p className="text-xs text-slate-500">Har shift ke liye allowed check-in / check-out time</p>
-                                    </div>
-                                </div>
-                                {isAdmin && (
-                                    <button
-                                        onClick={() => {
-                                            const shiftName = prompt('Shift name (e.g. Morning Shift):');
-                                            if (!shiftName) return;
-                                            _addShiftPunchWindow({
-                                                shiftId: shiftName.toUpperCase().replace(/\s+/g, '_'),
-                                                shiftName,
-                                                checkInFrom: '07:30',
-                                                checkInTo: '10:30',
-                                                checkOutFrom: '16:00',
-                                                checkOutTo: '21:00',
-                                                enabled: true,
-                                            });
-                                        }}
-                                        className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-violet-500/15 text-violet-400 border border-violet-500/30 hover:bg-violet-500/25 transition-all"
-                                    >
-                                        <Plus className="w-3.5 h-3.5" /> Add Window
-                                    </button>
                                 )}
+                                <p className="text-[11px] text-slate-600 mt-3">⚠️ Is window ke bahar punch karne par "Late Punch" alert dikhega.</p>
                             </div>
 
-                            {shiftPunchWindows.length === 0 ? (
-                                <div className="flex items-center gap-3 bg-slate-900/40 rounded-xl px-4 py-3 border border-slate-700/20">
-                                    <Clock className="w-4 h-4 text-slate-600" />
-                                    <p className="text-xs text-slate-500">Koi punch window set nahi. "+ Add Window" se shift-wise time restrict karo.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {shiftPunchWindows.map((win: any) => (
-                                        <div key={win.id} className={`rounded-xl border p-4 transition-all ${win.enabled ? 'bg-slate-700/30 border-slate-600/40' : 'bg-slate-800/20 border-slate-700/20 opacity-50'}`}>
-                                            <div className="flex items-center justify-between mb-3">
-                                                <div className="flex items-center gap-2">
-                                                    <div className={`w-2 h-2 rounded-full ${win.enabled ? 'bg-violet-400' : 'bg-slate-600'}`} />
-                                                    <p className="text-sm font-bold text-white">{win.shiftName}</p>
-                                                    <span className="text-xs text-slate-500 font-mono">({win.shiftId})</span>
-                                                </div>
-                                                {isAdmin && (
-                                                    <div className="flex items-center gap-1">
-                                                        <button
-                                                            onClick={() => _updateShiftPunchWindow(win.id, { enabled: !win.enabled })}
-                                                            className={`px-2 py-0.5 text-xs font-bold rounded border transition-all ${win.enabled ? 'bg-violet-500/15 text-violet-400 border-violet-500/30' : 'bg-slate-700/50 text-slate-500 border-slate-600/30'}`}
-                                                        >
-                                                            {win.enabled ? 'ON' : 'OFF'}
-                                                        </button>
-                                                        <button onClick={() => _removeShiftPunchWindow(win.id)} className="p-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all">
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <p className="text-[10px] text-slate-500 uppercase font-bold mb-1.5 flex items-center gap-1">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" /> Check-In Window
-                                                    </p>
-                                                    <div className="flex items-center gap-2">
-                                                        <input
-                                                            type="time"
-                                                            value={win.checkInFrom}
-                                                            disabled={!isAdmin}
-                                                            onChange={e => _updateShiftPunchWindow(win.id, { checkInFrom: e.target.value })}
-                                                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
-                                                        />
-                                                        <span className="text-slate-500 text-xs">→</span>
-                                                        <input
-                                                            type="time"
-                                                            value={win.checkInTo}
-                                                            disabled={!isAdmin}
-                                                            onChange={e => _updateShiftPunchWindow(win.id, { checkInTo: e.target.value })}
-                                                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] text-slate-500 uppercase font-bold mb-1.5 flex items-center gap-1">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" /> Check-Out Window
-                                                    </p>
-                                                    <div className="flex items-center gap-2">
-                                                        <input
-                                                            type="time"
-                                                            value={win.checkOutFrom}
-                                                            disabled={!isAdmin}
-                                                            onChange={e => _updateShiftPunchWindow(win.id, { checkOutFrom: e.target.value })}
-                                                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
-                                                        />
-                                                        <span className="text-slate-500 text-xs">→</span>
-                                                        <input
-                                                            type="time"
-                                                            value={win.checkOutTo}
-                                                            disabled={!isAdmin}
-                                                            onChange={e => _updateShiftPunchWindow(win.id, { checkOutTo: e.target.value })}
-                                                            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            <p className="text-[11px] text-slate-600 mt-3">⚠️ Is window ke bahar punch karne par "Late Punch" alert dikhega.</p>
                         </div>
-
-                    </div>
-                );
-            })()}
+                    );
+                })()
+            }
 
             <WarningModal
                 isOpen={warning.isOpen}

@@ -34,6 +34,7 @@ import { SkipMonthModal } from '@/components/loans/SkipMonthModal';
 import { EarlySettlementModal } from '@/components/loans/EarlySettlementModal';
 import { BulkLoanEntryModal } from '@/components/loans/BulkLoanEntryModal';
 import { LoanHistoryModal } from '@/components/loans/LoanHistoryModal';
+import { LoanTypesModal } from '@/components/loans/LoanTypesModal';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { useDialog } from '@/components/DialogProvider';
 
@@ -85,6 +86,7 @@ export const LoanDashboard = () => {
     const [settlementLoanId, setSettlementLoanId] = useState<string | null>(null);
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [showLoanTypesModal, setShowLoanTypesModal] = useState(false);
 
     const handleDeleteClick = (txnId: string) => {
         setDeleteTxnId(txnId);
@@ -268,6 +270,16 @@ export const LoanDashboard = () => {
                         <History className="w-4 h-4" />
                         <span className="hidden md:inline text-sm font-medium">History</span>
                     </button>
+                    {canManage && (
+                        <button
+                            onClick={() => setShowLoanTypesModal(true)}
+                            className="flex items-center gap-2 px-3 py-2 bg-slate-600/20 text-slate-300 hover:bg-slate-600 hover:text-white rounded-md transition-colors mr-2"
+                            title="Manage Loan Types"
+                        >
+                            <Wallet className="w-4 h-4" />
+                            <span className="hidden md:inline text-sm font-medium">Types</span>
+                        </button>
+                    )}
                     <button
                         onClick={() => setShowBulkModal(true)}
                         className="flex items-center gap-2 px-3 py-2 bg-primary-600/20 text-primary-400 hover:bg-primary-600 hover:text-white rounded-md transition-colors mr-2"
@@ -919,6 +931,7 @@ export const LoanDashboard = () => {
             }
             {showBulkModal && <BulkLoanEntryModal onClose={() => setShowBulkModal(false)} />}
             {showHistoryModal && <LoanHistoryModal onClose={() => setShowHistoryModal(false)} />}
+            {showLoanTypesModal && <LoanTypesModal onClose={() => setShowLoanTypesModal(false)} />}
         </div >
     );
 };
