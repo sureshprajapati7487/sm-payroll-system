@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
-import { useGlobalGPS } from '@/hooks/useGlobalGPS';
 import { clsx } from 'clsx';
 import { ShieldAlert, ChevronRight, User, Key, AlertCircle, Eye, EyeOff, Building2, PlusCircle, ArrowLeft, Lock, Clock } from 'lucide-react';
 
@@ -10,7 +9,6 @@ export const LoginPage = () => {
     const { loginWithCredentials, isLoading, isAuthenticated } = useAuthStore();
     const navigate = useNavigate();
     const { switchCompany } = useMultiCompanyStore();
-    const { requestPermission } = useGlobalGPS(false); // false = not logged in yet, just get the function
 
     // Redirect if already authenticated (no need to wait for companies — CompanyGuard handles that)
     useEffect(() => {
@@ -84,8 +82,6 @@ export const LoginPage = () => {
                 localStorage.removeItem('remembered_user_id');
                 localStorage.removeItem('remembered_password');
             }
-            // GPS permission login ke turant baad maango
-            requestPermission();
             navigate('/dashboard');
         } else {
             // Error
