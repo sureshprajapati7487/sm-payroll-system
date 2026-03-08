@@ -147,8 +147,10 @@ function App() {
     // ── Global GPS: Login ke baad request, Logout tak active ──
     useGlobalGPS(isAuthenticated);
 
+    const { currentCompanyId } = useMultiCompanyStore();
+
     useEffect(() => {
-        // Only fetch data after user has logged in (has a valid token)
+        // Fetch data on login OR when the active company changes
         if (!isAuthenticated) return;
         fetchCompanies();
         fetchEmployees();
@@ -156,7 +158,7 @@ function App() {
         fetchPayroll();
         fetchLeaves();
         fetchExpenses();
-    }, [isAuthenticated]);
+    }, [isAuthenticated, currentCompanyId]);
 
     return (
         <ErrorBoundary>

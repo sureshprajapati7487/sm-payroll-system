@@ -21,6 +21,18 @@ function getToken(): string | null {
     }
 }
 
+/** Read current company ID from Zustand persisted storage without importing the store */
+function getActiveCompanyId(): string | null {
+    try {
+        const raw = localStorage.getItem('multi-company-store');
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed?.state?.currentCompanyId ?? null;
+    } catch {
+        return null;
+    }
+}
+
 /** Set a new token in Zustand persisted storage directly (avoids circular import) */
 function setToken(token: string | null) {
     try {
@@ -96,9 +108,15 @@ export async function apiFetch(path: string, options: FetchOptions = {}): Promis
         headers['Content-Type'] = 'application/json';
     }
 
-    // Inject JWT token
+    // Inject JWT token and Company ID
     if (!skipAuth) {
         const token = getToken();
+        const companyId = getActiveCompanyId();
+
+        if (companyId) {
+            headers['x-company-id'] = companyId;
+        }
+
         if (!token && !_isRetry) {
             // No token — return synthetic 401 (prevents API loop on login page)
             return new Response(JSON.stringify({ error: 'No token' }), {

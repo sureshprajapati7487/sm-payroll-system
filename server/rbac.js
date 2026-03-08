@@ -35,7 +35,7 @@ const requireCompanyScope = (req, res, next) => {
 
     if (isSuperAdmin) {
         // SUPER_ADMIN can target any company explicitly, or fall back to own companyId
-        req.companyId = req.query.companyId || req.body?.companyId || req.user.companyId || null;
+        req.companyId = req.headers['x-company-id'] || req.query.companyId || req.body?.companyId || req.user.companyId || null;
     } else {
         // All other roles: company MUST come from JWT — ignore client-supplied param
         req.companyId = req.user.companyId || null;

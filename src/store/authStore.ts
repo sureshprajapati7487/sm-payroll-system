@@ -155,6 +155,16 @@ export const useAuthStore = create<AuthState>()(
                     });
                 }
                 set({ user: null, token: null, isAuthenticated: false });
+
+                // --- PREVENT DATA BLEED ACROSS LOGINS ---
+                // Wipe local storage completely except for UI theme preferences
+                try {
+                    const theme = localStorage.getItem('theme-storage');
+                    localStorage.clear();
+                    if (theme) localStorage.setItem('theme-storage', theme);
+                } catch (e) {
+                    console.error('Failed to clear local storage on logout', e);
+                }
             },
 
             hasPermission: (permission: PermissionValue) => {

@@ -29,9 +29,30 @@ export const CompanySwitcher = () => {
             setIsOpen(false);
             return;
         }
+
+        // --- PREVENT DATA BLEED ---
+        // Zustand `persist` stores tenant data in localStorage. 
+        // We must wipe this before reloading so the new company starts fresh.
+        const TENANT_STORES = [
+            'loan-storage',
+            'client-store',
+            'audit-storage',
+            'payroll-version-storage',
+            'sm-payroll-workflows',
+            'custom-field-store',
+            'draft-storage',
+            'notification-storage',
+            'security-alerts-storage',
+            'system-config-storage',
+            'role-permissions-storage'
+        ];
+
+        TENANT_STORES.forEach(storeKey => {
+            localStorage.removeItem(storeKey);
+        });
+
         switchCompany(companyId);
         setIsOpen(false);
-        // In real implementation, this would trigger data reload
         window.location.reload();
     };
 
