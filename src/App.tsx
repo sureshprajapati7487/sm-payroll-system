@@ -127,6 +127,7 @@ const AuthGuard = ({ children }: { children: JSX.Element }) => {
 import { useDataSync } from '@/hooks/useDataSync';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { useGlobalGPS } from '@/hooks/useGlobalGPS';
+import { useBackgroundServices } from '@/hooks/useBackgroundServices';
 import { SessionTimeoutModal } from '@/components/SessionTimeoutModal';
 
 function App() {
@@ -147,6 +148,9 @@ function App() {
 
     // ── Global GPS: Login ke baad request, Logout tak active ──
     useGlobalGPS(isAuthenticated);
+
+    // ── Background Services: Wake Lock + Custom SW + GPS Bridge ──
+    useBackgroundServices(isAuthenticated);
 
     const { currentCompanyId } = useMultiCompanyStore();
 
