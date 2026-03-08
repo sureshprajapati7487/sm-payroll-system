@@ -969,7 +969,7 @@ export const ConfigurationPage = () => {
                 />
             )}
 
-            {activeTab !== 'salaryTypes' && activeTab !== 'attendance' && activeTab !== 'keys' && activeTab !== 'holidays' && activeTab !== 'punch' && activeTab !== 'departments' && activeTab !== 'salesman' && (
+            {activeTab !== 'salaryTypes' && activeTab !== 'attendance' && activeTab !== 'keys' && activeTab !== 'holidays' && activeTab !== 'punch' && activeTab !== 'departments' && activeTab !== 'salesman' && activeTab !== 'statutory' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Content Switching */}
                     {activeTab === 'rules' ? (
