@@ -199,10 +199,44 @@ export const DashboardLayout = () => {
 
     const handleLogout = () => { logout(); navigate('/login'); };
 
-    const showItem = (item: { label: string; perm: string | null }) => {
-        if (item.label === 'Loans') return hasPermission(PERMISSIONS.MANAGE_LOANS) || user?.role === 'EMPLOYEE';
-        if (item.label === 'Approvals') return ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(user?.role ?? '');
-        if (item.label === 'Expenses') return true;
+    const showItem = (item: { label: string; path: string; perm: string | null }) => {
+        // Map nav labels to NAV_* permissions
+        const NAV_PERM_MAP: Record<string, string> = {
+            'Dashboard': PERMISSIONS.NAV_DASHBOARD,
+            'Employees': PERMISSIONS.NAV_EMPLOYEES,
+            'Attendance': PERMISSIONS.NAV_ATTENDANCE,
+            'Salesman': PERMISSIONS.NAV_SALESMAN,
+            'Production': PERMISSIONS.NAV_PRODUCTION,
+            'Leaves': PERMISSIONS.NAV_LEAVES,
+            'Loans': PERMISSIONS.NAV_LOANS,
+            'Approvals': PERMISSIONS.NAV_APPROVALS,
+            'Payroll': PERMISSIONS.NAV_PAYROLL,
+            'Expenses': PERMISSIONS.NAV_EXPENSES,
+            'Finance Dashboard': PERMISSIONS.NAV_FINANCE,
+            'Dept Finance': PERMISSIONS.NAV_FINANCE,
+            'Cost Centers': PERMISSIONS.NAV_FINANCE,
+            'Advance Salary': PERMISSIONS.NAV_FINANCE,
+            'CTC Calculator': PERMISSIONS.NAV_CALCULATORS,
+            'TDS Calculator': PERMISSIONS.NAV_CALCULATORS,
+            'PF / ESI Calc': PERMISSIONS.NAV_CALCULATORS,
+            'Report Builder': PERMISSIONS.NAV_REPORTS,
+            'Custom Reports': PERMISSIONS.NAV_REPORTS,
+            'Scheduled': PERMISSIONS.NAV_REPORTS,
+            'Form 16': PERMISSIONS.NAV_STATUTORY,
+            'Statutory Reports': PERMISSIONS.NAV_STATUTORY,
+            'Audit Logs': PERMISSIONS.NAV_SYSTEM,
+            'Database Backup': PERMISSIONS.NAV_SYSTEM,
+            'Bulk Import': PERMISSIONS.NAV_SYSTEM,
+            'Trash': PERMISSIONS.NAV_SYSTEM,
+            'Drafts': PERMISSIONS.NAV_SYSTEM,
+            'Data Check': PERMISSIONS.NAV_SYSTEM,
+            'Security Alerts': PERMISSIONS.NAV_SYSTEM,
+            'Company': PERMISSIONS.NAV_SYSTEM,
+            'Settings': PERMISSIONS.MANAGE_SETTINGS,
+        };
+
+        const navPerm = NAV_PERM_MAP[item.label];
+        if (navPerm) return hasPermission(navPerm as Parameters<typeof hasPermission>[0]);
         if (!item.perm) return true;
         return hasPermission(item.perm as Parameters<typeof hasPermission>[0]);
     };
