@@ -17,13 +17,13 @@ export default defineConfig(async () => {
       react(),
       ...extraPlugins,
       VitePWA({
-        registerType: 'prompt',
-        injectRegister: false,
+        registerType: 'autoUpdate',
+        injectRegister: 'auto',
         selfDestroying: false,
         devOptions: {
           enabled: false,
         },
-        includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
+        includeAssets: ['favicon.ico', 'favicon-32x32.png', 'apple-touch-icon.png', 'robots.txt'],
         manifest: {
           name: 'SM Payroll System',
           short_name: 'SM Payroll',
@@ -49,12 +49,12 @@ export default defineConfig(async () => {
               src: 'pwa-512x512.png',
               sizes: '512x512',
               type: 'image/png',
-              purpose: 'any maskable'
+              purpose: 'maskable'
             }
           ]
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           runtimeCaching: [
             {

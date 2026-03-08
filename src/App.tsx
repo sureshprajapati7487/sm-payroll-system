@@ -66,6 +66,7 @@ import { MobileDashboard } from '@/pages/mobile/MobileDashboard';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary, PageErrorBoundary } from '@/components/ErrorBoundary';
 import { CameraPunchWidget } from '@/components/CameraPunchWidget';
+import { InstallPWA } from '@/components/InstallPWA';
 
 import { DialogProvider } from '@/components/DialogProvider';
 
@@ -168,6 +169,7 @@ function App() {
                     <LoanApprovalModal />
                     <CommandPalette />
                     <CameraPunchWidget />
+                    <InstallPWA />
 
                     {showWarning && (
                         <SessionTimeoutModal
