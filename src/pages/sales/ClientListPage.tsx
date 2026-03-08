@@ -12,29 +12,76 @@ import {
     ChevronDown, IndianRupee, Radar, Zap, History, List
 } from 'lucide-react';
 import { useDialog } from '@/components/DialogProvider';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import * as L from 'leaflet';
+// ── Vanilla Leaflet Map (no react-leaflet — avoids render2 crash with React 18) ─
+const ClientMap = ({ clients }: { clients: SalesClient[] }) => {
+    const mapRef = useRef<HTMLDivElement>(null);
+    const leafletMapRef = useRef<any>(null);
 
-// Fix Leaflet's default icon issue with Webpack/Vite
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+    useEffect(() => {
+        if (!mapRef.current || leafletMapRef.current) return;
 
-// Custom Pins
-const activePin = new L.DivIcon({
-    className: 'bg-transparent',
-    html: `<div class="w-5 h-5 bg-green-500 rounded-full border-2 border-white shadow-md flex items-center justify-center"><div class="w-2 h-2 bg-white rounded-full"></div></div>`,
-    iconSize: [20, 20], iconAnchor: [10, 10]
-});
-const inactivePin = new L.DivIcon({
-    className: 'bg-transparent',
-    html: `<div class="w-5 h-5 bg-slate-500 rounded-full border-2 border-white shadow-md flex items-center justify-center"><div class="w-2 h-2 bg-white rounded-full"></div></div>`,
-    iconSize: [20, 20], iconAnchor: [10, 10]
-});
+        // Load Leaflet CSS dynamically
+        if (!document.getElementById('leaflet-css-cl')) {
+            const link = document.createElement('link');
+            link.id = 'leaflet-css-cl';
+            link.rel = 'stylesheet';
+            link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+            document.head.appendChild(link);
+        }
+
+        import('leaflet').then((leafletModule) => {
+            const L = (leafletModule.default ?? leafletModule) as any;
+
+            const mappedClients = clients.filter(c => c.latitude != null && c.longitude != null);
+            const defaultCenter: [number, number] = [20.5937, 78.9629];
+            const center: [number, number] = mappedClients.length > 0
+                ? [mappedClients[0].latitude!, mappedClients[0].longitude!]
+                : defaultCenter;
+            const zoom = mappedClients.length > 0 ? 12 : 5;
+
+            if (!mapRef.current) return;
+            const map = L.map(mapRef.current, { center, zoom, scrollWheelZoom: true });
+            leafletMapRef.current = map;
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+            }).addTo(map);
+
+            const activeIcon = L.divIcon({
+                className: '',
+                html: '<div style="width:18px;height:18px;background:#22c55e;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center"><div style="width:7px;height:7px;background:white;border-radius:50%"></div></div>',
+                iconSize: [18, 18], iconAnchor: [9, 9]
+            });
+            const inactiveIcon = L.divIcon({
+                className: '',
+                html: '<div style="width:18px;height:18px;background:#64748b;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>',
+                iconSize: [18, 18], iconAnchor: [9, 9]
+            });
+
+            mappedClients.forEach(c => {
+                L.marker([c.latitude!, c.longitude!], { icon: c.status === 'ACTIVE' ? activeIcon : inactiveIcon })
+                    .addTo(map)
+                    .bindPopup(`
+                        <div style="padding:6px;min-width:150px">
+                            <p style="font-weight:bold;font-size:13px;margin:0 0 3px">${c.name}</p>
+                            ${c.shopName ? `<p style="font-size:11px;color:#666;margin:0 0 2px">${c.shopName}</p>` : ''}
+                            <p style="font-size:11px;font-weight:600;color:#2563eb;margin:0">${c.status}</p>
+                            ${c.address || c.city ? `<p style="font-size:11px;color:#888;margin:3px 0 0">${c.address || c.city}</p>` : ''}
+                        </div>
+                    `);
+            });
+        });
+
+        return () => {
+            if (leafletMapRef.current) {
+                leafletMapRef.current.remove();
+                leafletMapRef.current = null;
+            }
+        };
+    }, []);
+
+    return <div ref={mapRef} className="w-full h-full" />;
+};
 
 // ── Excel Download helper — Blob approach (works on HTTPS + LAN IP) ──────────
 function downloadExcel(headers: string[], rows: (string | number | undefined | null | boolean)[][], filename: string, sheetName = 'Sheet1') {
@@ -928,50 +975,20 @@ export const ClientListPage = () => {
                 </div>
                 {loading && <div className="p-12 text-center text-dark-muted">Loading clients...</div>}
 
-                {!loading && viewMode === 'MAP' && (() => {
-                    const mappedClients = filtered.filter(c => c.latitude != null && c.longitude != null);
-                    const defaultCenter: [number, number] = [20.5937, 78.9629];
-                    const center: [number, number] = mappedClients.length > 0 ? [mappedClients[0].latitude!, mappedClients[0].longitude!] : defaultCenter;
-                    const zoom = mappedClients.length > 0 ? 12 : 5;
-
-                    return (
-                        <div className="w-full h-[600px] relative z-0 bg-[#1a1c23]">
-                            <MapContainer center={center} zoom={zoom} scrollWheelZoom={true} className="w-full h-full">
-                                <TileLayer
-                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                                />
-                                <>
-                                    {mappedClients.map(c => (
-                                        <Marker
-                                            key={c.id}
-                                            position={[c.latitude!, c.longitude!]}
-                                            icon={c.status === 'ACTIVE' ? activePin : inactivePin}
-                                        >
-                                            <Popup className="custom-popup">
-                                                <div className="p-2 space-y-1">
-                                                    <p className="font-bold text-gray-800 text-sm">{c.name}</p>
-                                                    {c.shopName && <p className="text-xs text-gray-500">{c.shopName}</p>}
-                                                    <p className="text-xs text-blue-600 font-semibold">{c.status}</p>
-                                                    <p className="text-xs text-gray-600 truncate max-w-[200px]">{c.address || c.city}</p>
-                                                </div>
-                                            </Popup>
-                                        </Marker>
-                                    ))}
-                                </>
-                            </MapContainer>
-                            {mappedClients.length === 0 && (
-                                <div className="absolute inset-0 z-[1000] bg-dark-bg/80 backdrop-blur-sm flex items-center justify-center">
-                                    <div className="text-center">
-                                        <MapPin className="w-12 h-12 text-dark-muted mx-auto mb-3 opacity-50" />
-                                        <h3 className="text-white font-medium">No Mapped Clients</h3>
-                                        <p className="text-sm text-dark-muted">None of the filtered clients have GPS coordinates set.</p>
-                                    </div>
+                {!loading && viewMode === 'MAP' && (
+                    <div className="w-full h-[600px] relative z-0 bg-[#1a1c23]">
+                        <ClientMap clients={filtered} />
+                        {filtered.filter(c => c.latitude != null).length === 0 && (
+                            <div className="absolute inset-0 z-[1000] bg-dark-bg/80 backdrop-blur-sm flex items-center justify-center">
+                                <div className="text-center">
+                                    <MapPin className="w-12 h-12 text-dark-muted mx-auto mb-3 opacity-50" />
+                                    <h3 className="text-white font-medium">No Mapped Clients</h3>
+                                    <p className="text-sm text-dark-muted">None of the filtered clients have GPS coordinates set.</p>
                                 </div>
-                            )}
-                        </div>
-                    );
-                })()}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {!loading && viewMode === 'LIST' && filtered.length === 0 && (
                     <div className="p-16 text-center space-y-3">
