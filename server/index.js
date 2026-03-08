@@ -511,6 +511,8 @@ const sharedModels = {
     Employee, Attendance, Production, Leave, Loan, SalarySlip,
     Expense, Biometric, AdvanceSalary, Holiday, AuditLog,
     Client, ClientVisit, SalesTask, Company, sequelize,
+    Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation,
+    SystemSetting, SystemKey, IPRestriction, UserSession,
     addError, getErrorHint,
     doBackup, getBackupStatus, setAutoBackupEnabled,
     CustomReportTemplate, ScheduledReport, StatutoryRule,
