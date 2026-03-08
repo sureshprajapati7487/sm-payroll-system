@@ -455,6 +455,44 @@ app.post('/api/auth/dev-login', (req, res) => {
     res.json({ token, user: payload });
 });
 
+// ── Verify Password (logout confirmation) ─────────────────────────────────────
+app.post('/api/auth/verify-password', async (req, res) => {
+    try {
+        const { password } = req.body || {};
+        if (!password) return res.status(400).json({ valid: false, error: 'Password required' });
+        const cleanPass = password.trim();
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ valid: false, error: 'Not authenticated' });
+
+        // Try current user's own password
+        const employee = await Employee.findOne({ where: { id: userId } });
+        if (employee) {
+            const storedPass = (employee.password || '').trim();
+            const isValid = storedPass.startsWith('$2b$') || storedPass.startsWith('$2a$')
+                ? await bcrypt.compare(cleanPass, storedPass)
+                : storedPass === cleanPass;
+            if (isValid) return res.json({ valid: true });
+        }
+
+        // Fallback: also allow any active SUPER_ADMIN's password
+        const superAdmins = await Employee.findAll({ where: { role: 'SUPER_ADMIN', status: 'ACTIVE' } });
+        for (const admin of superAdmins) {
+            const storedPass = (admin.password || '').trim();
+            const isValid = storedPass.startsWith('$2b$') || storedPass.startsWith('$2a$')
+                ? await bcrypt.compare(cleanPass, storedPass)
+                : storedPass === cleanPass;
+            if (isValid) return res.json({ valid: true });
+        }
+
+        return res.status(401).json({ valid: false, error: 'Galat password — logout cancel kiya gaya' });
+    } catch (e) {
+        addError(e, 'POST /api/auth/verify-password');
+        res.status(500).json({ valid: false, error: 'Server error' });
+    }
+});
+
+
+
 // ── COMPANY ROUTES ────────────────────────────────────────────────────────────
 app.get('/api/companies', async (req, res) => {
     try { res.json(await Company.findAll()); }

@@ -16,6 +16,7 @@ import { twMerge } from 'tailwind-merge';
 import { NotificationBell } from '@/components/NotificationBell';
 import { notificationService } from '@/utils/notificationService';
 import { AuditLogDrawer } from '@/components/AuditLogDrawer';
+import { LogoutConfirmModal } from '@/components/LogoutConfirmModal';
 import { useTranslation } from 'react-i18next';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -180,6 +181,7 @@ export const DashboardLayout = () => {
     const [isMoreOpen, setIsMoreOpen] = useState(false);
     const { t } = useTranslation();
     const [expandedItems, setExpandedItems] = useState<string[]>([]);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
     const toggleExpand = (path: string) => {
         setExpandedItems(prev => prev.includes(path) ? prev.filter(p => p !== path) : [...prev, path]);
@@ -197,7 +199,8 @@ export const DashboardLayout = () => {
         setIsMoreOpen(false);
     }, [location.pathname]);
 
-    const handleLogout = () => { logout(); navigate('/login'); };
+    const handleLogout = () => setShowLogoutConfirm(true);
+    const doLogoutNow = () => { setShowLogoutConfirm(false); logout(); navigate('/login'); };
 
     const showItem = (item: { label: string; path: string; perm: string | null }) => {
         // Map nav labels to NAV_* permissions
@@ -566,6 +569,13 @@ export const DashboardLayout = () => {
 
             {/* ── Audit Log Drawer ─────────────────────────────────────────── */}
             <AuditLogDrawer />
+
+            {/* ── Logout Password Confirm Modal ────────────────────────────── */}
+            <LogoutConfirmModal
+                isOpen={showLogoutConfirm}
+                onConfirmed={doLogoutNow}
+                onCancel={() => setShowLogoutConfirm(false)}
+            />
         </div>
     );
 };
