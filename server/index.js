@@ -155,6 +155,8 @@ const ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'https://localhost:5173',
     'http://localhost:4173',
+    'https://sm-payroll-system.vercel.app',  // production frontend
+    'https://192.168.1.3:5173',              // local network dev
     process.env.FRONTEND_URL,
 ].filter(Boolean);
 
