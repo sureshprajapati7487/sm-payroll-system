@@ -442,8 +442,8 @@ const Holiday = sequelize.define('Holiday', {
 const AuditLog = sequelize.define('AuditLog', {
     id: { type: DataTypes.STRING, primaryKey: true },
     companyId: { type: DataTypes.STRING },
-    userId: { type: DataTypes.STRING, allowNull: false },
-    userName: { type: DataTypes.STRING, allowNull: false },
+    userId: { type: DataTypes.STRING, allowNull: true },
+    userName: { type: DataTypes.STRING, allowNull: true },
     userRole: { type: DataTypes.STRING },
     action: { type: DataTypes.STRING, allowNull: false },   // AuditAction enum value
     entityType: { type: DataTypes.STRING },                     // EMPLOYEE | LOAN | etc.
