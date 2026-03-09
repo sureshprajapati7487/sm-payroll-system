@@ -334,7 +334,7 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
             if (whitelisted.length > 0) {
                 const isAllowed = whitelisted.some(r => r.ipAddress === ipAddress);
                 if (!isAllowed) {
-                    await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', entityType: 'USER', entityName: idOrEmail, status: 'FAILED', ipAddress, errorMessage: 'IP not whitelisted' });
+                    await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', userId: 'UNKNOWN', userName: idOrEmail || 'UNKNOWN', entityType: 'USER', entityName: idOrEmail, status: 'FAILED', ipAddress, errorMessage: 'IP not whitelisted' });
                     return res.status(403).json({ error: 'Access denied from this IP address.' });
                 }
             }
@@ -354,7 +354,7 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
         const employee = await Employee.findOne({ where: { [Op.or]: [{ code: cleanId }, { email: cleanEmail }] } });
         if (!employee) {
             recordFailedAttempt(attemptKey);
-            await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', entityType: 'USER', entityName: idOrEmail, status: 'FAILED', ipAddress, errorMessage: 'Invalid employee code/email' });
+            await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', userId: 'UNKNOWN', userName: idOrEmail || 'UNKNOWN', entityType: 'USER', entityName: idOrEmail, status: 'FAILED', ipAddress, errorMessage: 'Invalid employee code/email' });
             return res.status(401).json({ error: 'Invalid credentials', fix: 'Check your employee code/email and password' });
         }
 
