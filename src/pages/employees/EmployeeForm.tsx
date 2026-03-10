@@ -399,14 +399,14 @@ export const EmployeeForm = () => {
                             <label className="text-xs text-dark-muted uppercase">Department</label>
                             <select value={formData.department} onChange={e => handleChange('department', e.target.value)} className={inputCls}>
                                 <option value="">Select Department</option>
-                                {workGroups.map(g => (
-                                    <option key={g.id} value={g.name}>
-                                        {g.name}{g.department ? ` (${g.department})` : ''}
+                                {departments.map(dept => (
+                                    <option key={dept.id} value={dept.name}>
+                                        {dept.name}
                                     </option>
                                 ))}
                             </select>
                         </div>
-                        {/* ── Work Allocation (main dept) ── */}
+                        {/* ── Work Allocation (group assignment) ── */}
                         <div className="space-y-1">
                             <label className="text-xs text-dark-muted uppercase flex items-center gap-1">
                                 Work Allocation
@@ -422,8 +422,8 @@ export const EmployeeForm = () => {
                                 disabled={!id}
                             >
                                 <option value="">-- Select --</option>
-                                {departments.map(dept => (
-                                    <option key={dept.id} value={dept.id}>{dept.name}</option>
+                                {workGroups.map(g => (
+                                    <option key={g.id} value={g.id}>{g.name}{g.department ? ` (${g.department})` : ''}</option>
                                 ))}
                             </select>
                             {!id && <p className="text-[10px] text-dark-muted">Save karne ke baad assign hoga</p>}
