@@ -200,10 +200,18 @@ export const CompanySwitcher = () => {
             </div>
 
             {/* Current Company Selector */}
-            <div className="glass rounded-2xl p-6">
+            <div className="glass rounded-2xl p-6" style={{ overflow: 'visible', position: 'relative', zIndex: isOpen ? 40 : 'auto' }}>
                 <h3 className="text-lg font-semibold text-white mb-4">Current Company</h3>
 
-                <div className="relative">
+                {/* Click outside overlay to close dropdown */}
+                {isOpen && (
+                    <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setIsOpen(false)}
+                    />
+                )}
+
+                <div className="relative z-50">
                     <button
                         onClick={() => setIsOpen(!isOpen)}
                         className="w-full bg-dark-surface border border-dark-border rounded-xl p-4 flex items-center justify-between hover:bg-white/5 transition-all"
@@ -221,7 +229,9 @@ export const CompanySwitcher = () => {
                     </button>
 
                     {isOpen && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-dark-card border border-dark-border rounded-xl overflow-hidden z-50 animate-slide-down">
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-dark-card border border-dark-border rounded-xl overflow-hidden z-50 shadow-2xl animate-slide-down"
+                            style={{ maxHeight: '16rem', overflowY: 'auto' }}
+                        >
                             {activeCompanies.map(company => (
                                 <button
                                     key={company.id}
@@ -229,7 +239,7 @@ export const CompanySwitcher = () => {
                                     className={`w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-all ${company.id === currentCompanyId ? 'bg-primary-500/10' : ''
                                         }`}
                                 >
-                                    <div className="w-10 h-10 rounded-lg bg-primary-500/20 flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-lg bg-primary-500/20 flex items-center justify-center flex-shrink-0">
                                         <Building2 className="w-5 h-5 text-primary-400" />
                                     </div>
                                     <div className="flex-1 text-left">
@@ -237,13 +247,13 @@ export const CompanySwitcher = () => {
                                         <div className="text-xs text-dark-muted">{company.code} • {company.employeeCount} Employees</div>
                                     </div>
                                     {company.id === currentCompanyId && (
-                                        <div className="w-2 h-2 bg-green-500 rounded-full" />
+                                        <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
                                     )}
                                 </button>
                             ))}
 
-                            <button onClick={handleOpenAdd} className="w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-all border-t border-dark-border">
-                                <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                            <button onClick={handleOpenAdd} className="w-full p-4 flex items-center gap-3 hover:bg-white/5 transition-all border-t border-dark-border sticky bottom-0 bg-dark-card">
+                                <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center flex-shrink-0">
                                     <Plus className="w-5 h-5 text-green-400" />
                                 </div>
                                 <div className="text-left">
