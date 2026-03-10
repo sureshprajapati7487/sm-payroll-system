@@ -334,7 +334,7 @@ const EDITABLE_ROLES: { role: Role; label: string; emoji: string; gradFrom: stri
 // ─── Main Component ───────────────────────────────────────────────────────────
 export const RoleAccessConfig = () => {
     const { user } = useAuthStore();
-    const { permissions, scopes, setPermissions, resetRole, resetAll, isLoaded } = useRolePermissionsStore();
+    const { permissions, scopes, setPermissions, resetRole, resetAll, _hydrated } = useRolePermissionsStore();
 
     // ── Draft state: local copy of permissions/scopes before Save ──────────────
     const [draftPerms, setDraftPerms] = useState<Record<string, string[]>>(() => {
@@ -357,8 +357,9 @@ export const RoleAccessConfig = () => {
         isOpen: boolean; title: string; message: string; onConfirm: () => void;
     }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
 
-    // Sync draft whenever permissions are loaded from DB (runs once after fetch)
+    // Sync draft once localStorage hydration is complete (after _hydrated flips true)
     useEffect(() => {
+        if (!_hydrated) return; // wait until localStorage data is loaded
         const perms: Record<string, string[]> = {};
         const scopeMap: Record<string, DataScope> = {};
         EDITABLE_ROLES.forEach(({ role }) => {
@@ -367,9 +368,8 @@ export const RoleAccessConfig = () => {
         });
         setDraftPerms(perms);
         setDraftScopes(scopeMap);
-        // Re-run when the store finishes loading from DB
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLoaded]);
+    }, [_hydrated]);
 
     if (!user || user.role !== Roles.SUPER_ADMIN) {
         return (
@@ -409,15 +409,15 @@ export const RoleAccessConfig = () => {
         setSavedAt(null);
     };
 
-    // ── Save: commit all drafts to the real store + DB ───────────────────────
-    const saveChanges = async () => {
+    // ── Save: atomically write all drafts to Zustand store (persisted to localStorage) ─
+    const saveChanges = () => {
         const permsToSave: Record<string, PermissionValue[]> = {};
         const scopesToSave: Record<string, DataScope> = {};
         EDITABLE_ROLES.forEach(({ role }) => {
             permsToSave[role] = (draftPerms[role] ?? []) as PermissionValue[];
             scopesToSave[role] = draftScopes[role] ?? scopes[role] ?? 'ALL';
         });
-        await setPermissions(permsToSave as any, scopesToSave as any);
+        setPermissions(permsToSave as any, scopesToSave as any);
         setSavedAt(new Date().toLocaleTimeString());
     };
 
@@ -434,14 +434,14 @@ export const RoleAccessConfig = () => {
     };
 
     // ── Reset helpers that also clear draft ─────────────────────────────────
-    const handleResetRole = async (role: Role) => {
-        await resetRole(role);
-        // After reset, re-sync draft from freshly reset store
-        setDraftPerms(prev => ({ ...prev, [role]: [...(useRolePermissionsStore.getState().permissions[role] ?? [])] }));
-        setDraftScopes(prev => ({ ...prev, [role]: useRolePermissionsStore.getState().scopes[role] ?? 'OWN' }));
+    const handleResetRole = (role: Role) => {
+        resetRole(role);
+        const st = useRolePermissionsStore.getState();
+        setDraftPerms(prev => ({ ...prev, [role]: [...(st.permissions[role] ?? [])] }));
+        setDraftScopes(prev => ({ ...prev, [role]: st.scopes[role] ?? 'OWN' }));
     };
-    const handleResetAll = async () => {
-        await resetAll();
+    const handleResetAll = () => {
+        resetAll();
         const st = useRolePermissionsStore.getState();
         const perms: Record<string, string[]> = {};
         const scopeMap: Record<string, DataScope> = {};
