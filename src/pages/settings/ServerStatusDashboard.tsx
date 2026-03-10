@@ -315,7 +315,7 @@ export const ServerStatusDashboard = () => {
     const totalErrors = health?.totalErrors ?? 0;
 
     return (
-        <div className="flex flex-col" style={{ height: 'calc(100vh - 140px)' }}>
+        <div className="space-y-4">
 
             {/* ── Header ── */}
             <div className="flex items-center justify-between mb-3 shrink-0">
@@ -428,7 +428,7 @@ export const ServerStatusDashboard = () => {
             )}
 
             {/* ── Section Tabs ── */}
-            <div className="flex gap-2 border-b border-dark-border pb-2 shrink-0">
+            <div className="flex gap-2 border-b border-dark-border pb-2">
                 {(['endpoints', 'errors', 'routes'] as const).map(tab => (
                     <button
                         key={tab}
@@ -448,8 +448,8 @@ export const ServerStatusDashboard = () => {
                 ))}
             </div>
 
-            {/* ── Scrollable Content Area ── */}
-            <div className="flex-1 overflow-y-auto mt-3 space-y-3 pr-1">
+            {/* ── Content Area ── */}
+            <div className="mt-4 space-y-4">
 
                 {/* ── API Endpoints Section ── */}
                 {activeSection === 'endpoints' && (
@@ -552,7 +552,7 @@ export const ServerStatusDashboard = () => {
                     </div>
                 )}
 
-            </div>{/* end scrollable area */}
+            </div>{/* end content area */}
         </div>
     );
 };
