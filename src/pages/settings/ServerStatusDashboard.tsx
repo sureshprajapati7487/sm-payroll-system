@@ -54,7 +54,7 @@ interface HealthData {
 
 interface TableHealth { name: string; icon: string; count: number; status: 'ok' | 'error'; error?: string; lastUpdated?: string | null; }
 interface EnvCheck { key: string; label: string; critical: boolean; set: boolean; value: string; }
-interface FsCheck { label: string; icon: string; exists: boolean; size?: number | null; isDir?: boolean; error?: string; backupCount?: number; latestBackup?: string | null; path?: string; }
+interface FsCheck { label: string; icon: string; exists: boolean; size?: number | null; isDir?: boolean; error?: string; backupCount?: number; latestBackup?: string | null; path?: string; optional?: boolean; }
 interface ErrorAnalytics { total: number; byType: { type: string; count: number }[]; byPage: { page: string; count: number }[]; recentErrors: ErrorEntry[]; }
 interface RuntimeInfo { nodeVersion: string; platform: string; uptime: number; startedAt: string; memory: { heapUsed: string; heapTotal: string; rss: string }; pid: number; dbEngine: string; }
 interface DiagItem { category: string; name: string; status: 'ok' | 'warning' | 'critical' | 'error'; detail: string; fix: string | null; }
@@ -834,7 +834,7 @@ export const ServerStatusDashboard = () => {
                                 </h4>
                                 <div className="space-y-2">
                                     {deepHealth.filesystem.map((f, i) => (
-                                        <div key={i} className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${f.exists ? 'bg-dark-elem/30 border-dark-border/50' : 'bg-amber-500/10 border-amber-500/20'}`}>
+                                        <div key={i} className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${f.exists ? 'bg-dark-elem/30 border-dark-border/50' : f.optional ? 'bg-slate-500/5 border-slate-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm">{f.icon}</span>
                                                 <div>
@@ -843,7 +843,7 @@ export const ServerStatusDashboard = () => {
                                                     {f.size !== undefined && f.size !== null && !f.isDir && <p className="text-xs text-slate-500">{(f.size / 1024).toFixed(1)} KB</p>}
                                                 </div>
                                             </div>
-                                            <span className={`text-xs font-bold ${f.exists ? 'text-emerald-400' : 'text-amber-400'}`}>{f.exists ? '✓ Exists' : '⚠ Missing'}</span>
+                                            <span className={`text-xs font-bold ${f.exists ? 'text-emerald-400' : f.optional ? 'text-slate-400' : 'text-amber-400'}`}>{f.exists ? '✓ Exists' : f.optional ? 'ℹ️ Optional (Local)' : '⚠ Missing'}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -876,20 +876,20 @@ export const ServerStatusDashboard = () => {
                             </div>
 
                             {/* ── Error Analytics ── */}
-                            {deepHealth.errorAnalytics.total > 0 && (
+                            {deepHealth.errorAnalytics?.total > 0 && (
                                 <div className="bg-dark-card border border-dark-border rounded-xl p-4">
                                     <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                        <AlertTriangle className="w-3.5 h-3.5 text-red-400" /> Error Analytics ({deepHealth.errorAnalytics.total} total)
+                                        <AlertTriangle className="w-3.5 h-3.5 text-red-400" /> Error Analytics ({deepHealth.errorAnalytics?.total} total)
                                     </h4>
                                     <div className="grid md:grid-cols-2 gap-4">
                                         <div>
                                             <p className="text-[10px] text-slate-500 uppercase mb-2">By Error Type</p>
                                             <div className="space-y-1.5">
-                                                {deepHealth.errorAnalytics.byType.map(t => (
+                                                {deepHealth.errorAnalytics?.byType?.map(t => (
                                                     <div key={t.type} className="flex items-center gap-2">
                                                         <span className="text-xs font-mono text-red-300 flex-1 truncate">{t.type}</span>
                                                         <div className="flex items-center gap-1.5">
-                                                            <div className="h-1.5 bg-red-500/40 rounded-full" style={{ width: `${Math.min((t.count / deepHealth.errorAnalytics.total) * 100, 100) * 0.6}px` }} />
+                                                            <div className="h-1.5 bg-red-500/40 rounded-full" style={{ width: `${Math.min((t.count / (deepHealth.errorAnalytics?.total || 1)) * 100, 100) * 0.6}px` }} />
                                                             <span className="text-xs font-bold text-red-400 w-6 text-right">{t.count}</span>
                                                         </div>
                                                     </div>
@@ -899,7 +899,7 @@ export const ServerStatusDashboard = () => {
                                         <div>
                                             <p className="text-[10px] text-slate-500 uppercase mb-2">By Page / Endpoint</p>
                                             <div className="space-y-1.5">
-                                                {deepHealth.errorAnalytics.byPage.map(p => (
+                                                {deepHealth.errorAnalytics?.byPage?.map(p => (
                                                     <div key={p.page} className="flex items-center gap-2">
                                                         <span className="text-xs text-slate-400 flex-1 truncate font-mono">{p.page}</span>
                                                         <span className="text-xs font-bold text-amber-400 w-6 text-right">{p.count}</span>
@@ -911,7 +911,7 @@ export const ServerStatusDashboard = () => {
                                 </div>
                             )}
 
-                            {deepHealth.errorAnalytics.total === 0 && (
+                            {deepHealth.errorAnalytics?.total === 0 && (
                                 <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-6 text-center">
                                     <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2 opacity-70" />
                                     <p className="text-emerald-400 font-bold">System Clean!</p>

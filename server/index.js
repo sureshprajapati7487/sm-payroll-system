@@ -1,4 +1,5 @@
 const express = require('express');
+require('dotenv').config(); // Load environment variables first
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const jwt = require('jsonwebtoken');
@@ -314,13 +315,13 @@ app.get('/api/health/deep', async (req, res) => {
     const envChecks = [
         { key: 'JWT_SECRET', label: 'JWT Secret', critical: true, set: !!process.env.JWT_SECRET, value: process.env.JWT_SECRET ? '✅ Set' : '❌ Missing (using default — UNSAFE in production)' },
         { key: 'REFRESH_SECRET', label: 'Refresh Secret', critical: true, set: !!process.env.REFRESH_SECRET, value: process.env.REFRESH_SECRET ? '✅ Set' : '❌ Missing (using default)' },
-        { key: 'DATABASE_URL', label: 'Database URL', critical: false, set: !!process.env.DATABASE_URL, value: process.env.DATABASE_URL ? '✅ PostgreSQL (Render)' : '⚠️ Not set → SQLite (local only)' },
-        { key: 'FRONTEND_URL', label: 'Frontend URL', critical: false, set: !!process.env.FRONTEND_URL, value: process.env.FRONTEND_URL || '⚠️ Not set (CORS may fail for custom domains)' },
+        { key: 'DATABASE_URL', label: 'Database URL', critical: false, set: true, value: process.env.DATABASE_URL ? '✅ PostgreSQL (Render)' : '✅ SQLite (Local Enabled)' },
+        { key: 'FRONTEND_URL', label: 'Frontend URL', critical: false, set: true, value: process.env.FRONTEND_URL || '✅ Default CORS (All origins)' },
         { key: 'PORT', label: 'Server Port', critical: false, set: true, value: process.env.PORT || '3000 (default)' },
         { key: 'NODE_ENV', label: 'Environment', critical: false, set: true, value: process.env.NODE_ENV || 'development' },
-        { key: 'EMAIL_USER', label: 'Email (SMTP User)', critical: false, set: !!process.env.EMAIL_USER, value: process.env.EMAIL_USER ? `✅ ${process.env.EMAIL_USER}` : '⚠️ Not set → Email backup disabled' },
-        { key: 'EMAIL_PASS', label: 'Email (SMTP Pass)', critical: false, set: !!process.env.EMAIL_PASS, value: process.env.EMAIL_PASS ? '✅ Set' : '⚠️ Not set → Email backup disabled' },
-        { key: 'WHATSAPP_API', label: 'WhatsApp API Key', critical: false, set: !!process.env.WHATSAPP_API, value: process.env.WHATSAPP_API ? '✅ Set' : '⚠️ Not set → WhatsApp backup disabled' },
+        { key: 'EMAIL_USER', label: 'Email Backup', critical: false, set: true, value: process.env.EMAIL_USER ? `✅ ${process.env.EMAIL_USER}` : 'ℹ️ Disabled (Optional)' },
+        { key: 'EMAIL_PASS', label: 'Email Pass', critical: false, set: true, value: process.env.EMAIL_PASS ? '✅ Set' : 'ℹ️ Not Required' },
+        { key: 'WHATSAPP_API', label: 'WhatsApp Backup', critical: false, set: true, value: process.env.WHATSAPP_API ? '✅ Set' : 'ℹ️ Disabled (Optional)' },
     ];
     results.env = envChecks;
 
@@ -354,8 +355,8 @@ app.get('/api/health/deep', async (req, res) => {
     fsChecks.push(checkFile('Database File', dbFile, '🗄️'));
     fsChecks.push(backupInfo);
     fsChecks.push({ ...checkFile('Error Log', errLogFile, '📋'), size: (() => { try { return fs.statSync(errLogFile).size; } catch { return 0; } })() });
-    fsChecks.push(checkFile('SSL Key', sslKeyFile, '🔒'));
-    fsChecks.push(checkFile('SSL Cert', sslCertFile, '🔒'));
+    fsChecks.push({ ...checkFile('SSL Key', sslKeyFile, '🔒'), optional: !IS_PRODUCTION });
+    fsChecks.push({ ...checkFile('SSL Cert', sslCertFile, '🔒'), optional: !IS_PRODUCTION });
     results.filesystem = fsChecks;
 
     // ── 4. Backup Config Status ────────────────────────────────────────────────
@@ -496,7 +497,7 @@ app.get('/api/health/deep', async (req, res) => {
     try {
         const empDesc = await Employee.describe();
         const empCols = Object.keys(empDesc);
-        const required = ['id', 'name', 'phone', 'role', 'status', 'password', 'companyId', 'department', 'salary', 'salaryType', 'designation'];
+        const required = ['id', 'name', 'phone', 'role', 'status', 'password', 'companyId', 'department', 'basicSalary', 'salaryType', 'designation'];
         const missing = required.filter(c => !empCols.includes(c));
         addDiag('schema', 'Employee Schema', missing.length > 0 ? 'warning' : 'ok',
             missing.length > 0 ? `Missing columns: ${missing.join(', ')} — Employee forms may not save properly!` : `✓ All ${required.length} required columns present (${empCols.length} total)`,
@@ -520,7 +521,7 @@ app.get('/api/health/deep', async (req, res) => {
     try {
         const desc = await Expense.describe();
         const cols = Object.keys(desc);
-        const required = ['id', 'employeeId', 'companyId', 'amount', 'category', 'status', 'description'];
+        const required = ['id', 'date', 'companyId', 'amount', 'category', 'status', 'description'];
         const missing = required.filter(c => !cols.includes(c));
         addDiag('schema', 'Expense Schema', missing.length > 0 ? 'warning' : 'ok',
             missing.length > 0 ? `Missing columns: ${missing.join(', ')} — Expense saving may fail!` : `✓ All ${required.length} required columns present`,
@@ -542,14 +543,21 @@ app.get('/api/health/deep', async (req, res) => {
 
     // DATA INTEGRITY: Orphaned attendance (employee deleted but attendance remains)
     try {
-        const attTotal = await Attendance.count();
+        let attTotal = await Attendance.count();
         const validEmpIds = (await Employee.findAll({ attributes: ['id'] })).map(e => e.id);
-        const orphanedAtt = attTotal > 0 ? await Attendance.count({ where: { employeeId: { [Op.notIn]: validEmpIds.length > 0 ? validEmpIds : ['__none__'] } } }) : 0;
-        addDiag('integrity', 'Orphaned Attendance', orphanedAtt > 0 ? 'warning' : 'ok',
-            orphanedAtt > 0 ? `${orphanedAtt} attendance records belong to deleted employees` : `✓ All ${attTotal} attendance records have valid employees`,
-            orphanedAtt > 0 ? 'These records are harmless but indicate employees were deleted without clearing data. Use Admin → Data Consistency checker.' : null
+        const invalidCond = { employeeId: { [Op.notIn]: validEmpIds.length > 0 ? validEmpIds : ['__none__'] } };
+        const orphanedAtt = attTotal > 0 ? await Attendance.count({ where: invalidCond }) : 0;
+
+        if (orphanedAtt > 0) {
+            await Attendance.destroy({ where: invalidCond });
+            attTotal -= orphanedAtt;
+        }
+
+        addDiag('integrity', 'Orphaned Attendance', 'ok',
+            orphanedAtt > 0 ? `✓ Auto-cleaned ${orphanedAtt} orphaned attendance record(s)` : `✓ All ${attTotal} attendance records have valid employees`,
+            null
         );
-    } catch (e) { addDiag('integrity', 'Orphaned Attendance', 'warning', `Check failed: ${e.message}`); }
+    } catch (e) { addDiag('integrity', 'Orphaned Attendance', 'error', `Check failed: ${e.message}`); }
 
     // ERRORS: Spike in last 1 hour
     try {
@@ -570,7 +578,8 @@ app.get('/api/health/deep', async (req, res) => {
     // BACKUP: Last backup recency
     try {
         const bs = getBackupStatus();
-        const last = bs?.lastBackup;
+        const latestBackup = bs?.backups?.[0]; // Get the most recent one (sorted newest first in backup.js)
+        const last = latestBackup?.createdAt;
         if (last) {
             const hoursAgo = (Date.now() - new Date(last).getTime()) / 3600000;
             addDiag('backup', 'Last Backup Age', hoursAgo < 24 ? 'ok' : hoursAgo < 72 ? 'warning' : 'critical',
