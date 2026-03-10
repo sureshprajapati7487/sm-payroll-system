@@ -72,8 +72,8 @@ export function DatabaseBackup() {
     const [activeTab, setActiveTab] = useState<Tab>('history');
     const { confirm } = useDialog();
 
-    // Config state
-    const [cfg, setCfg] = useState<BackupConfig | null>(null);
+    // Config state — initialize with DEFAULT_CFG so JSX never reads .enabled on undefined
+    const [cfg, setCfg] = useState<BackupConfig>(DEFAULT_CFG);
     const [cfgLoading, setCfgLoading] = useState(false);
     const [savingCfg, setSavingCfg] = useState(false);
     const [newTime, setNewTime] = useState('');
