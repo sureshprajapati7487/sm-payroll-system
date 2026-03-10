@@ -57,7 +57,18 @@ interface EnvCheck { key: string; label: string; critical: boolean; set: boolean
 interface FsCheck { label: string; icon: string; exists: boolean; size?: number | null; isDir?: boolean; error?: string; backupCount?: number; latestBackup?: string | null; path?: string; }
 interface ErrorAnalytics { total: number; byType: { type: string; count: number }[]; byPage: { page: string; count: number }[]; recentErrors: ErrorEntry[]; }
 interface RuntimeInfo { nodeVersion: string; platform: string; uptime: number; startedAt: string; memory: { heapUsed: string; heapTotal: string; rss: string }; pid: number; dbEngine: string; }
-interface DeepHealth { tables: TableHealth[]; env: EnvCheck[]; filesystem: FsCheck[]; backup: { enabled: boolean; times: string[]; emailEnabled: boolean; emailTo: string | null; whatsappEnabled: boolean; status: any; error?: string }; errorAnalytics: ErrorAnalytics; runtime: RuntimeInfo; checkedAt: string; }
+interface DiagItem { category: string; name: string; status: 'ok' | 'warning' | 'critical' | 'error'; detail: string; fix: string | null; }
+interface DeepHealth {
+    tables: TableHealth[];
+    env: EnvCheck[];
+    filesystem: FsCheck[];
+    backup: { enabled: boolean; times: string[]; emailEnabled: boolean; emailTo: string | null; whatsappEnabled: boolean; status: any; error?: string };
+    errorAnalytics: ErrorAnalytics;
+    runtime: RuntimeInfo;
+    diagnostics?: DiagItem[];
+    diagnosticSummary?: { critical: number; warning: number; ok: number; total: number };
+    checkedAt: string;
+}
 
 // ─── Frontend Routes (from App.tsx) ───────────────────────────────────────────
 const FRONTEND_ROUTES = [
@@ -649,6 +660,104 @@ export const ServerStatusDashboard = () => {
 
                     {deepHealth && (
                         <>
+                            {/* ── Diagnostics Summary Bar ── */}
+                            {deepHealth.diagnosticSummary && (
+                                <>
+                                    <div className="grid grid-cols-4 gap-3">
+                                        {[
+                                            { label: 'Total Checks', value: deepHealth.diagnosticSummary.total, color: 'text-slate-300', bg: 'bg-dark-elem/50 border-dark-border' },
+                                            { label: 'Critical Issues', value: deepHealth.diagnosticSummary.critical, color: 'text-red-400', bg: deepHealth.diagnosticSummary.critical > 0 ? 'bg-red-500/15 border-red-500/30' : 'bg-dark-elem/50 border-dark-border' },
+                                            { label: 'Warnings', value: deepHealth.diagnosticSummary.warning, color: 'text-amber-400', bg: deepHealth.diagnosticSummary.warning > 0 ? 'bg-amber-500/15 border-amber-500/30' : 'bg-dark-elem/50 border-dark-border' },
+                                            { label: 'All Clear', value: deepHealth.diagnosticSummary.ok, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/25' },
+                                        ].map(item => (
+                                            <div key={item.label} className={`rounded-xl p-3 border ${item.bg}`}>
+                                                <p className="text-[10px] text-slate-500 uppercase">{item.label}</p>
+                                                <p className={`text-3xl font-black mt-1 ${item.color}`}>{item.value}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Critical Alert Banner */}
+                                    {deepHealth.diagnosticSummary.critical > 0 && (
+                                        <div className="bg-red-500/10 border border-red-500/40 rounded-xl p-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <XCircle className="w-5 h-5 text-red-400" />
+                                                <p className="font-bold text-red-300 text-sm">🚨 {deepHealth.diagnosticSummary.critical} Critical Issue(s) — Immediate Action Required!</p>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                {(deepHealth.diagnostics ?? []).filter(d => d.status === 'critical').map((d, i) => (
+                                                    <div key={i} className="bg-red-500/10 rounded-lg px-3 py-2">
+                                                        <p className="text-xs font-bold text-red-300">{d.name}: <span className="font-normal text-red-200">{d.detail}</span></p>
+                                                        {d.fix && <p className="text-xs text-amber-300 mt-1">👉 Fix: {d.fix}</p>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* All Diagnostics Traffic Light Cards */}
+                                    {(deepHealth.diagnostics ?? []).length > 0 && (
+                                        <div className="bg-dark-card border border-dark-border rounded-xl p-4">
+                                            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                <Activity className="w-3.5 h-3.5 text-amber-400" /> Live System Diagnostics ({(deepHealth.diagnostics ?? []).length} Checks)
+                                            </h4>
+                                            <div className="space-y-2">
+                                                {(['auth', 'setup', 'employees', 'database', 'schema', 'integrity', 'errors', 'backup'] as const).map(cat => {
+                                                    const items = (deepHealth.diagnostics ?? []).filter(d => d.category === cat);
+                                                    if (items.length === 0) return null;
+                                                    const catLabels: Record<string, string> = {
+                                                        auth: '🔐 Authentication',
+                                                        setup: '🏢 Setup',
+                                                        employees: '👷 Employees',
+                                                        database: '🗄️ Database',
+                                                        schema: '📐 Schema (Column Check)',
+                                                        integrity: '🔗 Data Integrity',
+                                                        errors: '🚨 Error Monitoring',
+                                                        backup: '💾 Backup',
+                                                    };
+                                                    return (
+                                                        <div key={cat}>
+                                                            <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-1.5 mt-3">{catLabels[cat] || cat}</p>
+                                                            <div className="space-y-1.5">
+                                                                {items.map((d, i) => {
+                                                                    const cfgMap: Record<string, { border: string; badge: string; icon: JSX.Element }> = {
+                                                                        ok: { border: 'border-emerald-500/20 bg-emerald-500/5', badge: 'bg-emerald-500/20 text-emerald-400', icon: <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> },
+                                                                        warning: { border: 'border-amber-500/25 bg-amber-500/5', badge: 'bg-amber-500/20 text-amber-400', icon: <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" /> },
+                                                                        critical: { border: 'border-red-500/40 bg-red-500/10', badge: 'bg-red-500/20 text-red-400', icon: <XCircle className="w-4 h-4 text-red-400 shrink-0" /> },
+                                                                        error: { border: 'border-red-500/30 bg-red-500/5', badge: 'bg-red-500/15 text-red-300', icon: <XCircle className="w-4 h-4 text-red-300 shrink-0" /> },
+                                                                    };
+                                                                    const cfg = cfgMap[d.status] ?? { border: 'border-dark-border bg-dark-elem/20', badge: 'bg-slate-500/20 text-slate-400', icon: <Info className="w-4 h-4 text-slate-400 shrink-0" /> };
+                                                                    return (
+                                                                        <div key={i} className={`rounded-lg border px-3 py-2.5 ${cfg.border}`}>
+                                                                            <div className="flex items-start gap-2.5">
+                                                                                {cfg.icon}
+                                                                                <div className="flex-1 min-w-0">
+                                                                                    <div className="flex items-center gap-2 mb-0.5">
+                                                                                        <span className="text-xs font-semibold text-white">{d.name}</span>
+                                                                                        <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${cfg.badge}`}>{d.status}</span>
+                                                                                    </div>
+                                                                                    <p className="text-xs text-slate-300 leading-relaxed">{d.detail}</p>
+                                                                                    {d.fix && (
+                                                                                        <div className="mt-1.5 flex items-start gap-1.5">
+                                                                                            <Wrench className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                                                                                            <p className="text-xs text-amber-300">{d.fix}</p>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
                             {/* ── Server Runtime ── */}
                             <div className="bg-dark-card border border-dark-border rounded-xl p-4">
                                 <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">

@@ -409,6 +409,185 @@ app.get('/api/health/deep', async (req, res) => {
         dbEngine: process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite',
     };
 
+
+    // ── 7. Live Diagnostics (Deep System Checks) ──────────────────────────────
+    const diagnostics = [];
+    const addDiag = (category, name, status, detail, fix = null) => {
+        diagnostics.push({ category, name, status, detail, fix });
+    };
+
+    // AUTH: Can anyone login? (Admin exists with password)
+    try {
+        const adminTotal = await Employee.count({ where: { role: 'ADMIN' } });
+        const adminActive = await Employee.count({ where: { role: 'ADMIN', status: 'ACTIVE' } });
+        const adminWithPass = await Employee.count({ where: { role: 'ADMIN', status: 'ACTIVE', password: { [Op.ne]: null } } });
+        const st = adminWithPass > 0 ? 'ok' : adminActive > 0 ? 'warning' : 'critical';
+        addDiag('auth', 'Login System', st,
+            adminTotal === 0 ? 'No ADMIN employee found — NOBODY can login!' :
+                adminActive === 0 ? `${adminTotal} admin(s) exist but ALL are inactive/disabled` :
+                    adminWithPass === 0 ? `${adminActive} active admin(s) found but none have passwords set` :
+                        `✓ ${adminWithPass} active admin(s) with password — login working`,
+            st === 'critical' ? 'Open terminal → run: node server/index.js → visit /api/dev/reset-admin to reset admin password' :
+                st === 'warning' ? 'Set employee status to ACTIVE and set a password for admin' : null
+        );
+    } catch (e) { addDiag('auth', 'Login System', 'error', `Check failed: ${e.message}`); }
+
+    // SETUP: At least one company configured?
+    try {
+        const compCount = await Company.count();
+        addDiag('setup', 'Company Setup', compCount > 0 ? 'ok' : 'critical',
+            compCount > 0 ? `✓ ${compCount} company/companies configured` : 'No company found — App cannot function at all!',
+            compCount === 0 ? 'Go to Company Setup page or POST /api/companies to create a company' : null
+        );
+    } catch (e) { addDiag('setup', 'Company Setup', 'error', `Check failed: ${e.message}`); }
+
+    // EMPLOYEES: Data integrity
+    try {
+        const empTotal = await Employee.count();
+        const empNoCompany = await Employee.count({ where: { companyId: null } });
+        const empNoRole = await Employee.count({ where: { role: null } });
+        const empInactive = await Employee.count({ where: { status: { [Op.notIn]: ['ACTIVE', 'INACTIVE', 'TERMINATED'] } } });
+        const st = empNoCompany > 0 || empNoRole > 0 ? 'warning' : 'ok';
+        addDiag('employees', 'Employee Integrity', st,
+            `Total: ${empTotal} | No Company: ${empNoCompany} | No Role: ${empNoRole} | Invalid Status: ${empInactive}`,
+            empNoCompany > 0 ? `${empNoCompany} employee(s) have no companyId — they CANNOT login, appear in lists, or be saved properly` :
+                empNoRole > 0 ? `${empNoRole} employee(s) have no role set — assign roles in Employee Profile` : null
+        );
+    } catch (e) { addDiag('employees', 'Employee Integrity', 'error', `Check failed: ${e.message}`); }
+
+    // DATABASE: Write test (can data be SAVED?)
+    try {
+        const tempKey = `_hcheck_${Date.now()}`;
+        await SystemKey.create({ key: tempKey, value: 'test', description: 'health check' });
+        await SystemKey.destroy({ where: { key: tempKey } });
+        addDiag('database', 'DB Write (Save) Test', 'ok', '✓ Database is fully writable — create/update/delete all working');
+    } catch (e) {
+        addDiag('database', 'DB Write (Save) Test', 'critical',
+            `CANNOT WRITE TO DATABASE: ${e.message}`,
+            'Stop server, delete database.sqlite (backup first!), restart. Or check disk permissions.'
+        );
+    }
+
+    // DATABASE: Response time
+    try {
+        const t0 = Date.now();
+        await sequelize.authenticate();
+        const ms = Date.now() - t0;
+        addDiag('database', 'DB Response Time', ms < 100 ? 'ok' : ms < 500 ? 'warning' : 'critical',
+            ms < 100 ? `✓ ${ms}ms — excellent` : ms < 500 ? `⚠ ${ms}ms — acceptable but slow` : `🚨 ${ms}ms — very slow!`,
+            ms > 500 ? 'DB is extremely slow. Large tables / disk issue. Restart server.' : null
+        );
+    } catch (e) { addDiag('database', 'DB Response Time', 'critical', `Auth failed: ${e.message}`); }
+
+    // SCHEMA: Employee required columns (critical for employee create/save)
+    try {
+        const empDesc = await Employee.describe();
+        const empCols = Object.keys(empDesc);
+        const required = ['id', 'name', 'phone', 'role', 'status', 'password', 'companyId', 'department', 'salary', 'salaryType', 'designation'];
+        const missing = required.filter(c => !empCols.includes(c));
+        addDiag('schema', 'Employee Schema', missing.length > 0 ? 'warning' : 'ok',
+            missing.length > 0 ? `Missing columns: ${missing.join(', ')} — Employee forms may not save properly!` : `✓ All ${required.length} required columns present (${empCols.length} total)`,
+            missing.length > 0 ? 'Restart server (npm start) to sync missing columns' : null
+        );
+    } catch (e) { addDiag('schema', 'Employee Schema', 'error', `Schema check failed: ${e.message}`); }
+
+    // SCHEMA: Attendance required columns
+    try {
+        const desc = await Attendance.describe();
+        const cols = Object.keys(desc);
+        const required = ['id', 'employeeId', 'companyId', 'date', 'status', 'checkIn', 'checkOut'];
+        const missing = required.filter(c => !cols.includes(c));
+        addDiag('schema', 'Attendance Schema', missing.length > 0 ? 'warning' : 'ok',
+            missing.length > 0 ? `Missing columns: ${missing.join(', ')} — Attendance punch-in may fail!` : `✓ All ${required.length} required columns present`,
+            missing.length > 0 ? 'Restart server to sync schema' : null
+        );
+    } catch (e) { addDiag('schema', 'Attendance Schema', 'error', `Schema check failed: ${e.message}`); }
+
+    // SCHEMA: Expense required columns
+    try {
+        const desc = await Expense.describe();
+        const cols = Object.keys(desc);
+        const required = ['id', 'employeeId', 'companyId', 'amount', 'category', 'status', 'description'];
+        const missing = required.filter(c => !cols.includes(c));
+        addDiag('schema', 'Expense Schema', missing.length > 0 ? 'warning' : 'ok',
+            missing.length > 0 ? `Missing columns: ${missing.join(', ')} — Expense saving may fail!` : `✓ All ${required.length} required columns present`,
+            missing.length > 0 ? 'Restart server to sync schema' : null
+        );
+    } catch (e) { addDiag('schema', 'Expense Schema', 'error', `Schema check failed: ${e.message}`); }
+
+    // SCHEMA: Leave required columns
+    try {
+        const desc = await Leave.describe();
+        const cols = Object.keys(desc);
+        const required = ['id', 'employeeId', 'companyId', 'startDate', 'endDate', 'type', 'status', 'reason'];
+        const missing = required.filter(c => !cols.includes(c));
+        addDiag('schema', 'Leave Schema', missing.length > 0 ? 'warning' : 'ok',
+            missing.length > 0 ? `Missing: ${missing.join(', ')} — Leave apply may fail` : `✓ All required columns present`,
+            missing.length > 0 ? 'Restart server to sync schema' : null
+        );
+    } catch (e) { addDiag('schema', 'Leave Schema', 'error', `Schema check failed: ${e.message}`); }
+
+    // DATA INTEGRITY: Orphaned attendance (employee deleted but attendance remains)
+    try {
+        const attTotal = await Attendance.count();
+        const validEmpIds = (await Employee.findAll({ attributes: ['id'] })).map(e => e.id);
+        const orphanedAtt = attTotal > 0 ? await Attendance.count({ where: { employeeId: { [Op.notIn]: validEmpIds.length > 0 ? validEmpIds : ['__none__'] } } }) : 0;
+        addDiag('integrity', 'Orphaned Attendance', orphanedAtt > 0 ? 'warning' : 'ok',
+            orphanedAtt > 0 ? `${orphanedAtt} attendance records belong to deleted employees` : `✓ All ${attTotal} attendance records have valid employees`,
+            orphanedAtt > 0 ? 'These records are harmless but indicate employees were deleted without clearing data. Use Admin → Data Consistency checker.' : null
+        );
+    } catch (e) { addDiag('integrity', 'Orphaned Attendance', 'warning', `Check failed: ${e.message}`); }
+
+    // ERRORS: Spike in last 1 hour
+    try {
+        const oneHourAgo = Date.now() - 60 * 60 * 1000;
+        const recent = errorLog.filter(e => new Date(e.timestamp).getTime() > oneHourAgo);
+        const byEndpoint = {};
+        for (const e of recent) { byEndpoint[e.endpoint] = (byEndpoint[e.endpoint] || 0) + 1; }
+        const top = Object.entries(byEndpoint).sort((a, b) => b[1] - a[1])[0];
+        const st = recent.length === 0 ? 'ok' : recent.length < 5 ? 'warning' : 'critical';
+        addDiag('errors', 'Error Spike (Last 1h)', st,
+            recent.length === 0 ? '✓ No errors in the last hour — system healthy' :
+                `${recent.length} error(s) in last 1 hour${top ? ` — worst: "${top[0]}" (${top[1]}x)` : ''}`,
+            st === 'critical' ? `High error rate! Check Live Errors tab. Most errors at: ${top?.[0]} (${top?.[1]}x)` :
+                st === 'warning' ? 'A few recent errors. Check Live Errors tab for details.' : null
+        );
+    } catch (e) { addDiag('errors', 'Error Spike (Last 1h)', 'warning', `Check failed: ${e.message}`); }
+
+    // BACKUP: Last backup recency
+    try {
+        const bs = getBackupStatus();
+        const last = bs?.lastBackup;
+        if (last) {
+            const hoursAgo = (Date.now() - new Date(last).getTime()) / 3600000;
+            addDiag('backup', 'Last Backup Age', hoursAgo < 24 ? 'ok' : hoursAgo < 72 ? 'warning' : 'critical',
+                `Last backup ${Math.round(hoursAgo)}h ago: ${new Date(last).toLocaleString()}`,
+                hoursAgo > 72 ? 'No backup in 3+ days! Enable auto-backup in Settings → Database Backup' :
+                    hoursAgo > 24 ? 'No backup in 24h. Consider enabling auto-backup.' : null
+            );
+        } else {
+            addDiag('backup', 'Last Backup Age', 'warning', 'No backup has been run yet',
+                'Enable auto-backup from Settings → Database Backup, or run a manual backup now'
+            );
+        }
+    } catch (e) { addDiag('backup', 'Last Backup Age', 'warning', `Backup status unknown: ${e.message}`); }
+
+    // SESSIONS: Active user sessions
+    try {
+        const sessionCount = await UserSession.count();
+        addDiag('auth', 'Active Sessions', 'ok',
+            sessionCount > 0 ? `${sessionCount} active user session token(s) in DB` : 'No active sessions (everyone is logged out)'
+        );
+    } catch (e) { addDiag('auth', 'Active Sessions', 'warning', `Session check failed: ${e.message}`); }
+
+    results.diagnostics = diagnostics;
+    results.diagnosticSummary = {
+        critical: diagnostics.filter(d => d.status === 'critical').length,
+        warning: diagnostics.filter(d => d.status === 'warning').length,
+        ok: diagnostics.filter(d => d.status === 'ok').length,
+        total: diagnostics.length,
+    };
+
     results.checkedAt = new Date().toISOString();
     res.json(results);
 });
