@@ -32,7 +32,7 @@ export const EmployeeProfile = () => {
     }
 
     // PRIVACY CHECK: Who can see sensitive financial data?
-    const canViewFinancials = hasPermission(PERMISSIONS.VIEW_SALARY) || user?.role === 'SUPER_ADMIN';
+    const canViewFinancials = hasPermission(PERMISSIONS.VIEW_EMPLOYEE_FINANCIALS) || user?.role === 'SUPER_ADMIN';
 
     return (
         <div className="max-w-5xl mx-auto">
@@ -77,8 +77,8 @@ export const EmployeeProfile = () => {
 
                     <div className="flex gap-3 mb-2">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium border ${employee.status === 'ACTIVE'
-                                ? 'bg-success/10 text-success border-success/20'
-                                : 'bg-danger/10 text-danger border-danger/20'
+                            ? 'bg-success/10 text-success border-success/20'
+                            : 'bg-danger/10 text-danger border-danger/20'
                             }`}>
                             {employee.status}
                         </span>

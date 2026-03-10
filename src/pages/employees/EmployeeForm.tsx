@@ -262,7 +262,7 @@ export const EmployeeForm = () => {
 
     const sc = formData.statutoryConfig!;
 
-    const canManageFinancials = hasPermission(PERMISSIONS.VIEW_SALARY);
+    const canManageFinancials = hasPermission(PERMISSIONS.VIEW_EMPLOYEE_FINANCIALS);
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 pb-20">

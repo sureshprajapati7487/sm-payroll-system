@@ -73,9 +73,11 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
             },
 
             hasPermission: (role, permission) => {
+                // Normalize role string (backend might send space instead of underscore)
+                const normalizedRole = (role || '').toUpperCase().replace(/ /g, '_') as Role;
                 // SUPER_ADMIN always has everything
-                if (role === Roles.SUPER_ADMIN) return true;
-                const perms = get().permissions[role] ?? [];
+                if (normalizedRole === Roles.SUPER_ADMIN) return true;
+                const perms = get().permissions[normalizedRole] ?? [];
                 return perms.includes(permission);
             },
 

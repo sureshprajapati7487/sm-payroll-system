@@ -31,6 +31,10 @@ export const PERMISSIONS = {
     ADD_EMPLOYEE: 'add_employee',
     EDIT_EMPLOYEE: 'edit_employee',
     DELETE_EMPLOYEE: 'delete_employee',
+    VIEW_EMPLOYEE_PERSONAL: 'view_employee_personal',
+    VIEW_EMPLOYEE_FINANCIALS: 'view_employee_financials',
+    EDIT_EMPLOYEE_FINANCIALS: 'edit_employee_financials',
+    VIEW_EMPLOYEE_DOCUMENTS: 'view_employee_documents',
     VIEW_EMPLOYEE_SALARY: 'view_employee_salary',     // Salary column in list
     VIEW_EMPLOYEE_BANK: 'view_employee_bank',          // Bank/Aadhaar/PAN
     EXPORT_EMPLOYEES: 'export_employees',
@@ -40,6 +44,8 @@ export const PERMISSIONS = {
     EDIT_ATTENDANCE: 'edit_attendance',
     APPROVE_ATTENDANCE: 'approve_attendance',
     MANUAL_ATTENDANCE: 'manual_attendance',
+    ADD_MANUAL_PUNCH: 'add_manual_punch',
+    APPROVE_REGULARIZATION: 'approve_regularization',
     MANAGE_HOLIDAYS: 'manage_holidays',
     VIEW_ATTENDANCE_REPORTS: 'view_attendance_reports',
     USE_FACE_KIOSK: 'use_face_kiosk',
@@ -144,6 +150,10 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.VIEW_EMPLOYEES,
         PERMISSIONS.ADD_EMPLOYEE,
         PERMISSIONS.EDIT_EMPLOYEE,
+        PERMISSIONS.VIEW_EMPLOYEE_PERSONAL,
+        PERMISSIONS.VIEW_EMPLOYEE_FINANCIALS,
+        PERMISSIONS.EDIT_EMPLOYEE_FINANCIALS,
+        PERMISSIONS.VIEW_EMPLOYEE_DOCUMENTS,
         PERMISSIONS.VIEW_EMPLOYEE_SALARY,
         PERMISSIONS.EXPORT_EMPLOYEES,
 
@@ -152,6 +162,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.EDIT_ATTENDANCE,
         PERMISSIONS.APPROVE_ATTENDANCE,
         PERMISSIONS.MANUAL_ATTENDANCE,
+        PERMISSIONS.ADD_MANUAL_PUNCH,
+        PERMISSIONS.APPROVE_REGULARIZATION,
         PERMISSIONS.MANAGE_HOLIDAYS,
         PERMISSIONS.VIEW_ATTENDANCE_REPORTS,
         PERMISSIONS.USE_FACE_KIOSK,
@@ -218,6 +230,10 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.VIEW_EMPLOYEES,
         PERMISSIONS.ADD_EMPLOYEE,
         PERMISSIONS.EDIT_EMPLOYEE,
+        PERMISSIONS.VIEW_EMPLOYEE_PERSONAL,
+        PERMISSIONS.VIEW_EMPLOYEE_FINANCIALS,
+        PERMISSIONS.EDIT_EMPLOYEE_FINANCIALS,
+        PERMISSIONS.VIEW_EMPLOYEE_DOCUMENTS,
         PERMISSIONS.VIEW_EMPLOYEE_SALARY,
         PERMISSIONS.VIEW_EMPLOYEE_BANK,
         PERMISSIONS.EXPORT_EMPLOYEES,
@@ -225,6 +241,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         // Attendance
         PERMISSIONS.VIEW_ATTENDANCE,
         PERMISSIONS.MANUAL_ATTENDANCE,
+        PERMISSIONS.ADD_MANUAL_PUNCH,
         PERMISSIONS.MANAGE_HOLIDAYS,
         PERMISSIONS.VIEW_ATTENDANCE_REPORTS,
 
