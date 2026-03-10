@@ -116,6 +116,9 @@ import { useAttendanceStore } from '@/store/attendanceStore';
 import { usePayrollStore } from '@/store/payrollStore';
 import { useLeaveStore } from '@/store/leaveStore';
 import { useExpenseStore } from '@/store/expenseStore';
+import { useInternalDepartmentStore } from '@/store/departmentStore';
+import { useInternalShiftStore } from '@/store/shiftStore';
+import { useInternalWorkGroupStore } from '@/store/workGroupStore';
 
 // ── Auth Guard: agar token hai toh login page nahi dikhega, seedha dashboard ──
 const AuthGuard = ({ children }: { children: JSX.Element }) => {
@@ -137,6 +140,9 @@ function App() {
     const { fetchPayroll } = usePayrollStore();
     const { fetchLeaves } = useLeaveStore();
     const { fetchExpenses } = useExpenseStore();
+    const fetchDepartments = useInternalDepartmentStore(s => s.fetchDepartments);
+    const fetchShifts = useInternalShiftStore(s => s.fetchShifts);
+    const fetchGroups = useInternalWorkGroupStore(s => s.fetchGroups);
 
     // Smart Auto-Sync: every 30s, only when tab is visible
     useDataSync(30000);
@@ -163,6 +169,11 @@ function App() {
         fetchPayroll();
         fetchLeaves();
         fetchExpenses();
+        if (currentCompanyId) {
+            fetchDepartments(currentCompanyId);
+            fetchShifts(currentCompanyId);
+            fetchGroups(currentCompanyId);
+        }
     }, [isAuthenticated, currentCompanyId]);
 
     return (
