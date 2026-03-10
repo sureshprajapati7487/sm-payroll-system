@@ -269,6 +269,17 @@ export const ServerStatusDashboard = () => {
     const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
     const [autoRefresh, setAutoRefresh] = useState(true);
     const [activeSection, setActiveSection] = useState<'endpoints' | 'errors' | 'routes'>('endpoints');
+    const [clearing, setClearing] = useState(false);
+
+    const clearErrors = async () => {
+        setClearing(true);
+        try {
+            await fetch(`${API_BASE}/api/health/errors`, { method: 'DELETE' });
+            await fetchHealth();
+        } catch { }
+        finally { setClearing(false); }
+    };
+
     const intervalRef = useRef<number | null>(null);
 
     const fetchHealth = useCallback(async () => {
@@ -491,9 +502,20 @@ export const ServerStatusDashboard = () => {
                             <p className="text-sm text-slate-400">
                                 {totalErrors === 0 ? '✅ Koi error nahi — sab theek chal raha hai!' : `${totalErrors} error(s) recorded — Click karein details dekhne ke liye:`}
                             </p>
-                            {totalErrors > 0 && (
-                                <span className="text-xs text-slate-600">Last 20 shown</span>
-                            )}
+                            <div className="flex items-center gap-2">
+                                {totalErrors > 0 && (
+                                    <>
+                                        <span className="text-xs text-slate-600">Last 20 shown</span>
+                                        <button
+                                            onClick={clearErrors}
+                                            disabled={clearing}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 border border-red-500/30 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/25 transition-all disabled:opacity-50"
+                                        >
+                                            {clearing ? '🗑️ Clearing...' : '🗑️ Clear All Errors'}
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
                         {!backendOnline ? (

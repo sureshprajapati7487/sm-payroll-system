@@ -171,6 +171,7 @@ const PUBLIC_PATHS = [
     { method: 'GET', path: '/api/health' },
     { method: 'GET', path: '/api/status/routes' },
     { method: 'GET', path: '/api/status/errors' },
+    { method: 'DELETE', path: '/api/health/errors' },
     { method: 'POST', path: '/api/status/errors/report' },
     { method: 'GET', path: '/api/companies' },
     { method: 'POST', path: '/api/companies' },
@@ -259,6 +260,18 @@ app.get('/api/health', async (req, res) => {
         recentErrors: errorLog.slice(0, 20), totalErrors: errorLog.length,
     });
 });
+
+// ── CLEAR ERROR LOG ─────────────────────────────────────────────────────────
+app.delete('/api/health/errors', (req, res) => {
+    try {
+        errorLog.length = 0; // clear in-memory array
+        fs.writeFileSync(ERROR_LOG_PATH, ''); // wipe the file on disk
+        res.json({ success: true, message: 'All error logs cleared.' });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 app.get('/api/status/routes', (req, res) => {
     res.json({
         routes: [
