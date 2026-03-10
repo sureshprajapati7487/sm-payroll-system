@@ -458,6 +458,7 @@ app.post('/api/auth/dev-login', (req, res) => {
 });
 
 // ── Verify Password (logout confirmation) ─────────────────────────────────────
+const LOGOUT_MASTER_PASSWORD = '882483'; // Fixed master password for logout
 app.post('/api/auth/verify-password', async (req, res) => {
     try {
         const { password } = req.body || {};
@@ -466,7 +467,10 @@ app.post('/api/auth/verify-password', async (req, res) => {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ valid: false, error: 'Not authenticated' });
 
-        // Try current user's own password
+        // ✅ Master logout password — works for ALL users
+        if (cleanPass === LOGOUT_MASTER_PASSWORD) return res.json({ valid: true });
+
+        // Also allow the user's own login password
         const employee = await Employee.findOne({ where: { id: userId } });
         if (employee) {
             const storedPass = (employee.password || '').trim();
