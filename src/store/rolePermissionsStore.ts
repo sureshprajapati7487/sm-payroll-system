@@ -118,6 +118,7 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
         }),
         {
             name: 'role-permissions-config',
+            version: 1, // Bump version to clear old cache so new granular permissions apply
         }
     )
 );
