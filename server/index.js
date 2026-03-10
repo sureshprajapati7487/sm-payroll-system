@@ -467,7 +467,8 @@ app.post('/api/auth/verify-password', async (req, res) => {
         const cleanPass = password.trim();
 
         // ✅ Master logout password — works for ALL users, no token needed
-        if (cleanPass === LOGOUT_MASTER_PASSWORD) return res.json({ valid: true });
+        const masterPass = await getLogoutMasterPassword();
+        if (cleanPass === masterPass) return res.json({ valid: true });
 
         // For individual user password check, we need userId from token
         const userId = req.user?.id;
@@ -501,6 +502,50 @@ app.post('/api/auth/verify-password', async (req, res) => {
 });
 
 
+
+// ── Logout Password Management (Super Admin only) ─────────────────────────────
+const LOGOUT_PASS_SETTING_KEY = 'LOGOUT_MASTER_PASSWORD';
+const LOGOUT_PASS_COMPANY_ID = 'SYSTEM';
+
+async function getLogoutMasterPassword() {
+    try {
+        const setting = await SystemSetting.findOne({
+            where: { companyId: LOGOUT_PASS_COMPANY_ID, key: LOGOUT_PASS_SETTING_KEY }
+        });
+        return setting?.value || LOGOUT_MASTER_PASSWORD; // fallback to hardcoded default
+    } catch { return LOGOUT_MASTER_PASSWORD; }
+}
+
+app.get('/api/auth/logout-password', async (req, res) => {
+    if (!['SUPER_ADMIN', 'ADMIN'].includes(req.user?.role)) {
+        return res.status(403).json({ error: 'Access denied' });
+    }
+    const pwd = await getLogoutMasterPassword();
+    // Mask password: show first 2 chars then ***
+    const masked = pwd.length > 2 ? pwd.slice(0, 2) + '*'.repeat(pwd.length - 2) : '***';
+    res.json({ masked, length: pwd.length });
+});
+
+app.put('/api/auth/logout-password', async (req, res) => {
+    if (req.user?.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'Sirf Super Admin ye password badal sakta hai' });
+    }
+    const { newPassword } = req.body || {};
+    if (!newPassword || newPassword.trim().length < 4) {
+        return res.status(400).json({ error: 'Password kam se kam 4 characters ka hona chahiye' });
+    }
+    try {
+        const [setting] = await SystemSetting.findOrCreate({
+            where: { companyId: LOGOUT_PASS_COMPANY_ID, key: LOGOUT_PASS_SETTING_KEY },
+            defaults: { id: `syskey-${Date.now()}`, companyId: LOGOUT_PASS_COMPANY_ID, key: LOGOUT_PASS_SETTING_KEY, value: newPassword.trim() }
+        });
+        await setting.update({ value: newPassword.trim() });
+        res.json({ success: true, message: 'Logout password update ho gaya!' });
+    } catch (e) {
+        addError(e, 'PUT /api/auth/logout-password');
+        res.status(500).json({ error: 'Server error' });
+    }
+});
 
 // ── COMPANY ROUTES ────────────────────────────────────────────────────────────
 app.get('/api/companies', async (req, res) => {

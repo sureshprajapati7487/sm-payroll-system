@@ -1,7 +1,125 @@
 import { useState, useEffect } from 'react';
-import { Shield, Plus, X, Clock, Eye, LogOut } from 'lucide-react';
+import { Shield, Plus, X, Clock, Eye, LogOut, Key, Check, AlertCircle } from 'lucide-react';
 import { useAuditStore } from '@/store/auditStore';
+import { useAuthStore } from '@/store/authStore';
+import { apiFetch } from '@/lib/apiClient';
 
+// ── Logout Password Card ──────────────────────────────────────────────────────
+function LogoutPasswordCard() {
+    const { user } = useAuthStore();
+    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [currentMasked, setCurrentMasked] = useState<string | null>(null);
+    const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        apiFetch('/api/auth/logout-password')
+            .then(r => r.json())
+            .then(d => { if (d.masked) setCurrentMasked(d.masked); })
+            .catch(() => { });
+    }, []);
+
+    const handleSave = async () => {
+        setError(null);
+        if (!newPassword.trim()) return setError('Naya password daalna zaroori hai');
+        if (newPassword.trim().length < 4) return setError('Password kam se kam 4 characters ka hona chahiye');
+        if (newPassword !== confirmPassword) return setError('Dono password match nahi kar rahe');
+
+        setStatus('saving');
+        try {
+            const res = await apiFetch('/api/auth/logout-password', {
+                method: 'PUT',
+                body: JSON.stringify({ newPassword: newPassword.trim() }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setStatus('success');
+                setCurrentMasked(newPassword.slice(0, 2) + '*'.repeat(Math.max(0, newPassword.length - 2)));
+                setNewPassword('');
+                setConfirmPassword('');
+                setTimeout(() => setStatus('idle'), 3000);
+            } else {
+                setError(data.error || 'Save nahi ho saka');
+                setStatus('error');
+            }
+        } catch {
+            setError('Server se connect nahi ho saka');
+            setStatus('error');
+        }
+    };
+
+    return (
+        <div className="glass rounded-2xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+                <Key className="w-5 h-5 text-amber-400" />
+                Logout Master Password
+            </h3>
+            <p className="text-dark-muted text-xs mb-4">
+                Ye password logout karte waqt maanga jata hai. Sabhi users ke liye same hota hai.
+            </p>
+
+            {currentMasked && (
+                <div className="flex items-center gap-2 bg-dark-surface rounded-lg px-4 py-2 mb-4">
+                    <span className="text-dark-muted text-xs">Current Password:</span>
+                    <span className="text-white font-mono font-bold tracking-widest">{currentMasked}</span>
+                </div>
+            )}
+
+            {isSuperAdmin ? (
+                <div className="space-y-3">
+                    <input
+                        type="text"
+                        value={newPassword}
+                        onChange={e => { setNewPassword(e.target.value); setError(null); setStatus('idle'); }}
+                        placeholder="Naya password dalein"
+                        className="w-full bg-dark-surface border border-dark-border rounded-xl px-4 py-2.5 text-white font-mono text-sm focus:border-amber-400 outline-none transition-all"
+                    />
+                    <input
+                        type="text"
+                        value={confirmPassword}
+                        onChange={e => { setConfirmPassword(e.target.value); setError(null); setStatus('idle'); }}
+                        placeholder="Dobara daalen (confirm)"
+                        className="w-full bg-dark-surface border border-dark-border rounded-xl px-4 py-2.5 text-white font-mono text-sm focus:border-amber-400 outline-none transition-all"
+                    />
+
+                    {error && (
+                        <div className="flex items-center gap-2 text-red-400 text-xs bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            {error}
+                        </div>
+                    )}
+
+                    {status === 'success' && (
+                        <div className="flex items-center gap-2 text-green-400 text-xs bg-green-500/10 border border-green-500/20 px-3 py-2 rounded-lg">
+                            <Check className="w-3.5 h-3.5" />
+                            Logout password update ho gaya! ✅
+                        </div>
+                    )}
+
+                    <button
+                        onClick={handleSave}
+                        disabled={status === 'saving' || !newPassword}
+                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-sm"
+                    >
+                        {status === 'saving' ? (
+                            <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                        ) : (
+                            <><Key className="w-4 h-4" /> Password Save Karo</>
+                        )}
+                    </button>
+                </div>
+            ) : (
+                <div className="text-center py-4 text-dark-muted text-sm">
+                    🔒 Sirf Super Admin ye password badal sakta hai
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 export const SecuritySettings = () => {
     const { ipRestrictions, sessions, addIPRestriction, removeIPRestriction, fetchSessions, fetchIPRestrictions, revokeSession } = useAuditStore();
     const [newIP, setNewIP] = useState('');
@@ -38,6 +156,9 @@ export const SecuritySettings = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Logout Master Password */}
+                <LogoutPasswordCard />
+
                 {/* IP Whitelist */}
                 <div className="glass rounded-2xl p-6">
                     <h3 className="text-lg font-semibold text-white mb-4">IP Whitelist</h3>
