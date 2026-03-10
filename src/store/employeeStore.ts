@@ -112,10 +112,9 @@ const useInternalEmployeeStore = create<EmployeeState>((set, get) => ({
         };
 
         try {
-            // skipAuth: true — allows this call without a JWT (needed during company setup)
+            // Include credentials for creating an employee
             const res = await apiFetch(`/employees`, {
                 method: 'POST',
-                skipAuth: true,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newEmployeeModel)
             });

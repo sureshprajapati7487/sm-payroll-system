@@ -177,7 +177,6 @@ const PUBLIC_PATHS = [
     { method: 'POST', path: '/api/status/errors/report' },
     { method: 'GET', path: '/api/companies' },
     { method: 'POST', path: '/api/companies' },
-    { method: 'POST', path: '/api/employees' },
     { method: 'GET', path: '/api/clients/export' },
     { method: 'GET', path: '/api/clients/demo-export' },
 ];
