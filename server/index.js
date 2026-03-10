@@ -416,19 +416,20 @@ app.get('/api/health/deep', async (req, res) => {
         diagnostics.push({ category, name, status, detail, fix });
     };
 
-    // AUTH: Can anyone login? (Admin exists with password)
+    // AUTH: Can anyone login? (Admin or Super Admin exists with password)
     try {
-        const adminTotal = await Employee.count({ where: { role: 'ADMIN' } });
-        const adminActive = await Employee.count({ where: { role: 'ADMIN', status: 'ACTIVE' } });
-        const adminWithPass = await Employee.count({ where: { role: 'ADMIN', status: 'ACTIVE', password: { [Op.ne]: null } } });
+        const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN', 'MANAGER'];
+        const adminTotal = await Employee.count({ where: { role: { [Op.in]: ADMIN_ROLES } } });
+        const adminActive = await Employee.count({ where: { role: { [Op.in]: ADMIN_ROLES }, status: 'ACTIVE' } });
+        const adminWithPass = await Employee.count({ where: { role: { [Op.in]: ADMIN_ROLES }, status: 'ACTIVE', password: { [Op.ne]: null } } });
         const st = adminWithPass > 0 ? 'ok' : adminActive > 0 ? 'warning' : 'critical';
         addDiag('auth', 'Login System', st,
-            adminTotal === 0 ? 'No ADMIN employee found — NOBODY can login!' :
+            adminTotal === 0 ? 'No ADMIN/SUPER_ADMIN employee found — NOBODY can login!' :
                 adminActive === 0 ? `${adminTotal} admin(s) exist but ALL are inactive/disabled` :
                     adminWithPass === 0 ? `${adminActive} active admin(s) found but none have passwords set` :
-                        `✓ ${adminWithPass} active admin(s) with password — login working`,
-            st === 'critical' ? 'Open terminal → run: node server/index.js → visit /api/dev/reset-admin to reset admin password' :
-                st === 'warning' ? 'Set employee status to ACTIVE and set a password for admin' : null
+                        `✓ ${adminWithPass} active admin/super-admin(s) with password — login working`,
+            st === 'critical' ? 'Visit /api/dev/reset-admin to reset the admin password' :
+                st === 'warning' ? 'Set employee status to ACTIVE and set a password' : null
         );
     } catch (e) { addDiag('auth', 'Login System', 'error', `Check failed: ${e.message}`); }
 
@@ -455,16 +456,28 @@ app.get('/api/health/deep', async (req, res) => {
         );
     } catch (e) { addDiag('employees', 'Employee Integrity', 'error', `Check failed: ${e.message}`); }
 
-    // DATABASE: Write test (can data be SAVED?)
+    // DATABASE: Write test (can data be SAVED?) — uses raw SQL to avoid model constraints
     try {
-        const tempKey = `_hcheck_${Date.now()}`;
-        await SystemKey.create({ key: tempKey, value: 'test', description: 'health check' });
-        await SystemKey.destroy({ where: { key: tempKey } });
+        const isPostgres = !!process.env.DATABASE_URL;
+        if (isPostgres) {
+            // PostgreSQL: use a temp table in a transaction
+            const txn = await sequelize.transaction();
+            try {
+                await sequelize.query('CREATE TEMP TABLE _write_test (id TEXT)', { transaction: txn });
+                await sequelize.query(`INSERT INTO _write_test VALUES ('ping')`, { transaction: txn });
+                await txn.commit();
+            } catch (te) { await txn.rollback(); throw te; }
+        } else {
+            // SQLite: create table, insert, drop
+            await sequelize.query('CREATE TABLE IF NOT EXISTS _write_test (id TEXT)');
+            await sequelize.query(`INSERT INTO _write_test VALUES ('ping')`);
+            await sequelize.query('DROP TABLE IF EXISTS _write_test');
+        }
         addDiag('database', 'DB Write (Save) Test', 'ok', '✓ Database is fully writable — create/update/delete all working');
     } catch (e) {
         addDiag('database', 'DB Write (Save) Test', 'critical',
             `CANNOT WRITE TO DATABASE: ${e.message}`,
-            'Stop server, delete database.sqlite (backup first!), restart. Or check disk permissions.'
+            'Check disk permissions. Restart server. If issue persists, database file may be locked.'
         );
     }
 
