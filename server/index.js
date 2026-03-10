@@ -172,6 +172,7 @@ const PUBLIC_PATHS = [
     { method: 'GET', path: '/api/status/routes' },
     { method: 'GET', path: '/api/status/errors' },
     { method: 'DELETE', path: '/api/health/errors' },
+    { method: 'GET', path: '/api/health/deep' },
     { method: 'POST', path: '/api/status/errors/report' },
     { method: 'GET', path: '/api/companies' },
     { method: 'POST', path: '/api/companies' },
@@ -261,7 +262,158 @@ app.get('/api/health', async (req, res) => {
     });
 });
 
-// ── CLEAR ERROR LOG ─────────────────────────────────────────────────────────
+// ── DEEP HEALTH CHECK ────────────────────────────────────────────────────────
+app.get('/api/health/deep', async (req, res) => {
+    const results = {};
+
+    // ── 1. Database Tables ─────────────────────────────────────────────────────
+    const TABLES = [
+        { name: 'Companies', model: Company, icon: '🏢' },
+        { name: 'Employees', model: Employee, icon: '👷' },
+        { name: 'Departments', model: Department, icon: '🏗️' },
+        { name: 'Shifts', model: Shift, icon: '🕒' },
+        { name: 'WorkGroups', model: WorkGroup, icon: '👥' },
+        { name: 'SalaryTypes', model: SalaryType, icon: '💰' },
+        { name: 'Attendance', model: Attendance, icon: '📋' },
+        { name: 'Production', model: Production, icon: '🏭' },
+        { name: 'Leaves', model: Leave, icon: '🌿' },
+        { name: 'Loans', model: Loan, icon: '💳' },
+        { name: 'Expenses', model: Expense, icon: '🧾' },
+        { name: 'SalarySlips', model: SalarySlip, icon: '📄' },
+        { name: 'AuditLogs', model: AuditLog, icon: '🔍' },
+        { name: 'Clients', model: Client, icon: '🤝' },
+        { name: 'ClientVisits', model: ClientVisit, icon: '📍' },
+        { name: 'SalesTasks', model: SalesTask, icon: '📌' },
+        { name: 'Holidays', model: Holiday, icon: '🎉' },
+        { name: 'AdvanceSalary', model: AdvanceSalary, icon: '💸' },
+        { name: 'Biometrics', model: Biometric, icon: '🧠' },
+        { name: 'SystemSettings', model: SystemSetting, icon: '⚙️' },
+        { name: 'SystemKeys', model: SystemKey, icon: '🔑' },
+        { name: 'PunchLocations', model: PunchLocation, icon: '📌' },
+        { name: 'UserSessions', model: UserSession, icon: '🔐' },
+    ];
+
+    const tableHealth = [];
+    for (const t of TABLES) {
+        try {
+            const count = await t.model.count();
+            // Get the latest updated record if model has updatedAt
+            let lastUpdated = null;
+            try {
+                const latest = await t.model.findOne({ order: [['updatedAt', 'DESC']], attributes: ['updatedAt'] });
+                lastUpdated = latest?.updatedAt || null;
+            } catch (_) { }
+            tableHealth.push({ name: t.name, icon: t.icon, count, status: 'ok', lastUpdated });
+        } catch (e) {
+            tableHealth.push({ name: t.name, icon: t.icon, count: 0, status: 'error', error: e.message });
+        }
+    }
+    results.tables = tableHealth;
+
+    // ── 2. Environment / Config Check ──────────────────────────────────────────
+    const envChecks = [
+        { key: 'JWT_SECRET', label: 'JWT Secret', critical: true, set: !!process.env.JWT_SECRET, value: process.env.JWT_SECRET ? '✅ Set' : '❌ Missing (using default — UNSAFE in production)' },
+        { key: 'REFRESH_SECRET', label: 'Refresh Secret', critical: true, set: !!process.env.REFRESH_SECRET, value: process.env.REFRESH_SECRET ? '✅ Set' : '❌ Missing (using default)' },
+        { key: 'DATABASE_URL', label: 'Database URL', critical: false, set: !!process.env.DATABASE_URL, value: process.env.DATABASE_URL ? '✅ PostgreSQL (Render)' : '⚠️ Not set → SQLite (local only)' },
+        { key: 'FRONTEND_URL', label: 'Frontend URL', critical: false, set: !!process.env.FRONTEND_URL, value: process.env.FRONTEND_URL || '⚠️ Not set (CORS may fail for custom domains)' },
+        { key: 'PORT', label: 'Server Port', critical: false, set: true, value: process.env.PORT || '3000 (default)' },
+        { key: 'NODE_ENV', label: 'Environment', critical: false, set: true, value: process.env.NODE_ENV || 'development' },
+        { key: 'EMAIL_USER', label: 'Email (SMTP User)', critical: false, set: !!process.env.EMAIL_USER, value: process.env.EMAIL_USER ? `✅ ${process.env.EMAIL_USER}` : '⚠️ Not set → Email backup disabled' },
+        { key: 'EMAIL_PASS', label: 'Email (SMTP Pass)', critical: false, set: !!process.env.EMAIL_PASS, value: process.env.EMAIL_PASS ? '✅ Set' : '⚠️ Not set → Email backup disabled' },
+        { key: 'WHATSAPP_API', label: 'WhatsApp API Key', critical: false, set: !!process.env.WHATSAPP_API, value: process.env.WHATSAPP_API ? '✅ Set' : '⚠️ Not set → WhatsApp backup disabled' },
+    ];
+    results.env = envChecks;
+
+    // ── 3. File System Check ───────────────────────────────────────────────────
+    const fsChecks = [];
+    const backupDir = path.join(__dirname, 'backups');
+    const dbFile = path.join(__dirname, 'database.sqlite');
+    const errLogFile = ERROR_LOG_PATH;
+    const sslKeyFile = path.join(__dirname, 'cert', 'server.key');
+    const sslCertFile = path.join(__dirname, 'cert', 'server.cert');
+
+    const checkFile = (label, filePath, icon) => {
+        try {
+            const exists = fs.existsSync(filePath);
+            const stat = exists ? fs.statSync(filePath) : null;
+            return { label, icon, exists, size: stat ? (stat.isDirectory() ? null : stat.size) : null, isDir: stat?.isDirectory() || false, path: filePath };
+        } catch (e) {
+            return { label, icon, exists: false, error: e.message, path: filePath };
+        }
+    };
+
+    const backupInfo = checkFile('Backups Folder', backupDir, '📦');
+    if (backupInfo.exists && backupInfo.isDir) {
+        try {
+            const files = fs.readdirSync(backupDir).filter(f => f.endsWith('.sqlite'));
+            backupInfo.backupCount = files.length;
+            backupInfo.latestBackup = files.sort().pop() || null;
+        } catch (_) { }
+    }
+
+    fsChecks.push(checkFile('Database File', dbFile, '🗄️'));
+    fsChecks.push(backupInfo);
+    fsChecks.push({ ...checkFile('Error Log', errLogFile, '📋'), size: (() => { try { return fs.statSync(errLogFile).size; } catch { return 0; } })() });
+    fsChecks.push(checkFile('SSL Key', sslKeyFile, '🔒'));
+    fsChecks.push(checkFile('SSL Cert', sslCertFile, '🔒'));
+    results.filesystem = fsChecks;
+
+    // ── 4. Backup Config Status ────────────────────────────────────────────────
+    try {
+        const backupCfg = getConfig();
+        results.backup = {
+            enabled: backupCfg.enabled,
+            times: backupCfg.times || [],
+            emailEnabled: backupCfg.email?.enabled || false,
+            emailTo: backupCfg.email?.to || null,
+            whatsappEnabled: backupCfg.whatsapp?.enabled || false,
+            status: getBackupStatus(),
+        };
+    } catch (e) {
+        results.backup = { error: e.message };
+    }
+
+    // ── 5. Error Analytics ─────────────────────────────────────────────────────
+    const errorsByType = {};
+    const errorsByPage = {};
+    for (const err of errorLog) {
+        // Group by errorType
+        if (!errorsByType[err.errorType]) errorsByType[err.errorType] = 0;
+        errorsByType[err.errorType]++;
+        // Group by endpoint/page
+        const page = err.endpoint || 'unknown';
+        if (!errorsByPage[page]) errorsByPage[page] = 0;
+        errorsByPage[page]++;
+    }
+    results.errorAnalytics = {
+        total: errorLog.length,
+        byType: Object.entries(errorsByType).map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count),
+        byPage: Object.entries(errorsByPage).map(([page, count]) => ({ page, count })).sort((a, b) => b.count - a.count).slice(0, 10),
+        recentErrors: errorLog.slice(0, 10),
+    };
+
+    // ── 6. Server Runtime Info ────────────────────────────────────────────────
+    const uptimeSeconds = Math.floor((Date.now() - SERVER_START_TIME) / 1000);
+    const mem = process.memoryUsage();
+    results.runtime = {
+        nodeVersion: process.version,
+        platform: process.platform,
+        uptime: uptimeSeconds,
+        startedAt: new Date(SERVER_START_TIME).toISOString(),
+        memory: {
+            heapUsed: Math.round(mem.heapUsed / 1024 / 1024) + ' MB',
+            heapTotal: Math.round(mem.heapTotal / 1024 / 1024) + ' MB',
+            rss: Math.round(mem.rss / 1024 / 1024) + ' MB',
+        },
+        pid: process.pid,
+        dbEngine: process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite',
+    };
+
+    results.checkedAt = new Date().toISOString();
+    res.json(results);
+});
+
+
 app.delete('/api/health/errors', (req, res) => {
     try {
         errorLog.length = 0; // clear in-memory array

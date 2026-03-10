@@ -52,6 +52,13 @@ interface HealthData {
     totalErrors: number;
 }
 
+interface TableHealth { name: string; icon: string; count: number; status: 'ok' | 'error'; error?: string; lastUpdated?: string | null; }
+interface EnvCheck { key: string; label: string; critical: boolean; set: boolean; value: string; }
+interface FsCheck { label: string; icon: string; exists: boolean; size?: number | null; isDir?: boolean; error?: string; backupCount?: number; latestBackup?: string | null; path?: string; }
+interface ErrorAnalytics { total: number; byType: { type: string; count: number }[]; byPage: { page: string; count: number }[]; recentErrors: ErrorEntry[]; }
+interface RuntimeInfo { nodeVersion: string; platform: string; uptime: number; startedAt: string; memory: { heapUsed: string; heapTotal: string; rss: string }; pid: number; dbEngine: string; }
+interface DeepHealth { tables: TableHealth[]; env: EnvCheck[]; filesystem: FsCheck[]; backup: { enabled: boolean; times: string[]; emailEnabled: boolean; emailTo: string | null; whatsappEnabled: boolean; status: any; error?: string }; errorAnalytics: ErrorAnalytics; runtime: RuntimeInfo; checkedAt: string; }
+
 // ─── Frontend Routes (from App.tsx) ───────────────────────────────────────────
 const FRONTEND_ROUTES = [
     { path: '/', component: 'LoginPage', group: 'Public', description: 'Login / Landing' },
@@ -268,8 +275,26 @@ export const ServerStatusDashboard = () => {
     const [lastChecked, setLastChecked] = useState<string>('Never');
     const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
     const [autoRefresh, setAutoRefresh] = useState(true);
-    const [activeSection, setActiveSection] = useState<'endpoints' | 'errors' | 'routes'>('endpoints');
+    const [activeSection, setActiveSection] = useState<'endpoints' | 'errors' | 'routes' | 'deep'>('endpoints');
     const [clearing, setClearing] = useState(false);
+    const [deepHealth, setDeepHealth] = useState<DeepHealth | null>(null);
+    const [deepLoading, setDeepLoading] = useState(false);
+    const [deepError, setDeepError] = useState<string | null>(null);
+
+    const fetchDeepHealth = useCallback(async () => {
+        setDeepLoading(true);
+        setDeepError(null);
+        try {
+            const res = await fetch(`${API_BASE}/api/health/deep`, { signal: AbortSignal.timeout(15000) });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data: DeepHealth = await res.json();
+            setDeepHealth(data);
+        } catch (e: any) {
+            setDeepError(e.message || 'Deep scan failed');
+        } finally {
+            setDeepLoading(false);
+        }
+    }, []);
 
     const clearErrors = async () => {
         setClearing(true);
@@ -439,11 +464,14 @@ export const ServerStatusDashboard = () => {
             )}
 
             {/* ── Section Tabs ── */}
-            <div className="flex gap-2 border-b border-dark-border pb-2">
-                {(['endpoints', 'errors', 'routes'] as const).map(tab => (
+            <div className="flex flex-wrap gap-2 border-b border-dark-border pb-2">
+                {(['endpoints', 'errors', 'routes', 'deep'] as const).map(tab => (
                     <button
                         key={tab}
-                        onClick={() => setActiveSection(tab)}
+                        onClick={() => {
+                            setActiveSection(tab);
+                            if (tab === 'deep' && !deepHealth && !deepLoading) fetchDeepHealth();
+                        }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 ${activeSection === tab ? 'bg-primary-500/20 border border-primary-500/40 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                     >
                         {tab === 'endpoints' && <><Globe className="w-3.5 h-3.5" /> API Endpoints</>}
@@ -455,6 +483,7 @@ export const ServerStatusDashboard = () => {
                             </>
                         )}
                         {tab === 'routes' && <><Layers className="w-3.5 h-3.5" /> Frontend Routes</>}
+                        {tab === 'deep' && <><Activity className="w-3.5 h-3.5 text-amber-400" /><span className="text-amber-400 font-bold">🔍 Deep Scan</span></>}
                     </button>
                 ))}
             </div>
@@ -575,6 +604,215 @@ export const ServerStatusDashboard = () => {
                 )}
 
             </div>{/* end content area */}
+
+            {/* ── Deep Scan Section ── */}
+            {activeSection === 'deep' && (
+                <div className="space-y-5">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-sm font-bold text-white">🔍 Deep System Scan</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                {deepHealth ? `Last scanned: ${new Date(deepHealth.checkedAt).toLocaleTimeString('en-IN')}` : 'Poora system check — database, env vars, files, errors sab'}
+                            </p>
+                        </div>
+                        <button
+                            onClick={fetchDeepHealth}
+                            disabled={deepLoading}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded-lg text-xs font-medium hover:bg-amber-500/25 transition-all disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${deepLoading ? 'animate-spin' : ''}`} />
+                            {deepLoading ? 'Scanning...' : 'Run Deep Scan'}
+                        </button>
+                    </div>
+
+                    {deepError && (
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-3">
+                            <XCircle className="w-5 h-5 text-red-400 shrink-0" />
+                            <div>
+                                <p className="text-sm font-semibold text-red-300">Deep Scan Failed</p>
+                                <p className="text-xs text-slate-400 mt-0.5">{deepError} — Make sure backend is running on localhost:3000</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {deepLoading && !deepHealth && (
+                        <div className="grid grid-cols-3 gap-3">
+                            {[...Array(6)].map((_, i) => (
+                                <div key={i} className="bg-dark-card border border-dark-border rounded-xl p-4 animate-pulse">
+                                    <div className="h-3 bg-dark-elem rounded w-1/2 mb-2" />
+                                    <div className="h-6 bg-dark-elem rounded w-3/4" />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {deepHealth && (
+                        <>
+                            {/* ── Server Runtime ── */}
+                            <div className="bg-dark-card border border-dark-border rounded-xl p-4">
+                                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <Terminal className="w-3.5 h-3.5" /> Server Runtime
+                                </h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {[
+                                        { label: 'Node.js', value: deepHealth.runtime.nodeVersion, icon: '🟢' },
+                                        { label: 'Platform', value: deepHealth.runtime.platform, icon: '💻' },
+                                        { label: 'DB Engine', value: deepHealth.runtime.dbEngine, icon: '🗄️' },
+                                        { label: 'Heap Used', value: deepHealth.runtime.memory.heapUsed, icon: '🧠' },
+                                        { label: 'Heap Total', value: deepHealth.runtime.memory.heapTotal, icon: '📦' },
+                                        { label: 'RSS Memory', value: deepHealth.runtime.memory.rss, icon: '💾' },
+                                        { label: 'Process ID', value: String(deepHealth.runtime.pid), icon: '🔢' },
+                                        { label: 'Started At', value: new Date(deepHealth.runtime.startedAt).toLocaleTimeString('en-IN'), icon: '🕐' },
+                                    ].map(item => (
+                                        <div key={item.label} className="bg-dark-elem/40 rounded-lg px-3 py-2">
+                                            <p className="text-[10px] text-slate-500 uppercase tracking-wide">{item.icon} {item.label}</p>
+                                            <p className="text-sm font-mono font-semibold text-white mt-0.5">{item.value}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* ── Database Tables ── */}
+                            <div className="bg-dark-card border border-dark-border rounded-xl p-4">
+                                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <Database className="w-3.5 h-3.5" /> Database Tables ({deepHealth.tables.filter(t => t.status === 'ok').length}/{deepHealth.tables.length} OK)
+                                </h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                    {deepHealth.tables.map(t => (
+                                        <div key={t.name} className={`rounded-lg px-3 py-2 border flex items-center justify-between ${t.status === 'ok' ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/10 border-red-500/30'}`}>
+                                            <div>
+                                                <p className="text-xs text-slate-400">{t.icon} {t.name}</p>
+                                                {t.status === 'ok'
+                                                    ? <p className="text-sm font-bold text-white">{t.count.toLocaleString()} <span className="text-[10px] text-slate-500 font-normal">records</span></p>
+                                                    : <p className="text-xs text-red-400 font-mono mt-0.5 truncate">{t.error}</p>
+                                                }
+                                            </div>
+                                            <span className={`text-[10px] font-bold ${t.status === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>{t.status === 'ok' ? '✓' : '✗'}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* ── Environment Variables ── */}
+                            <div className="bg-dark-card border border-dark-border rounded-xl p-4">
+                                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <Zap className="w-3.5 h-3.5" /> Environment Variables & Config
+                                </h4>
+                                <div className="space-y-2">
+                                    {deepHealth.env.map(e => (
+                                        <div key={e.key} className={`flex items-start justify-between gap-3 px-3 py-2.5 rounded-lg border ${e.critical && !e.set ? 'bg-red-500/10 border-red-500/30' : !e.set ? 'bg-amber-500/10 border-amber-500/20' : 'bg-dark-elem/30 border-dark-border/50'}`}>
+                                            <div className="flex items-center gap-2">
+                                                {e.critical && !e.set && <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />}
+                                                {!e.critical && !e.set && <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                                                {e.set && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                                                <div>
+                                                    <span className="text-xs font-mono font-bold text-slate-200">{e.key}</span>
+                                                    {e.critical && <span className="ml-1.5 text-[9px] font-bold text-red-400 uppercase bg-red-500/20 px-1 py-0.5 rounded">Critical</span>}
+                                                    <p className="text-xs text-slate-400 mt-0.5">{e.label}</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-xs text-right text-slate-400 shrink-0">{e.value}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* ── File System ── */}
+                            <div className="bg-dark-card border border-dark-border rounded-xl p-4">
+                                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <Layers className="w-3.5 h-3.5" /> File System
+                                </h4>
+                                <div className="space-y-2">
+                                    {deepHealth.filesystem.map((f, i) => (
+                                        <div key={i} className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${f.exists ? 'bg-dark-elem/30 border-dark-border/50' : 'bg-amber-500/10 border-amber-500/20'}`}>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm">{f.icon}</span>
+                                                <div>
+                                                    <p className="text-xs font-semibold text-slate-200">{f.label}</p>
+                                                    {f.backupCount !== undefined && <p className="text-xs text-slate-500">{f.backupCount} backup files · Latest: {f.latestBackup || 'none'}</p>}
+                                                    {f.size !== undefined && f.size !== null && !f.isDir && <p className="text-xs text-slate-500">{(f.size / 1024).toFixed(1)} KB</p>}
+                                                </div>
+                                            </div>
+                                            <span className={`text-xs font-bold ${f.exists ? 'text-emerald-400' : 'text-amber-400'}`}>{f.exists ? '✓ Exists' : '⚠ Missing'}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* ── Backup Config ── */}
+                            <div className="bg-dark-card border border-dark-border rounded-xl p-4">
+                                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <Clock className="w-3.5 h-3.5" /> Backup Configuration
+                                </h4>
+                                {deepHealth.backup.error ? (
+                                    <p className="text-xs text-red-400">{deepHealth.backup.error}</p>
+                                ) : (
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                        {[
+                                            { label: 'Backup Enabled', value: deepHealth.backup.enabled ? '✅ Yes' : '❌ No', ok: deepHealth.backup.enabled },
+                                            { label: 'Scheduled Times', value: deepHealth.backup.times.length > 0 ? deepHealth.backup.times.join(', ') : 'None', ok: deepHealth.backup.times.length > 0 },
+                                            { label: 'Email Delivery', value: deepHealth.backup.emailEnabled ? `✅ ${deepHealth.backup.emailTo || 'Enabled'}` : '⚠️ Disabled', ok: deepHealth.backup.emailEnabled },
+                                            { label: 'WhatsApp Delivery', value: deepHealth.backup.whatsappEnabled ? '✅ Enabled' : '⚠️ Disabled', ok: deepHealth.backup.whatsappEnabled },
+                                            { label: 'Last Backup', value: deepHealth.backup.status?.lastBackup ? new Date(deepHealth.backup.status.lastBackup).toLocaleString('en-IN') : 'Never', ok: !!deepHealth.backup.status?.lastBackup },
+                                            { label: 'Total Backups', value: String(deepHealth.backup.status?.totalBackups ?? 0), ok: (deepHealth.backup.status?.totalBackups ?? 0) > 0 },
+                                        ].map(item => (
+                                            <div key={item.label} className={`rounded-lg px-3 py-2 border ${item.ok ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
+                                                <p className="text-[10px] text-slate-500 uppercase">{item.label}</p>
+                                                <p className="text-xs font-semibold text-slate-200 mt-0.5">{item.value}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ── Error Analytics ── */}
+                            {deepHealth.errorAnalytics.total > 0 && (
+                                <div className="bg-dark-card border border-dark-border rounded-xl p-4">
+                                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                        <AlertTriangle className="w-3.5 h-3.5 text-red-400" /> Error Analytics ({deepHealth.errorAnalytics.total} total)
+                                    </h4>
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-[10px] text-slate-500 uppercase mb-2">By Error Type</p>
+                                            <div className="space-y-1.5">
+                                                {deepHealth.errorAnalytics.byType.map(t => (
+                                                    <div key={t.type} className="flex items-center gap-2">
+                                                        <span className="text-xs font-mono text-red-300 flex-1 truncate">{t.type}</span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="h-1.5 bg-red-500/40 rounded-full" style={{ width: `${Math.min((t.count / deepHealth.errorAnalytics.total) * 100, 100) * 0.6}px` }} />
+                                                            <span className="text-xs font-bold text-red-400 w-6 text-right">{t.count}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-slate-500 uppercase mb-2">By Page / Endpoint</p>
+                                            <div className="space-y-1.5">
+                                                {deepHealth.errorAnalytics.byPage.map(p => (
+                                                    <div key={p.page} className="flex items-center gap-2">
+                                                        <span className="text-xs text-slate-400 flex-1 truncate font-mono">{p.page}</span>
+                                                        <span className="text-xs font-bold text-amber-400 w-6 text-right">{p.count}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {deepHealth.errorAnalytics.total === 0 && (
+                                <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-6 text-center">
+                                    <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2 opacity-70" />
+                                    <p className="text-emerald-400 font-bold">System Clean!</p>
+                                    <p className="text-slate-500 text-xs mt-1">Koi bhi error log nahi hai — sab systems normal hain 🎉</p>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
