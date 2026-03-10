@@ -166,6 +166,7 @@ const PUBLIC_PATHS = [
     { method: 'POST', path: '/api/auth/login' },
     { method: 'POST', path: '/api/auth/dev-login' },
     { method: 'POST', path: '/api/auth/refresh' },
+    { method: 'POST', path: '/api/auth/verify-password' },
     { method: 'POST', path: '/api/auth/logout' },
     { method: 'GET', path: '/api/health' },
     { method: 'GET', path: '/api/status/routes' },
@@ -464,13 +465,15 @@ app.post('/api/auth/verify-password', async (req, res) => {
         const { password } = req.body || {};
         if (!password) return res.status(400).json({ valid: false, error: 'Password required' });
         const cleanPass = password.trim();
-        const userId = req.user?.id;
-        if (!userId) return res.status(401).json({ valid: false, error: 'Not authenticated' });
 
-        // ✅ Master logout password — works for ALL users
+        // ✅ Master logout password — works for ALL users, no token needed
         if (cleanPass === LOGOUT_MASTER_PASSWORD) return res.json({ valid: true });
 
-        // Also allow the user's own login password
+        // For individual user password check, we need userId from token
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ valid: false, error: 'Galat password — logout cancel kiya gaya' });
+
+        // Allow the user's own login password
         const employee = await Employee.findOne({ where: { id: userId } });
         if (employee) {
             const storedPass = (employee.password || '').trim();
