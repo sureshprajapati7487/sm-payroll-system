@@ -334,7 +334,7 @@ const EDITABLE_ROLES: { role: Role; label: string; emoji: string; gradFrom: stri
 // ─── Main Component ───────────────────────────────────────────────────────────
 export const RoleAccessConfig = () => {
     const { user } = useAuthStore();
-    const { permissions, scopes, togglePermission, setScope, resetRole, resetAll } = useRolePermissionsStore();
+    const { permissions, scopes, setPermissions, resetRole, resetAll, isLoaded } = useRolePermissionsStore();
 
     // ── Draft state: local copy of permissions/scopes before Save ──────────────
     const [draftPerms, setDraftPerms] = useState<Record<string, string[]>>(() => {
@@ -357,20 +357,19 @@ export const RoleAccessConfig = () => {
         isOpen: boolean; title: string; message: string; onConfirm: () => void;
     }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
 
-    // Sync draft when permissions from store change externally (e.g. reset)
+    // Sync draft whenever permissions are loaded from DB (runs once after fetch)
     useEffect(() => {
-        setDraftPerms(prev => {
-            const map: Record<string, string[]> = { ...prev };
-            EDITABLE_ROLES.forEach(({ role }) => { map[role] = [...(permissions[role] ?? [])]; });
-            return map;
+        const perms: Record<string, string[]> = {};
+        const scopeMap: Record<string, DataScope> = {};
+        EDITABLE_ROLES.forEach(({ role }) => {
+            perms[role] = [...(permissions[role] ?? [])];
+            scopeMap[role] = scopes[role] ?? 'ALL';
         });
-        setDraftScopes(prev => {
-            const map: Record<string, DataScope> = { ...prev };
-            EDITABLE_ROLES.forEach(({ role }) => { map[role] = scopes[role] ?? 'ALL'; });
-            return map;
-        });
+        setDraftPerms(perms);
+        setDraftScopes(scopeMap);
+        // Re-run when the store finishes loading from DB
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [isLoaded]);
 
     if (!user || user.role !== Roles.SUPER_ADMIN) {
         return (
@@ -410,19 +409,15 @@ export const RoleAccessConfig = () => {
         setSavedAt(null);
     };
 
-    // ── Save: commit all drafts to the real Zustand store (persisted) ────────
-    const saveChanges = () => {
+    // ── Save: commit all drafts to the real store + DB ───────────────────────
+    const saveChanges = async () => {
+        const permsToSave: Record<string, PermissionValue[]> = {};
+        const scopesToSave: Record<string, DataScope> = {};
         EDITABLE_ROLES.forEach(({ role }) => {
-            const draft = draftPerms[role] ?? [];
-            const saved = permissions[role] ?? [];
-            // Remove permissions no longer in draft
-            saved.forEach(p => { if (!draft.includes(p)) togglePermission(role, p as PermissionValue); });
-            // Add permissions newly in draft
-            draft.forEach(p => { if (!saved.includes(p as PermissionValue)) togglePermission(role, p as PermissionValue); });
-            // Save scope if changed
-            const newScope = draftScopes[role];
-            if (newScope && newScope !== scopes[role]) setScope(role, newScope);
+            permsToSave[role] = (draftPerms[role] ?? []) as PermissionValue[];
+            scopesToSave[role] = draftScopes[role] ?? scopes[role] ?? 'ALL';
         });
+        await setPermissions(permsToSave as any, scopesToSave as any);
         setSavedAt(new Date().toLocaleTimeString());
     };
 
@@ -439,19 +434,23 @@ export const RoleAccessConfig = () => {
     };
 
     // ── Reset helpers that also clear draft ─────────────────────────────────
-    const handleResetRole = (role: Role) => {
-        resetRole(role);
-        setTimeout(() => {
-            setDraftPerms(prev => ({ ...prev, [role]: [...(permissions[role] ?? [])] }));
-        }, 50);
+    const handleResetRole = async (role: Role) => {
+        await resetRole(role);
+        // After reset, re-sync draft from freshly reset store
+        setDraftPerms(prev => ({ ...prev, [role]: [...(useRolePermissionsStore.getState().permissions[role] ?? [])] }));
+        setDraftScopes(prev => ({ ...prev, [role]: useRolePermissionsStore.getState().scopes[role] ?? 'OWN' }));
     };
-    const handleResetAll = () => {
-        resetAll();
-        setTimeout(() => {
-            const perms: Record<string, string[]> = {};
-            EDITABLE_ROLES.forEach(({ role }) => { perms[role] = [...(permissions[role] ?? [])]; });
-            setDraftPerms(perms);
-        }, 50);
+    const handleResetAll = async () => {
+        await resetAll();
+        const st = useRolePermissionsStore.getState();
+        const perms: Record<string, string[]> = {};
+        const scopeMap: Record<string, DataScope> = {};
+        EDITABLE_ROLES.forEach(({ role }) => {
+            perms[role] = [...(st.permissions[role] ?? [])];
+            scopeMap[role] = st.scopes[role] ?? 'ALL';
+        });
+        setDraftPerms(perms);
+        setDraftScopes(scopeMap);
     };
 
     const toggleGroup = (id: string) =>
