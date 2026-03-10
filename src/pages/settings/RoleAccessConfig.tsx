@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     ShieldCheck, RotateCcw, Lock, Check, X,
     Users, CalendarClock, Banknote, Factory, Wallet,
@@ -6,7 +6,7 @@ import {
     TrendingUp, BarChart2, ShoppingBag,
     FileText, Database,
     Eye, Navigation, ChevronDown, ChevronRight,
-    AlertTriangle, Zap, Globe, Network, User
+    AlertTriangle, Zap, Globe, Network, User, Save
 } from 'lucide-react';
 import { useRolePermissionsStore, DataScope } from '@/store/rolePermissionsStore';
 import { useAuthStore } from '@/store/authStore';
@@ -335,6 +335,20 @@ const EDITABLE_ROLES: { role: Role; label: string; emoji: string; gradFrom: stri
 export const RoleAccessConfig = () => {
     const { user } = useAuthStore();
     const { permissions, scopes, togglePermission, setScope, resetRole, resetAll } = useRolePermissionsStore();
+
+    // ── Draft state: local copy of permissions/scopes before Save ──────────────
+    const [draftPerms, setDraftPerms] = useState<Record<string, string[]>>(() => {
+        const map: Record<string, string[]> = {};
+        EDITABLE_ROLES.forEach(({ role }) => { map[role] = [...(permissions[role] ?? [])]; });
+        return map;
+    });
+    const [draftScopes, setDraftScopes] = useState<Record<string, DataScope>>(() => {
+        const map: Record<string, DataScope> = {};
+        EDITABLE_ROLES.forEach(({ role }) => { map[role] = scopes[role] ?? 'ALL'; });
+        return map;
+    });
+    const [savedAt, setSavedAt] = useState<string | null>(null);
+
     const [selectedRole, setSelectedRole] = useState<Role>(Roles.ADMIN);
     const [expandedGroups, setExpandedGroups] = useState<string[]>(['sidebar', 'employees']);
     const [searchQuery, setSearchQuery] = useState('');
@@ -342,6 +356,21 @@ export const RoleAccessConfig = () => {
     const [warning, setWarning] = useState<{
         isOpen: boolean; title: string; message: string; onConfirm: () => void;
     }>({ isOpen: false, title: '', message: '', onConfirm: () => { } });
+
+    // Sync draft when permissions from store change externally (e.g. reset)
+    useEffect(() => {
+        setDraftPerms(prev => {
+            const map: Record<string, string[]> = { ...prev };
+            EDITABLE_ROLES.forEach(({ role }) => { map[role] = [...(permissions[role] ?? [])]; });
+            return map;
+        });
+        setDraftScopes(prev => {
+            const map: Record<string, DataScope> = { ...prev };
+            EDITABLE_ROLES.forEach(({ role }) => { map[role] = scopes[role] ?? 'ALL'; });
+            return map;
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     if (!user || user.role !== Roles.SUPER_ADMIN) {
         return (
@@ -355,10 +384,75 @@ export const RoleAccessConfig = () => {
         );
     }
 
-    const activePerms = permissions[selectedRole] ?? [];
+    // ── Computed from draft ──────────────────────────────────────────────────
+    const activePerms = draftPerms[selectedRole] ?? permissions[selectedRole] ?? [];
+    const savedPerms = permissions[selectedRole] ?? [];
     const activeRoleMeta = EDITABLE_ROLES.find(r => r.role === selectedRole)!;
     const totalPermCount = Object.keys(PERMISSIONS).length;
     const enabledCount = activePerms.length;
+
+    // Check if any role has unsaved changes vs persisted store
+    const hasUnsaved = EDITABLE_ROLES.some(({ role }) => {
+        const draft = draftPerms[role] ?? [];
+        const saved = permissions[role] ?? [];
+        if (draft.length !== saved.length) return true;
+        if ((draftScopes[role] ?? scopes[role]) !== scopes[role]) return true;
+        return draft.some(p => !saved.includes(p as PermissionValue));
+    });
+
+    // ── Draft toggle (does NOT touch the store) ──────────────────────────────
+    const toggleDraft = (role: Role, permission: string) => {
+        setDraftPerms(prev => {
+            const current = prev[role] ?? [];
+            const has = current.includes(permission);
+            return { ...prev, [role]: has ? current.filter(p => p !== permission) : [...current, permission] };
+        });
+        setSavedAt(null);
+    };
+
+    // ── Save: commit all drafts to the real Zustand store (persisted) ────────
+    const saveChanges = () => {
+        EDITABLE_ROLES.forEach(({ role }) => {
+            const draft = draftPerms[role] ?? [];
+            const saved = permissions[role] ?? [];
+            // Remove permissions no longer in draft
+            saved.forEach(p => { if (!draft.includes(p)) togglePermission(role, p as PermissionValue); });
+            // Add permissions newly in draft
+            draft.forEach(p => { if (!saved.includes(p as PermissionValue)) togglePermission(role, p as PermissionValue); });
+            // Save scope if changed
+            const newScope = draftScopes[role];
+            if (newScope && newScope !== scopes[role]) setScope(role, newScope);
+        });
+        setSavedAt(new Date().toLocaleTimeString());
+    };
+
+    // ── Discard: restore draft from persisted store ──────────────────────────
+    const discardChanges = () => {
+        const perms: Record<string, string[]> = {};
+        const scopeMap: Record<string, DataScope> = {};
+        EDITABLE_ROLES.forEach(({ role }) => {
+            perms[role] = [...(permissions[role] ?? [])];
+            scopeMap[role] = scopes[role] ?? 'ALL';
+        });
+        setDraftPerms(perms);
+        setDraftScopes(scopeMap);
+    };
+
+    // ── Reset helpers that also clear draft ─────────────────────────────────
+    const handleResetRole = (role: Role) => {
+        resetRole(role);
+        setTimeout(() => {
+            setDraftPerms(prev => ({ ...prev, [role]: [...(permissions[role] ?? [])] }));
+        }, 50);
+    };
+    const handleResetAll = () => {
+        resetAll();
+        setTimeout(() => {
+            const perms: Record<string, string[]> = {};
+            EDITABLE_ROLES.forEach(({ role }) => { perms[role] = [...(permissions[role] ?? [])]; });
+            setDraftPerms(perms);
+        }, 50);
+    };
 
     const toggleGroup = (id: string) =>
         setExpandedGroups(prev => prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]);
@@ -382,6 +476,30 @@ export const RoleAccessConfig = () => {
 
     return (
         <div className="space-y-6">
+            {/* Sticky Unsaved Banner */}
+            {hasUnsaved && (
+                <div className="sticky top-0 z-40 flex items-center justify-between gap-4 px-5 py-3 bg-amber-500/10 border border-amber-500/40 rounded-2xl backdrop-blur-sm shadow-xl">
+                    <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-400" />
+                        <span className="text-sm font-semibold text-amber-300">Unsaved changes — click Save to apply permissions</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={discardChanges} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-400 hover:text-white bg-slate-800 border border-slate-700 rounded-lg transition-all">
+                            <X className="w-3.5 h-3.5" /> Discard
+                        </button>
+                        <button onClick={saveChanges} className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-all shadow-lg shadow-emerald-600/20">
+                            <Save className="w-3.5 h-3.5" /> Save Changes
+                        </button>
+                    </div>
+                </div>
+            )}
+            {!hasUnsaved && savedAt && (
+                <div className="flex items-center gap-2 px-5 py-3 bg-green-500/10 border border-green-500/30 rounded-2xl">
+                    <Check className="w-4 h-4 text-green-400" />
+                    <span className="text-sm text-green-300">Permissions saved at {savedAt} — active until Super Admin changes them.</span>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                 <div>
@@ -397,7 +515,7 @@ export const RoleAccessConfig = () => {
                     onClick={() => setWarning({
                         isOpen: true, title: 'Reset ALL Roles?',
                         message: 'This will reset every role back to factory defaults. All customizations will be lost.',
-                        onConfirm: () => resetAll(),
+                        onConfirm: () => handleResetAll(),
                     })}
                     className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-sm font-medium transition-all border border-red-500/30 shrink-0"
                 >
@@ -408,7 +526,9 @@ export const RoleAccessConfig = () => {
             {/* Role Selector Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {EDITABLE_ROLES.map(({ role, label, emoji, gradFrom, gradTo, ring }) => {
-                    const perms = permissions[role] ?? [];
+                    const perms = draftPerms[role] ?? permissions[role] ?? [];
+                    const savedLen = (permissions[role] ?? []).length;
+                    const isDirty = perms.length !== savedLen || perms.some(p => !(permissions[role] ?? []).includes(p as PermissionValue));
                     const isSelected = selectedRole === role;
                     const pct = Math.round((perms.length / totalPermCount) * 100);
                     return (
@@ -421,7 +541,7 @@ export const RoleAccessConfig = () => {
                                 }`}
                         >
                             <div className="text-2xl mb-2">{emoji}</div>
-                            <div className="font-bold text-white text-sm mb-1">{label}</div>
+                            <div className="font-bold text-white text-sm mb-1">{label}{isDirty && <span className="ml-1 text-amber-400">*</span>}</div>
                             <div className="text-xs text-slate-400 mb-2">{perms.length} / {totalPermCount} permissions</div>
                             {/* Progress bar */}
                             <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
@@ -458,11 +578,11 @@ export const RoleAccessConfig = () => {
                         { scope: 'TEAM' as DataScope, label: 'Team Only (TEAM)', desc: 'Can see data only for employees in their own department', icon: Network, color: 'text-emerald-400', border: 'border-emerald-500/50', bg: 'bg-emerald-500/10' },
                         { scope: 'OWN' as DataScope, label: 'Own Only (OWN)', desc: 'Can see only their personal data and records', icon: User, color: 'text-amber-400', border: 'border-amber-500/50', bg: 'bg-amber-500/10' },
                     ].map(({ scope, label, desc, icon: Icon, color, border, bg }) => {
-                        const isSelected = scopes[selectedRole] === scope;
+                        const isSelected = (draftScopes[selectedRole] ?? scopes[selectedRole]) === scope;
                         return (
                             <button
                                 key={scope}
-                                onClick={() => setScope(selectedRole, scope)}
+                                onClick={() => setDraftScopes(prev => ({ ...prev, [selectedRole]: scope }))}
                                 className={`text-left p-4 rounded-xl border transition-all ${isSelected
                                     ? `${bg} ${border} ring-1 ring-white/10 shadow-lg scale-[1.02]`
                                     : 'bg-slate-900/50 border-slate-700 hover:border-slate-500 opacity-60 hover:opacity-100 cursor-pointer'
@@ -518,7 +638,7 @@ export const RoleAccessConfig = () => {
                         isOpen: true,
                         title: `Reset "${activeRoleMeta.label}"?`,
                         message: `Reset the "${activeRoleMeta.label}" role back to its default permissions?`,
-                        onConfirm: () => resetRole(selectedRole),
+                        onConfirm: () => handleResetRole(selectedRole),
                     })}
                     className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
                 >
@@ -531,15 +651,15 @@ export const RoleAccessConfig = () => {
             <div className="grid grid-cols-3 gap-3">
                 <div className="bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3 text-center">
                     <div className="text-2xl font-bold text-green-400">{enabledCount}</div>
-                    <div className="text-xs text-slate-400">Enabled</div>
+                    <div className="text-xs text-slate-400">Draft Enabled</div>
                 </div>
                 <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-center">
                     <div className="text-2xl font-bold text-red-400">{totalPermCount - enabledCount}</div>
-                    <div className="text-xs text-slate-400">Blocked</div>
+                    <div className="text-xs text-slate-400">Draft Blocked</div>
                 </div>
-                <div className="bg-slate-700/30 border border-slate-700 rounded-xl px-4 py-3 text-center">
-                    <div className="text-2xl font-bold text-white">{totalPermCount}</div>
-                    <div className="text-xs text-slate-400">Total</div>
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-3 text-center">
+                    <div className="text-2xl font-bold text-blue-300">{savedPerms.length}</div>
+                    <div className="text-xs text-slate-400">Saved &amp; Active</div>
                 </div>
             </div>
 
@@ -603,7 +723,7 @@ export const RoleAccessConfig = () => {
                                                         return (
                                                             <button
                                                                 key={key}
-                                                                onClick={() => togglePermission(selectedRole, key as PermissionValue)}
+                                                                onClick={() => toggleDraft(selectedRole, key)}
                                                                 className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all group ${isOn
                                                                     ? danger
                                                                         ? 'bg-red-500/10 border-red-500/40 hover:bg-red-500/15'
