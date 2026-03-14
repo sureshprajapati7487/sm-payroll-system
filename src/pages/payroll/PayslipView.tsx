@@ -1,5 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useAuthStore } from '@/store/authStore';
+import { PERMISSIONS } from '@/config/permissions';
 import { usePayrollStore } from '@/store/payrollStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAttendanceStore } from '@/store/attendanceStore';
@@ -16,7 +18,10 @@ export const PayslipView = () => {
     const { slips } = usePayrollStore();
     const { employees } = useEmployeeStore();
     const { companies, currentCompanyId } = useMultiCompanyStore();
+    const { user, hasPermission } = useAuthStore();
+
     const currentCompany = companies.find(c => c.id === currentCompanyId);
+    const canViewAllSlips = hasPermission(PERMISSIONS.VIEW_ALL_PAYSLIPS) || hasPermission(PERMISSIONS.VIEW_PAYROLL);
 
     // 1. Try from store first (fast), then fallback to server fetch
     const [localSlip, setLocalSlip] = useState<SalarySlip | null>(
@@ -59,6 +64,20 @@ export const PayslipView = () => {
                     <p className="text-dark-muted mb-6">This slip does not exist or has not been generated yet.</p>
                     <button onClick={() => navigate('/payroll')} className="px-4 py-2 bg-primary-600 rounded-lg text-sm hover:bg-primary-500">
                         ← Back to Payroll
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (slip.employeeId !== user?.id && !canViewAllSlips) {
+        return (
+            <div className="min-h-screen bg-dark-bg flex items-center justify-center">
+                <div className="text-center text-white">
+                    <p className="text-2xl font-bold mb-2 text-danger">Access Denied</p>
+                    <p className="text-dark-muted mb-6">You do not have permission to view other employees' payslips.</p>
+                    <button onClick={() => navigate('/dashboard')} className="px-4 py-2 bg-primary-600 rounded-lg text-sm hover:bg-primary-500">
+                        ← Back to Dashboard
                     </button>
                 </div>
             </div>

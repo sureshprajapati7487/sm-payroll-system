@@ -3,6 +3,8 @@ import { History, RotateCcw, CheckCircle, AlertTriangle, Clock } from 'lucide-re
 import { usePayrollVersionStore } from '@/store/payrollVersionStore';
 import { usePayrollStore } from '@/store/payrollStore';
 import { useEmployeeStore } from '@/store/employeeStore';
+import { useAuthStore } from '@/store/authStore';
+import { PERMISSIONS } from '@/config/permissions';
 import { exportToExcel, exportPayrollToPDF } from '@/utils/exportUtils';
 import { Download, FileSpreadsheet, Search, ArrowUpRight } from 'lucide-react';
 import { useDialog } from '@/components/DialogProvider';
@@ -13,6 +15,11 @@ export const PayrollHistory = () => {
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [showConfirm, setShowConfirm] = useState<string | null>(null);
     const { toast } = useDialog();
+    const { user, hasPermission } = useAuthStore();
+
+    const canViewAllSlips = hasPermission(PERMISSIONS.VIEW_ALL_PAYSLIPS) || hasPermission(PERMISSIONS.VIEW_PAYROLL) || hasPermission(PERMISSIONS.GENERATE_PAYROLL);
+    const canRollback = hasPermission(PERMISSIONS.GENERATE_PAYROLL);
+    const canExport = hasPermission(PERMISSIONS.EXPORT_REPORTS) || hasPermission(PERMISSIONS.GENERATE_PAYROLL);
 
     const [month, year] = selectedMonth.split('-');
     const history = getVersionHistory(month, parseInt(year));
@@ -50,7 +57,8 @@ export const PayrollHistory = () => {
         const emp = employees.find(e => e.id === s.employeeId);
         const nameMatch = emp?.name.toLowerCase().includes(searchTerm.toLowerCase()) || false;
         const statusMatch = statusFilter === 'ALL' || s.status === statusFilter;
-        return nameMatch && statusMatch;
+        const accessOk = canViewAllSlips || s.employeeId === user?.id;
+        return nameMatch && statusMatch && accessOk;
     });
 
     const handleExportExcel = () => {
@@ -168,7 +176,7 @@ export const PayrollHistory = () => {
                                     </p>
                                     <div className="flex justify-between items-center text-xs text-dark-muted">
                                         <span>Items: {version.changes.length}</span>
-                                        {version.status === 'finalized' && idx !== 0 && (
+                                        {version.status === 'finalized' && idx !== 0 && canRollback && (
                                             <button
                                                 onClick={() => setShowConfirm(version.id)}
                                                 className="text-yellow-500 hover:text-yellow-400 flex items-center gap-1"
@@ -213,20 +221,24 @@ export const PayrollHistory = () => {
                         </div>
 
                         <div className="flex gap-2">
-                            <button
-                                onClick={handleExportExcel}
-                                className="flex items-center gap-2 px-3 py-2 bg-green-600/20 text-green-400 hover:bg-green-600/30 border border-green-600/30 rounded-lg text-sm transition-all"
-                            >
-                                <FileSpreadsheet className="w-4 h-4" />
-                                Excel
-                            </button>
-                            <button
-                                onClick={handleExportPDF}
-                                className="flex items-center gap-2 px-3 py-2 bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-600/30 rounded-lg text-sm transition-all"
-                            >
-                                <Download className="w-4 h-4" />
-                                PDF
-                            </button>
+                            {canExport && (
+                                <>
+                                    <button
+                                        onClick={handleExportExcel}
+                                        className="flex items-center gap-2 px-3 py-2 bg-green-600/20 text-green-400 hover:bg-green-600/30 border border-green-600/30 rounded-lg text-sm transition-all"
+                                    >
+                                        <FileSpreadsheet className="w-4 h-4" />
+                                        Excel
+                                    </button>
+                                    <button
+                                        onClick={handleExportPDF}
+                                        className="flex items-center gap-2 px-3 py-2 bg-red-600/20 text-red-400 hover:bg-red-600/30 border border-red-600/30 rounded-lg text-sm transition-all"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                        PDF
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
 

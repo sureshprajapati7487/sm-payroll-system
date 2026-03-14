@@ -32,8 +32,12 @@ export const PayrollDashboard = () => {
     // Default to current month YYYY-MM
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [searchTerm, setSearchTerm] = useState('');
-
     const canGenerate = hasPermission(PERMISSIONS.GENERATE_PAYROLL);
+    const canSimulate = hasPermission(PERMISSIONS.RUN_PAYROLL_SIMULATION) || canGenerate;
+    const canApprove = hasPermission(PERMISSIONS.APPROVE_PAYROLL) || canGenerate;
+    const canLock = hasPermission(PERMISSIONS.LOCK_PAYROLL) || canGenerate;
+    const canViewAllSlips = hasPermission(PERMISSIONS.VIEW_ALL_PAYSLIPS) || hasPermission(PERMISSIONS.VIEW_PAYROLL) || canGenerate;
+    const canManageLoans = hasPermission(PERMISSIONS.MANAGE_LOANS);
 
     const [showPendingOnly, setShowPendingOnly] = useState(false);
     const [selectedDept, setSelectedDept] = useState('ALL');
@@ -64,7 +68,10 @@ export const PayrollDashboard = () => {
         const emp = employees.find(e => e.id === s.employeeId);
         const deptMatch = selectedDept === 'ALL' || emp?.department === selectedDept;
 
-        return monthMatch && searchMatch && statusMatch && deptMatch;
+        // Privacy Access Check
+        const accessOk = canViewAllSlips || s.employeeId === user?.id;
+
+        return monthMatch && searchMatch && statusMatch && deptMatch && accessOk;
     });
     const totalPayout = filteredSlips.reduce((sum, s) => sum + s.netSalary, 0);
 
@@ -145,11 +152,9 @@ export const PayrollDashboard = () => {
                         >
                             <option value="" disabled>Select Action...</option>
                             {canGenerate && <option value="GENERATE">{isSaving ? '⏳ Saving...' : '⚡ Generate Salary Slips'}</option>}
-                            <option value="REPORT">📊 Final Disbursement Report</option>
-                            <option value="TOGGLE_PENDING">
-                                {showPendingOnly ? '☑ Show All Records' : '☐ Show Pending Only'}
-                            </option>
-                            <option value="LOANS">💰 Manage Loans</option>
+                            {canViewAllSlips && <option value="REPORT">📊 Final Disbursement Report</option>}
+                            {canViewAllSlips && <option value="TOGGLE_PENDING">{showPendingOnly ? '☑ Show All Records' : '☐ Show Pending Only'}</option>}
+                            {canManageLoans && <option value="LOANS">💰 Manage Loans</option>}
                             <option value="HISTORY">📜 View History</option>
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -211,7 +216,8 @@ export const PayrollDashboard = () => {
                                 const dataToRender = showEstimates ?
                                     employees.filter(e => e.status === 'ACTIVE' &&
                                         (e.name.toLowerCase().includes(searchTerm.toLowerCase()) || e.code.toLowerCase().includes(searchTerm.toLowerCase())) &&
-                                        (selectedDept === 'ALL' || e.department === selectedDept)
+                                        (selectedDept === 'ALL' || e.department === selectedDept) &&
+                                        (canViewAllSlips || e.id === user?.id)
                                     ).map(emp => {
                                         // LIVE CALC
                                         return calculateSalary(
@@ -283,7 +289,7 @@ export const PayrollDashboard = () => {
 
                                                     {!isEstimate ? (
                                                         <>
-                                                            {slip.status === 'DRAFT' && canGenerate && (
+                                                            {slip.status === 'DRAFT' && canSimulate && (
                                                                 <button
                                                                     onClick={() => advanceState(slip.id, 'simulate')}
                                                                     className="p-1.5 text-info hover:bg-info/10 rounded transition-colors"
@@ -292,7 +298,7 @@ export const PayrollDashboard = () => {
                                                                     <div className="w-5 h-5 flex items-center justify-center font-bold text-xs">SIM</div>
                                                                 </button>
                                                             )}
-                                                            {slip.status === 'SIMULATION' && canGenerate && (
+                                                            {slip.status === 'SIMULATION' && canApprove && (
                                                                 <button
                                                                     onClick={() => advanceState(slip.id, 'approve')}
                                                                     className="p-1.5 text-warning hover:bg-warning/10 rounded transition-colors"
@@ -301,7 +307,7 @@ export const PayrollDashboard = () => {
                                                                     <div className="w-5 h-5 flex items-center justify-center font-bold text-xs">APP</div>
                                                                 </button>
                                                             )}
-                                                            {slip.status === 'FINAL_APPROVED' && canGenerate && (
+                                                            {slip.status === 'FINAL_APPROVED' && canLock && (
                                                                 <button
                                                                     onClick={() => advanceState(slip.id, 'lock')}
                                                                     className="p-1.5 text-success hover:bg-success/10 rounded transition-colors"
