@@ -80,6 +80,7 @@ export const PERMISSIONS = {
     VIEW_LEAVES: 'view_leaves',
     REQUEST_LEAVES: 'request_leaves',
     APPROVE_LEAVES: 'approve_leaves',
+    MANAGE_LEAVES: 'manage_leaves',
     VIEW_ALL_LEAVES: 'view_all_leaves',
     MANAGE_LEAVE_BALANCE: 'manage_leave_balance',
 
@@ -323,6 +324,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.APPROVE_LEAVES,
         PERMISSIONS.VIEW_ALL_LEAVES,
         PERMISSIONS.MANAGE_LEAVE_BALANCE,
+        PERMISSIONS.MANAGE_LEAVES,
 
         // Production
         PERMISSIONS.VIEW_PRODUCTION,

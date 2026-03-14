@@ -194,6 +194,7 @@ const PERMISSION_GROUPS: {
                         { key: PERMISSIONS.VIEW_LEAVES, label: 'View Leaves', desc: 'See leave request list' },
                         { key: PERMISSIONS.REQUEST_LEAVES, label: 'Apply for Leave', desc: 'Submit personal leave requests' },
                         { key: PERMISSIONS.APPROVE_LEAVES, label: 'Approve Leaves', desc: 'Approve or reject leave requests' },
+                        { key: PERMISSIONS.MANAGE_LEAVES, label: 'Manage Leaves', desc: 'Apply leaves on behalf of employees' },
                         { key: PERMISSIONS.VIEW_ALL_LEAVES, label: 'View All Leaves', desc: 'See all employees\' leave history' },
                         { key: PERMISSIONS.MANAGE_LEAVE_BALANCE, label: 'Manage Leave Balance', desc: 'Add/deduct leave balance for employees' },
                     ],

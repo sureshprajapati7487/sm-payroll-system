@@ -129,8 +129,8 @@ export const LeaveDashboard = () => {
     const [searchTerm, setSearchTerm] = useState('');
 
     const canApprove = hasPermission(PERMISSIONS.APPROVE_LEAVES);
-    const canManageLeaves = hasPermission(PERMISSIONS.APPROVE_LEAVES);
-    const canViewAllLeaves = hasPermission(PERMISSIONS.VIEW_ALL_LEAVES) || canApprove;
+    const canManageLeaves = hasPermission(PERMISSIONS.MANAGE_LEAVES) || canApprove;
+    const canViewAllLeaves = hasPermission(PERMISSIONS.VIEW_ALL_LEAVES) || canManageLeaves;
 
     // Get Target Employee Data
     const targetEmployee = employees.find(e => e.id === targetEmployeeId);
