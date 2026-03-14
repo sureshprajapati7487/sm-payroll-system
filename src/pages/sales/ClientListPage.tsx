@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useDialog } from '@/components/DialogProvider';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { PERMISSIONS } from '@/config/permissions';
 // ── Vanilla Leaflet Map (no react-leaflet — avoids render2 crash with React 18) ─
 const ClientMap = ({ clients }: { clients: SalesClient[] }) => {
     const mapRef = useRef<HTMLDivElement>(null);
@@ -735,9 +736,11 @@ export const ClientListPage = () => {
     const { clients, fetchClients, addClient, updateClient, deleteClient, bulkImportClients, setClientLocation, checkIn, checkOut, fetchActiveVisit, activeVisit, loading } = useClientStore();
     const { toast } = useDialog();
     const { employees } = useEmployeeStore();
-    const { user } = useAuthStore();
+    const { user, hasPermission } = useAuthStore();
     const { currentCompanyId } = useMultiCompanyStore();
     const { settings: sysSettings, fetchSettings } = useInternalSystemSettingStore();
+
+    const canManage = hasPermission(PERMISSIONS.MANAGE_CLIENTS);
 
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState('ALL');
@@ -918,12 +921,16 @@ export const ClientListPage = () => {
                     <button onClick={() => exportClientsToExcel(clients, { companyId: currentCompanyId || undefined, assignedTo: filterAssigned || undefined, status: filterStatus })} disabled={filtered.length === 0} className="flex items-center gap-1.5 px-2.5 py-2 bg-green-500/20 hover:bg-green-500/30 disabled:opacity-40 text-green-400 rounded-xl text-xs font-semibold border border-green-500/30 transition-all">
                         <FileDown className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Export</span>
                     </button>
-                    <button onClick={() => setShowBulk(true)} className="flex items-center gap-1.5 px-2.5 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-xl text-xs font-semibold border border-blue-500/30 transition-all">
-                        <Upload className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Import</span>
-                    </button>
-                    <button onClick={() => setModalClient(null)} className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 hover:bg-orange-400 text-white rounded-xl text-xs font-semibold transition-all shadow-lg shadow-orange-500/20">
-                        <Plus className="w-3.5 h-3.5" /> Add Client
-                    </button>
+                    {canManage && (
+                        <>
+                            <button onClick={() => setShowBulk(true)} className="flex items-center gap-1.5 px-2.5 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-xl text-xs font-semibold border border-blue-500/30 transition-all">
+                                <Upload className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Import</span>
+                            </button>
+                            <button onClick={() => setModalClient(null)} className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 hover:bg-orange-400 text-white rounded-xl text-xs font-semibold transition-all shadow-lg shadow-orange-500/20">
+                                <Plus className="w-3.5 h-3.5" /> Add Client
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -1072,9 +1079,11 @@ export const ClientListPage = () => {
                                                 <Eye className="w-3.5 h-3.5" />
                                             </button>
                                             {/* Set GPS */}
-                                            <button onClick={() => handleSetLocation(client.id)} disabled={gpsLoading === client.id} title={client.latitude ? 'Update GPS Location' : 'Set GPS Location'} className={`p-1.5 rounded-lg transition-colors ${client.latitude ? 'hover:bg-dark-border/50 text-dark-muted hover:text-green-400' : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'}`}>
-                                                {gpsLoading === client.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Navigation className="w-3.5 h-3.5" />}
-                                            </button>
+                                            {canManage && (
+                                                <button onClick={() => handleSetLocation(client.id)} disabled={gpsLoading === client.id} title={client.latitude ? 'Update GPS Location' : 'Set GPS Location'} className={`p-1.5 rounded-lg transition-colors ${client.latitude ? 'hover:bg-dark-border/50 text-dark-muted hover:text-green-400' : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'}`}>
+                                                    {gpsLoading === client.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Navigation className="w-3.5 h-3.5" />}
+                                                </button>
+                                            )}
                                             {/* Check In / Google Maps */}
                                             {client.latitude && (
                                                 <a href={`https://maps.google.com/?q=${client.latitude},${client.longitude}`} target="_blank" rel="noreferrer" title="Open in Google Maps" className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-blue-400 transition-colors">
@@ -1126,19 +1135,21 @@ export const ClientListPage = () => {
                                                     <LogOut className="w-3 h-3" /> Out
                                                 </button>
                                             )}
-                                            {/* Edit */}
-                                            <button onClick={() => setModalClient(client)} className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-white transition-colors">
-                                                <Edit3 className="w-3.5 h-3.5" />
-                                            </button>
-                                            {/* Delete */}
-                                            <button
-                                                onClick={() => setDeleteConfirm(client)}
-                                                title="Party Delete Karo"
-                                                className="p-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/30 text-red-400 hover:text-red-300 transition-colors"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-
+                                            {/* Edit & Delete */}
+                                            {canManage && (
+                                                <>
+                                                    <button onClick={() => setModalClient(client)} className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-white transition-colors">
+                                                        <Edit3 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setDeleteConfirm(client)}
+                                                        title="Party Delete Karo"
+                                                        className="p-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/30 text-red-400 hover:text-red-300 transition-colors"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

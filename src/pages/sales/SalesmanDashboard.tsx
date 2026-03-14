@@ -3,6 +3,8 @@ import { useEmployeeStore } from '@/store/employeeStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { useClientStore } from '@/store/clientStore';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/authStore';
+import { PERMISSIONS } from '@/config/permissions';
 import {
     ShoppingBag, Users, CheckCircle2, Clock,
     AlertCircle, Plus, Trash2, Edit3, Phone, Mail,
@@ -143,13 +145,14 @@ const TaskModal = ({
 
 // ─── Single Task Row ──────────────────────────────────────────────────────────
 const TaskRow = ({
-    task, empName, onToggle, onEdit, onDelete,
+    task, empName, onToggle, onEdit, onDelete, canEdit
 }: {
     task: SalesTask;
     empName: string;
     onToggle: () => void;
     onEdit: () => void;
     onDelete: () => void;
+    canEdit: boolean;
 }) => {
     const priority = PRIORITY_META[task.priority] || PRIORITY_META['medium'];
     const isDone = task.status === 'done';
@@ -205,14 +208,18 @@ const TaskRow = ({
                 </div>
             </div>
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                {!isDone && (
-                    <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-white transition-colors" title="Edit">
-                        <Edit3 className="w-3.5 h-3.5" />
-                    </button>
+                {canEdit && (
+                    <>
+                        {!isDone && (
+                            <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-dark-border/50 text-dark-muted hover:text-white transition-colors" title="Edit">
+                                <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                        <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-red-500/10 text-dark-muted hover:text-red-400 transition-colors" title="Delete">
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    </>
                 )}
-                <button onClick={onDelete} className="p-1.5 rounded-lg hover:bg-red-500/10 text-dark-muted hover:text-red-400 transition-colors" title="Delete">
-                    <Trash2 className="w-3.5 h-3.5" />
-                </button>
             </div>
         </div>
     );
@@ -450,7 +457,11 @@ const TodayActivityBanner = ({ companyId }: { companyId: string }) => {
 export const SalesmanDashboard = () => {
     const { employees } = useEmployeeStore();
     const { currentCompanyId } = useMultiCompanyStore();
+    const { hasPermission } = useAuthStore();
     const navigate = useNavigate();
+
+    const canManageSalesman = hasPermission(PERMISSIONS.MANAGE_SALESMAN);
+    const canManageTasks = hasPermission(PERMISSIONS.MANAGE_SALESMAN);
 
     const { tasks, fetchTasks, addTask, updateTask, deleteTask } = useSalesTaskStore();
     const [activeTab, setActiveTab] = useState<'tasks' | 'clients' | 'performance' | 'route'>('tasks');
@@ -562,7 +573,7 @@ export const SalesmanDashboard = () => {
                     </h1>
                     <p className="text-dark-muted mt-1 text-sm hidden md:block">Sales team overview + task management + performance</p>
                 </div>
-                {activeTab === 'tasks' && (
+                {activeTab === 'tasks' && canManageTasks && (
                     <button
                         onClick={() => setModalTask({})}
                         className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-400 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-orange-500/20"
@@ -652,12 +663,14 @@ export const SalesmanDashboard = () => {
                                     {salesEmployees.length}
                                 </span>
                             </div>
-                            <button
-                                onClick={() => navigate('/employees/new')}
-                                className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1 font-medium transition-colors"
-                            >
-                                Add <ArrowRight className="w-3 h-3" />
-                            </button>
+                            {canManageSalesman && (
+                                <button
+                                    onClick={() => navigate('/employees/new')}
+                                    className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1 font-medium transition-colors"
+                                >
+                                    Add <ArrowRight className="w-3 h-3" />
+                                </button>
+                            )}
                         </div>
 
                         <div className="px-4 py-3 border-b border-dark-border/50">
@@ -676,12 +689,14 @@ export const SalesmanDashboard = () => {
                                 <p className="text-xs text-center px-4">
                                     Employee create karte waqt Department mein <strong className="text-orange-400">"Sales"</strong> dal kar save karein
                                 </p>
-                                <button
-                                    onClick={() => navigate('/employees/new')}
-                                    className="mt-2 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg text-xs font-semibold transition-colors"
-                                >
-                                    + Add Employee
-                                </button>
+                                {canManageSalesman && (
+                                    <button
+                                        onClick={() => navigate('/employees/new')}
+                                        className="mt-2 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg text-xs font-semibold transition-colors"
+                                    >
+                                        + Add Employee
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             <div className="divide-y divide-dark-border/40 max-h-[420px] overflow-y-auto">
@@ -763,6 +778,7 @@ export const SalesmanDashboard = () => {
                                             onToggle={() => toggleTask(task.id, task.status)}
                                             onEdit={() => setModalTask(task)}
                                             onDelete={() => handleDelete(task.id)}
+                                            canEdit={canManageTasks}
                                         />
                                     ))}
                                 </div>
@@ -798,6 +814,7 @@ export const SalesmanDashboard = () => {
                                                     onToggle={() => toggleTask(task.id, task.status)}
                                                     onEdit={() => setModalTask(task)}
                                                     onDelete={() => handleDelete(task.id)}
+                                                    canEdit={canManageTasks}
                                                 />
                                             ))}
                                         </div>
@@ -806,14 +823,16 @@ export const SalesmanDashboard = () => {
                             )}
                         </div>
 
-                        <div className="px-5 py-3 border-t border-dark-border/50">
-                            <button
-                                onClick={() => setModalTask({})}
-                                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-dashed border-dark-border text-dark-muted hover:text-white hover:border-orange-500/40 transition-all text-xs font-medium"
-                            >
-                                <Plus className="w-3.5 h-3.5" /> Add New Task
-                            </button>
-                        </div>
+                        {canManageTasks && (
+                            <div className="px-5 py-3 border-t border-dark-border/50">
+                                <button
+                                    onClick={() => setModalTask({})}
+                                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-dashed border-dark-border text-dark-muted hover:text-white hover:border-orange-500/40 transition-all text-xs font-medium"
+                                >
+                                    <Plus className="w-3.5 h-3.5" /> Add New Task
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
