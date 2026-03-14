@@ -59,7 +59,7 @@ const NAV_GROUPS = [
         items: [
             { label: 'Leaves', path: '/leaves', icon: CalendarClock, perm: PERMISSIONS.NAV_LEAVES },
             { label: 'Loans', path: '/loans', icon: Wallet, perm: PERMISSIONS.NAV_LOANS },
-            { label: 'Approvals', path: '/approvals', icon: UserCheck, perm: PERMISSIONS.NAV_APPROVALS },
+            { label: 'Approvals', path: '/approvals', icon: UserCheck, perm: PERMISSIONS.VIEW_APPROVALS },
             {
                 label: 'Payroll', path: '/payroll', icon: Banknote, perm: PERMISSIONS.NAV_PAYROLL,
                 subItems: [

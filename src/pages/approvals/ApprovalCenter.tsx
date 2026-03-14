@@ -10,13 +10,16 @@ import { clsx } from 'clsx';
 import { calculateSalary } from '@/utils/salaryCalculator';
 import { EmployeeHistoryModal } from '@/components/payroll/EmployeeHistoryModal';
 import { useDialog } from '@/components/DialogProvider';
+import { PERMISSIONS } from '@/config/permissions';
 
 export const ApprovalCenter = () => {
-    const { user } = useAuthStore();
+    const { user, hasPermission } = useAuthStore();
     const { loans, approveLoan, rejectLoan } = useLoanStore();
     const { entries: productionEntries, approveEntry, rejectEntry } = useProductionStore();
     const { employees } = useEmployeeStore();
     const { records: attendanceRecords } = useAttendanceStore();
+
+    const canProcess = hasPermission(PERMISSIONS.PROCESS_APPROVALS);
 
     const [category, setCategory] = useState<'LOANS' | 'PRODUCTION'>('LOANS');
     const [filter, setFilter] = useState<'MY_APPROVALS' | 'ALL' | 'HISTORY'>('MY_APPROVALS');
@@ -31,12 +34,12 @@ export const ApprovalCenter = () => {
         : loans.filter(l => l.status === LoanStatus.REQUESTED || l.status === LoanStatus.CHECKED);
 
     const filteredLoans = relevantLoans.filter(l => {
-        if (filter === 'ALL') return true;
+        if (filter === 'ALL') return canProcess;
         if (filter === 'HISTORY') return true;
 
         if (l.checkingApproverId === user?.id && l.status === LoanStatus.REQUESTED) return true;
         if (l.approverId === user?.id && (l.status === LoanStatus.REQUESTED || l.status === LoanStatus.CHECKED)) return true;
-        if (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN') return true;
+        if (canProcess) return true;
 
         return false;
     });
@@ -47,8 +50,7 @@ export const ApprovalCenter = () => {
         : productionEntries.filter(e => e.status === ProductionStatus.PENDING);
 
     const filteredProduction = relevantProduction.filter(_ => {
-        if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') return true;
-        return false;
+        return canProcess;
     });
 
     const getEmployeeName = (id: string) => employees.find(e => e.id === id)?.name || 'Unknown';
@@ -117,7 +119,7 @@ export const ApprovalCenter = () => {
                         >
                             Pending My Action
                         </button>
-                        {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') && (
+                        {canProcess && (
                             <button
                                 onClick={() => setFilter('ALL')}
                                 className={clsx(
@@ -162,7 +164,7 @@ export const ApprovalCenter = () => {
                                     const isMyApprove = loan.approverId === user?.id;
                                     const canAct = (isMyCheck && loan.status === LoanStatus.REQUESTED) ||
                                         (isMyApprove && (loan.status === LoanStatus.REQUESTED || loan.status === LoanStatus.CHECKED)) ||
-                                        user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+                                        canProcess;
 
                                     const isHistory = filter === 'HISTORY';
                                     const lastAudit = loan.auditTrail?.slice(-1)[0];
