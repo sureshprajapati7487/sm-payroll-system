@@ -28,28 +28,28 @@ const NAV_GROUPS = [
     {
         label: 'Main',
         items: [
-            { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, perm: null },
-            { label: 'Employees', path: '/employees', icon: Users, perm: PERMISSIONS.VIEW_EMPLOYEES },
+            { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, perm: PERMISSIONS.NAV_DASHBOARD },
+            { label: 'Employees', path: '/employees', icon: Users, perm: PERMISSIONS.NAV_EMPLOYEES },
             {
-                label: 'Attendance', path: '/attendance', icon: CalendarClock, perm: PERMISSIONS.VIEW_ATTENDANCE,
+                label: 'Attendance', path: '/attendance', icon: CalendarClock, perm: PERMISSIONS.NAV_ATTENDANCE,
                 subItems: [
-                    { label: 'Holiday Manager', path: '/attendance/holidays', icon: CalendarClock },
-                    { label: 'Face Kiosk', path: '/attendance/kiosk', icon: ShieldCheck },
+                    { label: 'Holiday Manager', path: '/attendance/holidays', icon: CalendarClock, perm: PERMISSIONS.MANAGE_HOLIDAYS },
+                    { label: 'Face Kiosk', path: '/attendance/kiosk', icon: ShieldCheck, perm: PERMISSIONS.USE_FACE_KIOSK },
                 ],
             },
             {
-                label: 'Salesman', path: '/salesman', icon: ShoppingBag, perm: null,
+                label: 'Salesman', path: '/salesman', icon: ShoppingBag, perm: PERMISSIONS.NAV_SALESMAN,
                 subItems: [
-                    { label: 'Client / Party List', path: '/salesman/clients', icon: Building2 },
+                    { label: 'Client / Party List', path: '/salesman/clients', icon: Building2, perm: PERMISSIONS.VIEW_CLIENTS },
                 ],
             },
 
             {
-                label: 'Production', path: '/production', icon: Factory, perm: PERMISSIONS.VIEW_PRODUCTION,
+                label: 'Production', path: '/production', icon: Factory, perm: PERMISSIONS.NAV_PRODUCTION,
                 subItems: [
-                    { label: 'Rate Manager', path: '/production/rates', icon: IndianRupee },
-                    { label: 'Work Groups', path: '/production/workgroups', icon: Users },
-                    { label: 'Bulk Entry', path: '/production/bulk', icon: Upload },
+                    { label: 'Rate Manager', path: '/production/rates', icon: IndianRupee, perm: PERMISSIONS.MANAGE_PRODUCTION_RATES },
+                    { label: 'Work Groups', path: '/production/workgroups', icon: Users, perm: PERMISSIONS.MANAGE_WORK_GROUPS },
+                    { label: 'Bulk Entry', path: '/production/bulk', icon: Upload, perm: PERMISSIONS.BULK_PRODUCTION_ENTRY },
                 ],
             },
         ],
@@ -57,68 +57,68 @@ const NAV_GROUPS = [
     {
         label: 'Finance',
         items: [
-            { label: 'Leaves', path: '/leaves', icon: CalendarClock, perm: PERMISSIONS.VIEW_LEAVES },
-            { label: 'Loans', path: '/loans', icon: Wallet, perm: null },
-            { label: 'Approvals', path: '/approvals', icon: UserCheck, perm: null },
+            { label: 'Leaves', path: '/leaves', icon: CalendarClock, perm: PERMISSIONS.NAV_LEAVES },
+            { label: 'Loans', path: '/loans', icon: Wallet, perm: PERMISSIONS.NAV_LOANS },
+            { label: 'Approvals', path: '/approvals', icon: UserCheck, perm: PERMISSIONS.NAV_APPROVALS },
             {
-                label: 'Payroll', path: '/payroll', icon: Banknote, perm: PERMISSIONS.VIEW_PAYROLL,
+                label: 'Payroll', path: '/payroll', icon: Banknote, perm: PERMISSIONS.NAV_PAYROLL,
                 subItems: [
-                    { label: 'Payroll History', path: '/payroll/history', icon: BarChart2 },
-                    { label: 'Simulation', path: '/payroll/simulation', icon: FlaskConical },
+                    { label: 'Payroll History', path: '/payroll/history', icon: BarChart2, perm: PERMISSIONS.VIEW_PAYROLL },
+                    { label: 'Simulation', path: '/payroll/simulation', icon: FlaskConical, perm: PERMISSIONS.RUN_PAYROLL_SIMULATION },
                 ],
             },
-            { label: 'Expenses', path: '/expenses', icon: Wallet, perm: null },
-            { label: 'Finance Dashboard', path: '/finance/dashboard', icon: TrendingUp, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Advance Salary', path: '/finance/advance-salary', icon: IndianRupee, perm: null },
-            { label: 'Dept Finance', path: '/finance/department', icon: BarChart2, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Cost Centers', path: '/finance/cost-centers', icon: Scale, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Expenses', path: '/expenses', icon: Wallet, perm: PERMISSIONS.NAV_EXPENSES },
+            { label: 'Finance Dashboard', path: '/finance/dashboard', icon: TrendingUp, perm: PERMISSIONS.NAV_FINANCE },
+            { label: 'Advance Salary', path: '/finance/advance-salary', icon: IndianRupee, perm: PERMISSIONS.NAV_FINANCE },
+            { label: 'Dept Finance', path: '/finance/department', icon: BarChart2, perm: PERMISSIONS.NAV_FINANCE },
+            { label: 'Cost Centers', path: '/finance/cost-centers', icon: Scale, perm: PERMISSIONS.NAV_FINANCE },
         ],
     },
     {
         label: 'Calculators',
         items: [
-            { label: 'CTC Calculator', path: '/calculators/ctc', icon: Calculator, perm: null },
-            { label: 'TDS Calculator', path: '/calculators/tds', icon: Scale, perm: null },
-            { label: 'PF / ESI Calc', path: '/calculators/pfesi', icon: FlaskConical, perm: null },
+            { label: 'CTC Calculator', path: '/calculators/ctc', icon: Calculator, perm: PERMISSIONS.NAV_CALCULATORS },
+            { label: 'TDS Calculator', path: '/calculators/tds', icon: Scale, perm: PERMISSIONS.NAV_CALCULATORS },
+            { label: 'PF / ESI Calc', path: '/calculators/pfesi', icon: FlaskConical, perm: PERMISSIONS.NAV_CALCULATORS },
         ],
     },
     {
         label: 'Reports',
         items: [
-            { label: 'Report Builder', path: '/reports/builder', icon: BarChart2, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Custom Reports', path: '/reports/custom', icon: FileText, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Scheduled', path: '/reports/scheduled', icon: CalendarClock, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Report Builder', path: '/reports/builder', icon: BarChart2, perm: PERMISSIONS.NAV_REPORTS },
+            { label: 'Custom Reports', path: '/reports/custom', icon: FileText, perm: PERMISSIONS.NAV_REPORTS },
+            { label: 'Scheduled', path: '/reports/scheduled', icon: CalendarClock, perm: PERMISSIONS.NAV_REPORTS },
         ],
     },
     {
         label: 'Statutory',
         items: [
-            { label: 'Form 16', path: '/statutory/form16', icon: FileText, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Statutory Reports', path: '/statutory/reports', icon: ShieldCheck, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Form 16', path: '/statutory/form16', icon: FileText, perm: PERMISSIONS.NAV_STATUTORY },
+            { label: 'Statutory Reports', path: '/statutory/reports', icon: ShieldCheck, perm: PERMISSIONS.NAV_STATUTORY },
         ],
     },
     {
         label: 'System',
         items: [
-            { label: 'Audit Logs', path: '/admin/audit-logs', icon: ShieldCheck, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Database Backup', path: '/admin/backup', icon: Database, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Bulk Import', path: '/admin/bulk-import', icon: Upload, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Trash', path: '/admin/trash', icon: Trash2, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Drafts', path: '/admin/drafts', icon: GitBranch, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Data Check', path: '/admin/consistency', icon: ShieldCheck, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Security Alerts', path: '/security/alerts', icon: ShieldAlert, perm: PERMISSIONS.MANAGE_SETTINGS },
-            { label: 'Help Center', path: '/help', icon: FileText, perm: null },
-            { label: 'Company', path: '/company/switcher', icon: Database, perm: PERMISSIONS.MANAGE_SETTINGS },
+            { label: 'Audit Logs', path: '/admin/audit-logs', icon: ShieldCheck, perm: PERMISSIONS.NAV_SYSTEM },
+            { label: 'Database Backup', path: '/admin/backup', icon: Database, perm: PERMISSIONS.NAV_SYSTEM },
+            { label: 'Bulk Import', path: '/admin/bulk-import', icon: Upload, perm: PERMISSIONS.NAV_SYSTEM },
+            { label: 'Trash', path: '/admin/trash', icon: Trash2, perm: PERMISSIONS.NAV_SYSTEM },
+            { label: 'Drafts', path: '/admin/drafts', icon: GitBranch, perm: PERMISSIONS.NAV_SYSTEM },
+            { label: 'Data Check', path: '/admin/consistency', icon: ShieldCheck, perm: PERMISSIONS.NAV_SYSTEM },
+            { label: 'Security Alerts', path: '/security/alerts', icon: ShieldAlert, perm: PERMISSIONS.NAV_SYSTEM },
+            { label: 'Help Center', path: '/help', icon: FileText, perm: null }, // Null perm means always visible
+            { label: 'Company', path: '/company/switcher', icon: Database, perm: PERMISSIONS.NAV_SYSTEM },
             {
                 label: 'Settings', path: '/settings', icon: Settings, perm: PERMISSIONS.MANAGE_SETTINGS,
                 subItems: [
-                    { label: 'Configuration', path: '/configuration', icon: Settings },
-                    { label: 'Security', path: '/settings/security', icon: ShieldCheck },
-                    { label: 'Theme', path: '/settings/theme', icon: Settings },
-                    { label: 'Language', path: '/settings/language', icon: FileText },
-                    { label: 'Notifications', path: '/settings/notifications', icon: Settings },
-                    { label: 'Server Status', path: '/settings/server-status', icon: Database },
-                    { label: 'My Profile', path: '/settings/profile', icon: Users },
+                    { label: 'Configuration', path: '/configuration', icon: Settings, perm: PERMISSIONS.MANAGE_SETTINGS },
+                    { label: 'Security', path: '/settings/security', icon: ShieldCheck, perm: PERMISSIONS.MANAGE_SETTINGS },
+                    { label: 'Theme', path: '/settings/theme', icon: Settings, perm: null }, // Theme is personal preference
+                    { label: 'Language', path: '/settings/language', icon: FileText, perm: null },
+                    { label: 'Notifications', path: '/settings/notifications', icon: Settings, perm: null },
+                    { label: 'Server Status', path: '/settings/server-status', icon: Database, perm: PERMISSIONS.MANAGE_SETTINGS },
+                    { label: 'My Profile', path: '/settings/profile', icon: Users, perm: null },
                 ],
             },
         ],
@@ -202,44 +202,7 @@ export const DashboardLayout = () => {
     const handleLogout = () => setShowLogoutConfirm(true);
     const doLogoutNow = () => { setShowLogoutConfirm(false); logout(); navigate('/login'); };
 
-    const showItem = (item: { label: string; path: string; perm: string | null }) => {
-        // Map nav labels to NAV_* permissions
-        const NAV_PERM_MAP: Record<string, string> = {
-            'Dashboard': PERMISSIONS.NAV_DASHBOARD,
-            'Employees': PERMISSIONS.NAV_EMPLOYEES,
-            'Attendance': PERMISSIONS.NAV_ATTENDANCE,
-            'Salesman': PERMISSIONS.NAV_SALESMAN,
-            'Production': PERMISSIONS.NAV_PRODUCTION,
-            'Leaves': PERMISSIONS.NAV_LEAVES,
-            'Loans': PERMISSIONS.NAV_LOANS,
-            'Approvals': PERMISSIONS.NAV_APPROVALS,
-            'Payroll': PERMISSIONS.NAV_PAYROLL,
-            'Expenses': PERMISSIONS.NAV_EXPENSES,
-            'Finance Dashboard': PERMISSIONS.NAV_FINANCE,
-            'Dept Finance': PERMISSIONS.NAV_FINANCE,
-            'Cost Centers': PERMISSIONS.NAV_FINANCE,
-            'Advance Salary': PERMISSIONS.NAV_FINANCE,
-            'CTC Calculator': PERMISSIONS.NAV_CALCULATORS,
-            'TDS Calculator': PERMISSIONS.NAV_CALCULATORS,
-            'PF / ESI Calc': PERMISSIONS.NAV_CALCULATORS,
-            'Report Builder': PERMISSIONS.NAV_REPORTS,
-            'Custom Reports': PERMISSIONS.NAV_REPORTS,
-            'Scheduled': PERMISSIONS.NAV_REPORTS,
-            'Form 16': PERMISSIONS.NAV_STATUTORY,
-            'Statutory Reports': PERMISSIONS.NAV_STATUTORY,
-            'Audit Logs': PERMISSIONS.NAV_SYSTEM,
-            'Database Backup': PERMISSIONS.NAV_SYSTEM,
-            'Bulk Import': PERMISSIONS.NAV_SYSTEM,
-            'Trash': PERMISSIONS.NAV_SYSTEM,
-            'Drafts': PERMISSIONS.NAV_SYSTEM,
-            'Data Check': PERMISSIONS.NAV_SYSTEM,
-            'Security Alerts': PERMISSIONS.NAV_SYSTEM,
-            'Company': PERMISSIONS.NAV_SYSTEM,
-            'Settings': PERMISSIONS.MANAGE_SETTINGS,
-        };
-
-        const navPerm = NAV_PERM_MAP[item.label];
-        if (navPerm) return hasPermission(navPerm as Parameters<typeof hasPermission>[0]);
+    const showItem = (item: { perm?: string | null }) => {
         if (!item.perm) return true;
         return hasPermission(item.perm as Parameters<typeof hasPermission>[0]);
     };
@@ -272,9 +235,12 @@ export const DashboardLayout = () => {
                             </p>
                             <div className="space-y-0.5">
                                 {visible.map(item => {
-                                    const hasSubItems = 'subItems' in item && item.subItems && item.subItems.length > 0;
+                                    const rawSubItems = 'subItems' in item && item.subItems ? item.subItems : [];
+                                    const visibleSubItems = rawSubItems.filter(sub => showItem(sub as any));
+                                    const hasSubItems = visibleSubItems.length > 0;
+
                                     const isExpanded = expandedItems.includes(item.path);
-                                    const isSubActive = hasSubItems && item.subItems!.some(s => location.pathname.startsWith(s.path));
+                                    const isSubActive = hasSubItems && visibleSubItems.some(s => location.pathname.startsWith(s.path));
 
                                     return (
                                         <div key={item.path}>
@@ -311,7 +277,7 @@ export const DashboardLayout = () => {
                                                     {/* Sub-items */}
                                                     {isExpanded && (
                                                         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-dark-border/50 pl-2">
-                                                            {item.subItems!.map(sub => (
+                                                            {visibleSubItems.map(sub => (
                                                                 <NavLink
                                                                     key={sub.path}
                                                                     to={sub.path}
