@@ -3,10 +3,16 @@ import { FileBarChart, Save, Download, GripVertical, Eye, EyeOff } from 'lucide-
 import { useCustomReportStore, ReportColumn } from '@/store/customReportStore';
 import { apiJson, apiFetch } from '@/lib/apiClient';
 import { useDialog } from '@/components/DialogProvider';
+import { useAuthStore } from '@/store/authStore';
+import { PERMISSIONS } from '@/config/permissions';
 
 export const CustomReportBuilder = () => {
     const { availableColumns, saveTemplate, templates } = useCustomReportStore();
     const { toast } = useDialog();
+
+    const { hasPermission } = useAuthStore();
+    const canExport = hasPermission(PERMISSIONS.EXPORT_REPORTS);
+    const canBuild = hasPermission(PERMISSIONS.BUILD_REPORTS);
 
     // State for builder
     const [reportName, setReportName] = useState('');
@@ -221,14 +227,16 @@ export const CustomReportBuilder = () => {
                                 </div>
                             </div>
 
-                            <button
-                                onClick={handleSaveTemplate}
-                                disabled={!reportName}
-                                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
-                            >
-                                <Save className="w-5 h-5" />
-                                Save Template
-                            </button>
+                            {canBuild && (
+                                <button
+                                    onClick={handleSaveTemplate}
+                                    disabled={!reportName}
+                                    className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Save className="w-5 h-5" />
+                                    Save Template
+                                </button>
+                            )}
                         </div>
 
                         {/* Saved Templates List */}
@@ -253,14 +261,16 @@ export const CustomReportBuilder = () => {
                 <div className="glass rounded-2xl overflow-hidden animate-slide-up">
                     <div className="p-6 border-b border-dark-border flex items-center justify-between">
                         <h3 className="text-lg font-semibold text-white">Report Preview (First 5 Rows)</h3>
-                        <button
-                            onClick={exportToCSV}
-                            disabled={isExporting}
-                            className="flex items-center gap-2 bg-primary-500/20 text-primary-400 px-4 py-2 rounded-lg hover:bg-primary-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Download className="w-4 h-4" />
-                            {isExporting ? 'Generating...' : 'Export Data'}
-                        </button>
+                        {canExport && (
+                            <button
+                                onClick={exportToCSV}
+                                disabled={isExporting}
+                                className="flex items-center gap-2 bg-primary-500/20 text-primary-400 px-4 py-2 rounded-lg hover:bg-primary-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Download className="w-4 h-4" />
+                                {isExporting ? 'Generating...' : 'Export Data'}
+                            </button>
+                        )}
                     </div>
 
                     <div className="overflow-x-auto">

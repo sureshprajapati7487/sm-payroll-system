@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Calendar, Mail, Clock, Power, Plus, Trash2, CheckCircle, Play } from 'lucide-react';
 import { useScheduledReportStore } from '@/store/scheduledReportStore';
 import { apiFetch } from '@/lib/apiClient';
+import { useAuthStore } from '@/store/authStore';
+import { PERMISSIONS } from '@/config/permissions';
 
 export const ScheduledReports = () => {
     const { reports, createScheduledReport, deleteScheduledReport, toggleReportStatus } = useScheduledReportStore();
@@ -16,6 +18,9 @@ export const ScheduledReports = () => {
         enabled: true,
         createdBy: 'Admin'
     });
+
+    const { hasPermission } = useAuthStore();
+    const canSchedule = hasPermission(PERMISSIONS.SCHEDULE_REPORTS);
 
     // Manual "Run Now" — fetch CSV from backend
     const runNow = async (reportType: string, reportName: string) => {
@@ -84,13 +89,15 @@ export const ScheduledReports = () => {
                     <p className="text-dark-muted mt-1">Automate report generation and email delivery</p>
                 </div>
 
-                <button
-                    onClick={() => setShowForm(!showForm)}
-                    className="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl transition-all flex items-center gap-2"
-                >
-                    <Plus className="w-5 h-5" />
-                    {showForm ? 'Cancel' : 'New Schedule'}
-                </button>
+                {canSchedule && (
+                    <button
+                        onClick={() => setShowForm(!showForm)}
+                        className="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl transition-all flex items-center gap-2"
+                    >
+                        <Plus className="w-5 h-5" />
+                        {showForm ? 'Cancel' : 'New Schedule'}
+                    </button>
+                )}
             </div>
 
             {/* Stats */}
@@ -270,23 +277,27 @@ export const ScheduledReports = () => {
                                             <Play className="w-3 h-3" />
                                             Run Now
                                         </button>
-                                        <button
-                                            onClick={() => toggleReportStatus(report.id)}
-                                            className={`p-2 rounded-lg transition-all ${report.enabled
-                                                ? 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400'
-                                                : 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
-                                                }`}
-                                            title={report.enabled ? 'Disable' : 'Enable'}
-                                        >
-                                            <Power className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => deleteScheduledReport(report.id)}
-                                            className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
-                                            title="Delete"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        {canSchedule && (
+                                            <>
+                                                <button
+                                                    onClick={() => toggleReportStatus(report.id)}
+                                                    className={`p-2 rounded-lg transition-all ${report.enabled
+                                                        ? 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400'
+                                                        : 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+                                                        }`}
+                                                    title={report.enabled ? 'Disable' : 'Enable'}
+                                                >
+                                                    <Power className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteScheduledReport(report.id)}
+                                                    className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>

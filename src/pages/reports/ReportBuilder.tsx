@@ -7,6 +7,8 @@ import { useProductionStore } from '@/store/productionStore';
 import { useLeaveStore } from '@/store/leaveStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
+import { useAuthStore } from '@/store/authStore';
+import { PERMISSIONS } from '@/config/permissions';
 
 // ── Report type definitions with field mappings ───────────────────────────────
 const REPORT_TYPES = [
@@ -48,6 +50,9 @@ export const ReportBuilder = () => {
     const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
     const [generatedReport, setGeneratedReport] = useState<any[] | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
+
+    const { hasPermission } = useAuthStore();
+    const canExport = hasPermission(PERMISSIONS.EXPORT_REPORTS);
 
     // Store data
     const { records: attendanceRecords } = useAttendanceStore();
@@ -255,13 +260,15 @@ export const ReportBuilder = () => {
                 {generatedReport && (
                     <div className="flex items-center gap-3">
                         <span className="text-dark-muted text-sm">{totalRows} records</span>
-                        <button
-                            onClick={exportCSV}
-                            className="flex items-center gap-2 px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-xl transition-all"
-                        >
-                            <Download className="w-4 h-4" />
-                            Export CSV
-                        </button>
+                        {canExport && (
+                            <button
+                                onClick={exportCSV}
+                                className="flex items-center gap-2 px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-xl transition-all"
+                            >
+                                <Download className="w-4 h-4" />
+                                Export CSV
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

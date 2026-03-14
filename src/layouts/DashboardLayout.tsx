@@ -85,9 +85,9 @@ const NAV_GROUPS = [
     {
         label: 'Reports',
         items: [
-            { label: 'Report Builder', path: '/reports/builder', icon: BarChart2, perm: PERMISSIONS.NAV_REPORTS },
-            { label: 'Custom Reports', path: '/reports/custom', icon: FileText, perm: PERMISSIONS.NAV_REPORTS },
-            { label: 'Scheduled', path: '/reports/scheduled', icon: CalendarClock, perm: PERMISSIONS.NAV_REPORTS },
+            { label: 'Report Builder', path: '/reports/builder', icon: BarChart2, perm: PERMISSIONS.VIEW_REPORTS },
+            { label: 'Custom Reports', path: '/reports/custom', icon: FileText, perm: PERMISSIONS.BUILD_REPORTS },
+            { label: 'Scheduled', path: '/reports/scheduled', icon: CalendarClock, perm: PERMISSIONS.SCHEDULE_REPORTS },
         ],
     },
     {
@@ -143,7 +143,7 @@ const MORE_ITEMS = [
     { label: 'Production', path: '/production', icon: Factory, perm: PERMISSIONS.NAV_PRODUCTION },
     { label: 'Approvals', path: '/approvals', icon: UserCheck, perm: PERMISSIONS.NAV_APPROVALS },
     { label: 'Settings', path: '/settings', icon: Settings, perm: PERMISSIONS.MANAGE_SETTINGS },
-    { label: 'Reports', path: '/reports/builder', icon: ShieldCheck, perm: PERMISSIONS.NAV_REPORTS },
+    { label: 'Reports', path: '/reports/builder', icon: ShieldCheck, perm: PERMISSIONS.VIEW_REPORTS },
 ];
 
 // ── Translation keys ───────────────────────────────────────────────────────
