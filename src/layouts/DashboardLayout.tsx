@@ -93,8 +93,8 @@ const NAV_GROUPS = [
     {
         label: 'Statutory',
         items: [
-            { label: 'Form 16', path: '/statutory/form16', icon: FileText, perm: PERMISSIONS.NAV_STATUTORY },
-            { label: 'Statutory Reports', path: '/statutory/reports', icon: ShieldCheck, perm: PERMISSIONS.NAV_STATUTORY },
+            { label: 'Form 16', path: '/statutory/form16', icon: FileText, perm: PERMISSIONS.VIEW_FORM16 },
+            { label: 'Statutory Reports', path: '/statutory/reports', icon: ShieldCheck, perm: PERMISSIONS.VIEW_STATUTORY },
         ],
     },
     {
