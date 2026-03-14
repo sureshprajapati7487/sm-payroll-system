@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/config/permissions';
+import { useScopedEmployees } from '@/hooks/useScopedEmployees';
 import {
     Search, Plus, Eye, Edit, Trash2, XCircle, Key,
     Filter, ChevronDown, X, ArrowUpDown, SlidersHorizontal,
@@ -58,6 +59,9 @@ export const EmployeeList = () => {
     const [credentialEmployee, setCredentialEmployee] = useState<Employee | null>(null);
     const [showFilters, setShowFilters] = useState(false);
 
+    // ── Row-Level Security ───────────────────────────────────────────────
+    const { scopedEmployees } = useScopedEmployees();
+
     // ── Pagination State ─────────────────────────────────────────────────────
     const { totalCount, currentPage, totalPages, fetchEmployees } = useEmployeeStore();
     const [page, setPage] = useState(1);
@@ -76,8 +80,8 @@ export const EmployeeList = () => {
     const [sortDir, setSortDir] = useState<SortDir>('asc');
 
     // ── Derived Data (from full list loaded in store if available, or just from active)
-    const departments = useMemo(() => ['All', ...new Set(employees.map(e => e.department).filter(Boolean).sort())], [employees]);
-    const designations = useMemo(() => ['All', ...new Set(employees.map(e => e.designation).filter(Boolean).sort())], [employees]);
+    const departments = useMemo(() => ['All', ...new Set(scopedEmployees.map(e => e.department).filter(Boolean).sort())], [scopedEmployees]);
+    const designations = useMemo(() => ['All', ...new Set(scopedEmployees.map(e => e.designation).filter(Boolean).sort())], [scopedEmployees]);
 
     // ── Server-Side Fetch Trigger ──────────────────────────────────────────────
     useEffect(() => {
@@ -129,7 +133,8 @@ export const EmployeeList = () => {
         const minSal = salaryMin ? Number(salaryMin) : null;
         const maxSal = salaryMax ? Number(salaryMax) : null;
 
-        const result = employees.filter(emp => {
+        // Use scoped employees (Row-Level Security) as the base list
+        const result = scopedEmployees.filter(emp => {
             if (deptFilter !== 'All' && emp.department !== deptFilter) return false;
             if (statusFilter !== 'All' && emp.status !== statusFilter) return false;
             if (shiftFilter !== 'All' && emp.shift !== shiftFilter) return false;

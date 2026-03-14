@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useEmployeeStore } from '@/store/employeeStore';
+import { PERMISSIONS } from '@/config/permissions';
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type CategoryType = 'Navigation' | 'Action' | 'Employee' | 'Report' | 'Settings' | 'Quick';
 
 interface CommandItem {
@@ -26,20 +27,21 @@ interface CommandItem {
     category: CategoryType;
     shortcut?: string;
     danger?: boolean;
+    perm?: string; // Optional permission key â€” command hidden if user lacks it
 }
 
 const CATEGORY_ORDER: CategoryType[] = ['Quick', 'Navigation', 'Action', 'Employee', 'Report', 'Settings'];
 
 const CATEGORY_CONFIG: Record<CategoryType, { label: string; color: string }> = {
-    Quick: { label: '⚡ Quick Actions', color: 'text-yellow-400' },
-    Navigation: { label: '🧭 Navigate', color: 'text-primary-400' },
-    Action: { label: '⚙️ Actions', color: 'text-success' },
-    Employee: { label: '👤 Employees', color: 'text-info' },
-    Report: { label: '📊 Reports & Finance', color: 'text-purple-400' },
-    Settings: { label: '🔧 Settings', color: 'text-dark-muted' },
+    Quick: { label: 'âš¡ Quick Actions', color: 'text-yellow-400' },
+    Navigation: { label: 'ðŸ§­ Navigate', color: 'text-primary-400' },
+    Action: { label: 'âš™ï¸ Actions', color: 'text-success' },
+    Employee: { label: 'ðŸ‘¤ Employees', color: 'text-info' },
+    Report: { label: 'ðŸ“Š Reports & Finance', color: 'text-purple-400' },
+    Settings: { label: 'ðŸ”§ Settings', color: 'text-dark-muted' },
 };
 
-// ── Component ────────────────────────────────────────────────────────────────
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const CommandPalette = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -48,7 +50,7 @@ export const CommandPalette = () => {
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
 
-    const { logout } = useAuthStore();
+    const { logout, hasPermission } = useAuthStore();
     const { employees } = useEmployeeStore();
 
     const close = useCallback(() => {
@@ -62,48 +64,51 @@ export const CommandPalette = () => {
         setSelectedIdx(0);
     }, []);
 
-    // ── Static commands ───────────────────────────────────────────────────
-    const staticCommands: CommandItem[] = useMemo(() => [
-        // ── Navigation ──────────────────────────────────────────────────
-        { id: 'nav-dashboard', title: 'Dashboard', description: 'Overview & key metrics', icon: <LayoutDashboard className="w-4 h-4" />, action: () => navigate('/dashboard'), keywords: ['home', 'overview', 'dashboard', 'stats'], category: 'Navigation' },
-        { id: 'nav-employees', title: 'Employees', description: 'Manage staff records', icon: <Users className="w-4 h-4" />, action: () => navigate('/employees'), keywords: ['employees', 'staff', 'workers', 'kaamgar'], category: 'Navigation' },
-        { id: 'nav-attendance', title: 'Attendance', description: 'Daily punch-in records', icon: <Clock className="w-4 h-4" />, action: () => navigate('/attendance'), keywords: ['attendance', 'present', 'absent', 'punch', 'hazri'], category: 'Navigation' },
-        { id: 'nav-payroll', title: 'Payroll', description: 'Salary slips & payments', icon: <DollarSign className="w-4 h-4" />, action: () => navigate('/payroll'), keywords: ['payroll', 'salary', 'payment', 'tankhwa'], category: 'Navigation' },
-        { id: 'nav-loans', title: 'Loans', description: 'Advance & loan requests', icon: <CreditCard className="w-4 h-4" />, action: () => navigate('/loans'), keywords: ['loans', 'advance', 'deduction', 'udhar'], category: 'Navigation' },
-        { id: 'nav-leaves', title: 'Leave Management', description: 'Request & approve leaves', icon: <Calendar className="w-4 h-4" />, action: () => navigate('/leaves'), keywords: ['leave', 'vacation', 'chutti', 'off'], category: 'Navigation' },
-        { id: 'nav-production', title: 'Production', description: 'Track production output', icon: <TrendingUp className="w-4 h-4" />, action: () => navigate('/production'), keywords: ['production', 'output', 'pieces', 'kaam'], category: 'Navigation' },
-        { id: 'nav-approvals', title: 'Approvals', description: 'Pending approval requests', icon: <CheckSquare className="w-4 h-4" />, action: () => navigate('/approvals'), keywords: ['approvals', 'pending', 'approve'], category: 'Navigation' },
-        { id: 'nav-expenses', title: 'Expenses', description: 'Petty cash & daily expenses', icon: <Banknote className="w-4 h-4" />, action: () => navigate('/expenses'), keywords: ['expenses', 'petty cash', 'kharch'], category: 'Navigation' },
-        { id: 'nav-holidays', title: 'Holiday Manager', description: 'Manage holidays & schedule', icon: <BookOpen className="w-4 h-4" />, action: () => navigate('/attendance/holidays'), keywords: ['holidays', 'holiday', 'chutti', 'calendar'], category: 'Navigation' },
-        { id: 'nav-statutory', title: 'Statutory Reports', description: 'PF, ESIC, PT reports', icon: <Shield className="w-4 h-4" />, action: () => navigate('/statutory/reports'), keywords: ['pf', 'esic', 'pt', 'statutory', 'compliance'], category: 'Navigation' },
-        { id: 'nav-form16', title: 'Form 16 Generator', description: 'Income tax year-end form', icon: <FileText className="w-4 h-4" />, action: () => navigate('/statutory/form16'), keywords: ['form16', 'tax', 'income tax'], category: 'Navigation' },
+    // â”€â”€ Static commands â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const staticCommands: CommandItem[] = useMemo(() => {
+        const allCmds: CommandItem[] = [
+            { id: 'nav-dashboard', title: 'Dashboard', description: 'Overview & key metrics', icon: <LayoutDashboard className="w-4 h-4" />, action: () => navigate('/dashboard'), keywords: ['home', 'overview', 'dashboard', 'stats'], category: 'Navigation' },
+            { id: 'nav-employees', title: 'Employees', description: 'Manage staff records', icon: <Users className="w-4 h-4" />, action: () => navigate('/employees'), keywords: ['employees', 'staff', 'workers', 'kaamgar'], category: 'Navigation', perm: PERMISSIONS.VIEW_EMPLOYEES },
+            { id: 'nav-attendance', title: 'Attendance', description: 'Daily punch-in records', icon: <Clock className="w-4 h-4" />, action: () => navigate('/attendance'), keywords: ['attendance', 'present', 'absent', 'punch', 'hazri'], category: 'Navigation', perm: PERMISSIONS.VIEW_ATTENDANCE },
+            { id: 'nav-payroll', title: 'Payroll', description: 'Salary slips & payments', icon: <DollarSign className="w-4 h-4" />, action: () => navigate('/payroll'), keywords: ['payroll', 'salary', 'payment', 'tankhwa'], category: 'Navigation', perm: PERMISSIONS.VIEW_PAYROLL },
+            { id: 'nav-loans', title: 'Loans', description: 'Advance & loan requests', icon: <CreditCard className="w-4 h-4" />, action: () => navigate('/loans'), keywords: ['loans', 'advance', 'deduction', 'udhar'], category: 'Navigation', perm: PERMISSIONS.VIEW_ALL_LOANS },
+            { id: 'nav-leaves', title: 'Leave Management', description: 'Request & approve leaves', icon: <Calendar className="w-4 h-4" />, action: () => navigate('/leaves'), keywords: ['leave', 'vacation', 'chutti', 'off'], category: 'Navigation', perm: PERMISSIONS.VIEW_LEAVES },
+            { id: 'nav-production', title: 'Production', description: 'Track production output', icon: <TrendingUp className="w-4 h-4" />, action: () => navigate('/production'), keywords: ['production', 'output', 'pieces', 'kaam'], category: 'Navigation', perm: PERMISSIONS.VIEW_PRODUCTION },
+            { id: 'nav-approvals', title: 'Approvals', description: 'Pending approval requests', icon: <CheckSquare className="w-4 h-4" />, action: () => navigate('/approvals'), keywords: ['approvals', 'pending', 'approve'], category: 'Navigation', perm: PERMISSIONS.VIEW_APPROVALS },
+            { id: 'nav-expenses', title: 'Expenses', description: 'Petty cash & daily expenses', icon: <Banknote className="w-4 h-4" />, action: () => navigate('/expenses'), keywords: ['expenses', 'petty cash', 'kharch'], category: 'Navigation', perm: PERMISSIONS.SUBMIT_EXPENSE },
+            { id: 'nav-holidays', title: 'Holiday Manager', description: 'Manage holidays & schedule', icon: <BookOpen className="w-4 h-4" />, action: () => navigate('/attendance/holidays'), keywords: ['holidays', 'holiday', 'chutti', 'calendar'], category: 'Navigation', perm: PERMISSIONS.MANAGE_HOLIDAYS },
+            { id: 'nav-statutory', title: 'Statutory Reports', description: 'PF, ESIC, PT reports', icon: <Shield className="w-4 h-4" />, action: () => navigate('/statutory/reports'), keywords: ['pf', 'esic', 'pt', 'statutory', 'compliance'], category: 'Navigation', perm: PERMISSIONS.VIEW_STATUTORY },
+            { id: 'nav-form16', title: 'Form 16 Generator', description: 'Income tax year-end form', icon: <FileText className="w-4 h-4" />, action: () => navigate('/statutory/form16'), keywords: ['form16', 'tax', 'income tax'], category: 'Navigation', perm: PERMISSIONS.VIEW_FORM16 },
 
-        // ── Actions ──────────────────────────────────────────────────────
-        { id: 'act-add-emp', title: 'Add New Employee', description: 'Create a new staff record', icon: <UserPlus className="w-4 h-4" />, action: () => navigate('/employees/new'), keywords: ['add', 'new', 'create', 'employee', 'naya'], category: 'Action' },
-        { id: 'act-attendance', title: 'Mark Attendance', description: 'Record today\'s check-in', icon: <Clock className="w-4 h-4" />, action: () => navigate('/attendance'), keywords: ['mark', 'attendance', 'punch', 'hazri'], category: 'Action' },
-        { id: 'act-gen-payroll', title: 'Generate Payroll', description: 'Create salary slips', icon: <DollarSign className="w-4 h-4" />, action: () => navigate('/payroll'), keywords: ['generate', 'payroll', 'salary', 'slip'], category: 'Action' },
-        { id: 'act-payslip', title: 'View Payslip History', description: 'Past payroll records', icon: <FileSpreadsheet className="w-4 h-4" />, action: () => navigate('/payroll/history'), keywords: ['payslip', 'history', 'past', 'payroll'], category: 'Action' },
-        { id: 'act-loan-req', title: 'New Loan Request', description: 'Raise an advance/loan', icon: <PiggyBank className="w-4 h-4" />, action: () => navigate('/loans'), keywords: ['loan', 'advance', 'udhar', 'request'], category: 'Action' },
-        { id: 'act-bulk-import', title: 'Bulk Import', description: 'Import employees from file', icon: <Download className="w-4 h-4" />, action: () => navigate('/admin/bulk-import'), keywords: ['import', 'bulk', 'upload', 'excel'], category: 'Action' },
-        { id: 'act-audit', title: 'Audit Logs', description: 'View system activity logs', icon: <Activity className="w-4 h-4" />, action: () => navigate('/admin/audit-logs'), keywords: ['audit', 'logs', 'activity', 'history'], category: 'Action' },
-        { id: 'act-trash', title: 'Trash / Deleted Items', description: 'Restore deleted records', icon: <Trash2 className="w-4 h-4" />, action: () => navigate('/admin/trash'), keywords: ['trash', 'deleted', 'restore', 'recycle'], category: 'Action' },
+            // â”€â”€ Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            { id: 'act-add-emp', title: 'Add New Employee', description: 'Create a new staff record', icon: <UserPlus className="w-4 h-4" />, action: () => navigate('/employees/new'), keywords: ['add', 'new', 'create', 'employee', 'naya'], category: 'Action', perm: PERMISSIONS.ADD_EMPLOYEE },
+            { id: 'act-attendance', title: 'Mark Attendance', description: 'Record today\'s check-in', icon: <Clock className="w-4 h-4" />, action: () => navigate('/attendance'), keywords: ['mark', 'attendance', 'punch', 'hazri'], category: 'Action', perm: PERMISSIONS.VIEW_ATTENDANCE },
+            { id: 'act-gen-payroll', title: 'Generate Payroll', description: 'Create salary slips', icon: <DollarSign className="w-4 h-4" />, action: () => navigate('/payroll'), keywords: ['generate', 'payroll', 'salary', 'slip'], category: 'Action', perm: PERMISSIONS.GENERATE_PAYROLL },
+            { id: 'act-payslip', title: 'View Payslip History', description: 'Past payroll records', icon: <FileSpreadsheet className="w-4 h-4" />, action: () => navigate('/payroll/history'), keywords: ['payslip', 'history', 'past', 'payroll'], category: 'Action', perm: PERMISSIONS.VIEW_PAYROLL },
+            { id: 'act-loan-req', title: 'New Loan Request', description: 'Raise an advance/loan', icon: <PiggyBank className="w-4 h-4" />, action: () => navigate('/loans'), keywords: ['loan', 'advance', 'udhar', 'request'], category: 'Action', perm: PERMISSIONS.VIEW_ALL_LOANS },
+            { id: 'act-bulk-import', title: 'Bulk Import', description: 'Import employees from file', icon: <Download className="w-4 h-4" />, action: () => navigate('/admin/bulk-import'), keywords: ['import', 'bulk', 'upload', 'excel'], category: 'Action', perm: PERMISSIONS.BULK_IMPORT },
+            { id: 'act-audit', title: 'Audit Logs', description: 'View system activity logs', icon: <Activity className="w-4 h-4" />, action: () => navigate('/admin/audit-logs'), keywords: ['audit', 'logs', 'activity', 'history'], category: 'Action', perm: PERMISSIONS.VIEW_AUDIT_LOGS },
+            { id: 'act-trash', title: 'Trash / Deleted Items', description: 'Restore deleted records', icon: <Trash2 className="w-4 h-4" />, action: () => navigate('/admin/trash'), keywords: ['trash', 'deleted', 'restore', 'recycle'], category: 'Action', perm: PERMISSIONS.MANAGE_TRASH },
 
-        // ── Reports ──────────────────────────────────────────────────────
-        { id: 'rep-builder', title: 'Report Builder', description: 'Custom report generation', icon: <BarChart3 className="w-4 h-4" />, action: () => navigate('/reports/builder'), keywords: ['report', 'builder', 'custom'], category: 'Report' },
-        { id: 'rep-finance', title: 'Finance Dashboard', description: 'Financial overview & charts', icon: <TrendingUp className="w-4 h-4" />, action: () => navigate('/finance/dashboard'), keywords: ['finance', 'financial', 'charts', 'budget'], category: 'Report' },
-        { id: 'rep-dept', title: 'Department Finance', description: 'Department-wise cost report', icon: <Building2 className="w-4 h-4" />, action: () => navigate('/finance/department'), keywords: ['department', 'finance', 'cost'], category: 'Report' },
-        { id: 'rep-advance', title: 'Advance Salary', description: 'Advance salary management', icon: <CreditCard className="w-4 h-4" />, action: () => navigate('/finance/advance-salary'), keywords: ['advance', 'salary', 'management'], category: 'Report' },
-        { id: 'rep-scheduled', title: 'Scheduled Reports', description: 'Auto-send report schedule', icon: <RefreshCw className="w-4 h-4" />, action: () => navigate('/reports/scheduled'), keywords: ['scheduled', 'auto', 'report', 'email'], category: 'Report' },
+            // â”€â”€ Reports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            { id: 'rep-builder', title: 'Report Builder', description: 'Custom report generation', icon: <BarChart3 className="w-4 h-4" />, action: () => navigate('/reports/builder'), keywords: ['report', 'builder', 'custom'], category: 'Report', perm: PERMISSIONS.VIEW_REPORTS },
+            { id: 'rep-finance', title: 'Finance Dashboard', description: 'Financial overview & charts', icon: <TrendingUp className="w-4 h-4" />, action: () => navigate('/finance/dashboard'), keywords: ['finance', 'financial', 'charts', 'budget'], category: 'Report', perm: PERMISSIONS.VIEW_FINANCE_DASHBOARD },
+            { id: 'rep-dept', title: 'Department Finance', description: 'Department-wise cost report', icon: <Building2 className="w-4 h-4" />, action: () => navigate('/finance/department'), keywords: ['department', 'finance', 'cost'], category: 'Report', perm: PERMISSIONS.VIEW_DEPT_FINANCE },
+            { id: 'rep-advance', title: 'Advance Salary', description: 'Advance salary management', icon: <CreditCard className="w-4 h-4" />, action: () => navigate('/finance/advance-salary'), keywords: ['advance', 'salary', 'management'], category: 'Report', perm: PERMISSIONS.MANAGE_ADVANCE_SALARY },
+            { id: 'rep-scheduled', title: 'Scheduled Reports', description: 'Auto-send report schedule', icon: <RefreshCw className="w-4 h-4" />, action: () => navigate('/reports/scheduled'), keywords: ['scheduled', 'auto', 'report', 'email'], category: 'Report', perm: PERMISSIONS.SCHEDULE_REPORTS },
 
-        // ── Settings ─────────────────────────────────────────────────────
-        { id: 'set-settings', title: 'Settings', description: 'App configuration', icon: <Settings className="w-4 h-4" />, action: () => navigate('/settings'), keywords: ['settings', 'config', 'preferences'], category: 'Settings' },
-        { id: 'set-theme', title: 'Change Theme', description: 'Switch app theme & dark mode', icon: <Moon className="w-4 h-4" />, action: () => navigate('/settings'), keywords: ['theme', 'dark', 'light', 'color', 'mode', 'theem'], category: 'Settings' },
-        { id: 'set-logout', title: 'Log Out', description: 'Sign out of your account', icon: <LogOut className="w-4 h-4" />, action: () => { logout(); navigate('/login'); }, keywords: ['logout', 'sign out', 'exit', 'quit'], category: 'Settings', danger: true },
-    ], [navigate, logout]);
-
-    // ── Employee quick-search commands ────────────────────────────────────
+            // â”€â”€ Settings (always visible) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            { id: 'set-settings', title: 'Settings', description: 'App configuration', icon: <Settings className="w-4 h-4" />, action: () => navigate('/settings'), keywords: ['settings', 'config', 'preferences'], category: 'Settings' },
+            { id: 'set-theme', title: 'Change Theme', description: 'Switch app theme & dark mode', icon: <Moon className="w-4 h-4" />, action: () => navigate('/settings'), keywords: ['theme', 'dark', 'light', 'color', 'mode', 'theem'], category: 'Settings' },
+            { id: 'set-logout', title: 'Log Out', description: 'Sign out of your account', icon: <LogOut className="w-4 h-4" />, action: () => { logout(); navigate('/login'); }, keywords: ['logout', 'sign out', 'exit', 'quit'], category: 'Settings' as CategoryType, danger: true },
+        ];
+        // Filter: show only commands this user has permission for
+        return allCmds.filter(cmd => !cmd.perm || hasPermission(cmd.perm as any));
+    }, [navigate, logout, hasPermission]);
     const employeeCommands: CommandItem[] = useMemo(() => {
         if (!search || search.length < 2) return [];
+        // Only show employee search to those with VIEW_EMPLOYEES permission
+        if (!hasPermission(PERMISSIONS.VIEW_EMPLOYEES)) return [];
         const q = search.toLowerCase();
         return employees
             .filter(e =>
@@ -115,7 +120,7 @@ export const CommandPalette = () => {
             .map(e => ({
                 id: `emp-${e.id}`,
                 title: e.name,
-                description: `${e.designation} · ${e.department} · ${e.code}`,
+                description: `${e.designation} Â· ${e.department} Â· ${e.code}`,
                 icon: (
                     <img
                         src={e.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${e.name}`}
@@ -129,7 +134,7 @@ export const CommandPalette = () => {
             }));
     }, [search, employees, navigate]);
 
-    // ── All filtered commands ─────────────────────────────────────────────
+    // â”€â”€ All filtered commands â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const allCommands = useMemo(() => {
         const all = [...employeeCommands, ...staticCommands];
         if (!search) return all;
@@ -141,7 +146,7 @@ export const CommandPalette = () => {
         );
     }, [search, staticCommands, employeeCommands]);
 
-    // ── Group by category ─────────────────────────────────────────────────
+    // â”€â”€ Group by category â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const grouped = useMemo(() => {
         const map = new Map<CategoryType, CommandItem[]>();
         for (const cmd of allCommands) {
@@ -159,7 +164,7 @@ export const CommandPalette = () => {
     // Flat list for keyboard nav
     const flatList = useMemo(() => allCommands, [allCommands]);
 
-    // ── Keyboard navigation ───────────────────────────────────────────────
+    // â”€â”€ Keyboard navigation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -198,7 +203,7 @@ export const CommandPalette = () => {
     // Reset selected when search changes
     useEffect(() => { setSelectedIdx(0); }, [search]);
 
-    // ── Quick actions strip (shown when search is empty) ──────────────────
+    // â”€â”€ Quick actions strip (shown when search is empty) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const quickActions: CommandItem[] = useMemo(() => [
         staticCommands.find(c => c.id === 'act-add-emp')!,
         staticCommands.find(c => c.id === 'nav-payroll')!,
@@ -220,7 +225,7 @@ export const CommandPalette = () => {
                 className="w-full max-w-2xl rounded-2xl border border-dark-border bg-dark-card shadow-2xl shadow-black/50 animate-in zoom-in-95 fade-in duration-150 overflow-hidden"
                 onClick={e => e.stopPropagation()}
             >
-                {/* ── Search Input ──────────────────────────────────── */}
+                {/* â”€â”€ Search Input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 <div className="flex items-center gap-3 px-4 py-3.5 border-b border-dark-border bg-dark-bg/50">
                     <Search className="w-5 h-5 text-primary-400 shrink-0" />
                     <input
@@ -228,7 +233,7 @@ export const CommandPalette = () => {
                         type="text"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        placeholder="Search commands, employees, pages…"
+                        placeholder="Search commands, employees, pagesâ€¦"
                         className="flex-1 bg-transparent text-dark-text placeholder-dark-muted outline-none text-base"
                         autoFocus
                     />
@@ -242,7 +247,7 @@ export const CommandPalette = () => {
                     </kbd>
                 </div>
 
-                {/* ── Quick Actions (when no search) ────────────────── */}
+                {/* â”€â”€ Quick Actions (when no search) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 {!search && (
                     <div className="px-3 py-2.5 border-b border-dark-border/50 flex gap-2 overflow-x-auto">
                         {quickActions.map(cmd => (
@@ -258,13 +263,13 @@ export const CommandPalette = () => {
                     </div>
                 )}
 
-                {/* ── Results ───────────────────────────────────────── */}
+                {/* â”€â”€ Results â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 <div ref={listRef} className="max-h-[400px] overflow-y-auto py-2 scroll-smooth">
                     {flatList.length === 0 ? (
                         <div className="flex flex-col items-center py-12 text-dark-muted gap-3">
                             <AlertCircle className="w-8 h-8 opacity-30" />
                             <div className="text-sm">No results for <span className="text-dark-text font-medium">"{search}"</span></div>
-                            <p className="text-xs opacity-60">Try: employees, payroll, attendance, settings…</p>
+                            <p className="text-xs opacity-60">Try: employees, payroll, attendance, settingsâ€¦</p>
                         </div>
                     ) : (
                         grouped.map(({ category, items }) => (
@@ -315,7 +320,7 @@ export const CommandPalette = () => {
                                             {/* Enter hint */}
                                             {isSelected && (
                                                 <span className="text-xs text-dark-muted flex items-center gap-1 shrink-0">
-                                                    <kbd className="px-1.5 py-0.5 bg-dark-bg border border-dark-border rounded text-[10px]">↵</kbd>
+                                                    <kbd className="px-1.5 py-0.5 bg-dark-bg border border-dark-border rounded text-[10px]">â†µ</kbd>
                                                 </span>
                                             )}
 
@@ -331,15 +336,15 @@ export const CommandPalette = () => {
                     )}
                 </div>
 
-                {/* ── Footer ───────────────────────────────────────────── */}
+                {/* â”€â”€ Footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                 <div className="flex items-center justify-between px-4 py-2.5 border-t border-dark-border bg-dark-bg/30 text-[11px] text-dark-muted">
                     <div className="flex items-center gap-4">
                         <span className="flex items-center gap-1">
-                            <kbd className="px-1.5 py-0.5 bg-dark-bg border border-dark-border rounded font-mono">↑↓</kbd>
+                            <kbd className="px-1.5 py-0.5 bg-dark-bg border border-dark-border rounded font-mono">â†‘â†“</kbd>
                             Navigate
                         </span>
                         <span className="flex items-center gap-1">
-                            <kbd className="px-1.5 py-0.5 bg-dark-bg border border-dark-border rounded font-mono">↵</kbd>
+                            <kbd className="px-1.5 py-0.5 bg-dark-bg border border-dark-border rounded font-mono">â†µ</kbd>
                             Select
                         </span>
                         <span className="flex items-center gap-1">
@@ -348,10 +353,11 @@ export const CommandPalette = () => {
                         </span>
                     </div>
                     <span className="flex items-center gap-1 text-dark-muted/60">
-                        <Command className="w-3 h-3" />K &nbsp;·&nbsp; {flatList.length} commands
+                        <Command className="w-3 h-3" />K &nbsp;Â·&nbsp; {flatList.length} commands
                     </span>
                 </div>
             </div>
         </div>
     );
 };
+
