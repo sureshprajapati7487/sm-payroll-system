@@ -523,7 +523,11 @@ export const EmployeeList = () => {
                                         </div>
                                         <div>
                                             <p className="text-dark-muted text-[10px] uppercase tracking-wider">Salary</p>
-                                            <p className="text-dark-text text-xs font-medium">₹{(employee.basicSalary || 0).toLocaleString()}</p>
+                                            <p className="text-dark-text text-xs font-medium">
+                                                {hasPermission(PERMISSIONS.VIEW_EMPLOYEE_SALARY)
+                                                    ? `₹${(employee.basicSalary || 0).toLocaleString()}`
+                                                    : '****'}
+                                            </p>
                                         </div>
                                         <div className="text-right">
                                             <p className="text-dark-muted text-[10px] uppercase tracking-wider">Type</p>
@@ -534,13 +538,15 @@ export const EmployeeList = () => {
                                     {/* Actions Footer — always visible on mobile, hover-reveal on desktop */}
                                     <div className="inset-x-0 bottom-0 p-3 bg-dark-card/95 backdrop-blur-sm flex items-center justify-center gap-2
                                         absolute translate-y-0 md:translate-y-full md:group-hover:translate-y-0 transition-transform duration-300">
-                                        <button
-                                            onClick={() => setCredentialEmployee(employee)}
-                                            className="p-1.5 rounded-lg bg-info/10 text-info hover:bg-info hover:text-white transition-colors"
-                                            title="Credentials"
-                                        >
-                                            <Key className="w-4 h-4" />
-                                        </button>
+                                        {hasPermission(PERMISSIONS.EDIT_EMPLOYEE) && (
+                                            <button
+                                                onClick={() => setCredentialEmployee(employee)}
+                                                className="p-1.5 rounded-lg bg-info/10 text-info hover:bg-info hover:text-white transition-colors"
+                                                title="Credentials"
+                                            >
+                                                <Key className="w-4 h-4" />
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => navigate(`/employees/${employee.id}`)}
                                             className="p-1.5 rounded-lg bg-primary-500/10 text-primary-500 hover:bg-primary-500 hover:text-white transition-colors"

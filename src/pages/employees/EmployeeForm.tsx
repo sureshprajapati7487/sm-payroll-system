@@ -121,7 +121,7 @@ export const EmployeeForm = () => {
     const { shifts } = useShiftStore();
     const { currentCompanyId } = useMultiCompanyStore();
     const { groups: workGroups, assignments: workAssignments, assignEmployee, unassignEmployee } = useWorkGroupStore();
-    const { hasPermission } = useAuthStore();
+    const { hasPermission, user } = useAuthStore();
     const { fields } = useCustomFieldStore();
 
     const activeCustomFields = fields.filter(f => f.module === 'employee' && f.isActive);
@@ -262,7 +262,7 @@ export const EmployeeForm = () => {
 
     const sc = formData.statutoryConfig!;
 
-    const canManageFinancials = hasPermission(PERMISSIONS.VIEW_EMPLOYEE_FINANCIALS);
+    const canManageFinancials = hasPermission(PERMISSIONS.EDIT_EMPLOYEE_FINANCIALS) || user?.role === 'SUPER_ADMIN';
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 pb-20">

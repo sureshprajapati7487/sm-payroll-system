@@ -157,25 +157,38 @@ export const EmployeeProfile = () => {
                         <div className="space-y-4">
                             <div>
                                 <p className="text-xs text-dark-muted mb-1">Basic Salary</p>
-                                <p className="text-2xl font-bold text-success">₹{employee.basicSalary.toLocaleString()}</p>
+                                <p className="text-2xl font-bold text-success">
+                                    {hasPermission(PERMISSIONS.VIEW_EMPLOYEE_SALARY) || user?.role === 'SUPER_ADMIN'
+                                        ? `₹${employee.basicSalary.toLocaleString()}`
+                                        : '₹****'}
+                                </p>
                             </div>
 
                             {employee.bankDetails ? (
-                                <div className="p-3 bg-dark-bg/50 rounded-xl border border-dark-border">
-                                    <div className="flex items-center gap-2 mb-2 text-primary-400">
-                                        <CreditCard className="w-4 h-4" />
-                                        <span className="text-xs font-bold tracking-wider">BANK DETAILS</span>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-xs text-dark-muted">Bank Name</p>
-                                        <p className="text-sm text-white font-medium">{employee.bankDetails.bankName}</p>
+                                hasPermission(PERMISSIONS.VIEW_EMPLOYEE_BANK) || user?.role === 'SUPER_ADMIN' ? (
+                                    <div className="p-3 bg-dark-bg/50 rounded-xl border border-dark-border">
+                                        <div className="flex items-center gap-2 mb-2 text-primary-400">
+                                            <CreditCard className="w-4 h-4" />
+                                            <span className="text-xs font-bold tracking-wider">BANK DETAILS</span>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-xs text-dark-muted">Bank Name</p>
+                                            <p className="text-sm text-white font-medium">{employee.bankDetails.bankName}</p>
 
-                                        <p className="text-xs text-dark-muted mt-2">Account Number</p>
-                                        <p className="text-sm text-white font-mono tracking-wider">
-                                            •••• {employee.bankDetails.accountNumber.slice(-4)}
-                                        </p>
+                                            <p className="text-xs text-dark-muted mt-2">Account Number</p>
+                                            <p className="text-sm text-white font-mono tracking-wider">
+                                                •••• {employee.bankDetails.accountNumber.slice(-4)}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="p-3 bg-dark-bg/50 rounded-xl border border-dark-border flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-dark-muted">
+                                            <Shield className="w-4 h-4" />
+                                            <span className="text-xs font-bold tracking-wider">BANK DETAILS HIDDEN</span>
+                                        </div>
+                                    </div>
+                                )
                             ) : (
                                 <p className="text-sm text-dark-muted italic">No bank details attached.</p>
                             )}
