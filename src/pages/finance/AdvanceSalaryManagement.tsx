@@ -8,6 +8,7 @@ import { useAdvanceSalaryStore } from '@/store/advanceSalaryStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAuthStore } from '@/store/authStore';
 import { useDialog } from '@/components/DialogProvider';
+import { PERMISSIONS } from '@/config/permissions';
 
 const STATUS_COLORS = {
     approved: 'bg-green-500/20 text-green-400 border-green-500/30',
@@ -18,8 +19,8 @@ const STATUS_COLORS = {
 export const AdvanceSalaryManagement = () => {
     const { requests, isLoading, fetchAdvances, createRequest, approveRequest, rejectRequest, deleteRequest } = useAdvanceSalaryStore();
     const { _rawEmployees: employees } = useEmployeeStore();
-    const { user } = useAuthStore();
-    const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+    const { user, hasPermission } = useAuthStore();
+    const canManage = hasPermission(PERMISSIONS.MANAGE_ADVANCE_SALARY);
     const { confirm } = useDialog();
 
     const [showForm, setShowForm] = useState(false);
@@ -271,7 +272,7 @@ export const AdvanceSalaryManagement = () => {
                                             </td>
                                             <td className="px-5 py-4">
                                                 <div className="flex items-center justify-center gap-2">
-                                                    {req.status === 'pending' && isAdmin && (
+                                                    {req.status === 'pending' && canManage && (
                                                         <>
                                                             <button onClick={() => handleApprove(req.id)}
                                                                 className="p-1.5 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors" title="Approve">
@@ -286,7 +287,7 @@ export const AdvanceSalaryManagement = () => {
                                                     {req.status === 'approved' && req.remainingBalance === 0 && (
                                                         <span className="text-xs text-green-400 flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" /> Fully recovered</span>
                                                     )}
-                                                    {req.status === 'rejected' && isAdmin && (
+                                                    {req.status === 'rejected' && canManage && (
                                                         <button onClick={() => handleDelete(req.id)}
                                                             className="p-1.5 bg-slate-700 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-lg transition-colors" title="Delete">
                                                             <Trash2 className="w-4 h-4" />

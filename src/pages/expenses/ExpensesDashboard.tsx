@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useExpenseStore, Expense } from '@/store/expenseStore';
 import { useAuthStore } from '@/store/authStore';
+import { PERMISSIONS } from '@/config/permissions';
 import {
     Banknote, Plus, Trash2, Calendar,
     TrendingUp, Coffee, Truck, Wrench, CircleDollarSign, CheckCircle, XCircle, Clock
@@ -11,9 +12,12 @@ import { useDialog } from '@/components/DialogProvider';
 import { InfoTip } from '@/components/ui/InfoTip';
 
 export const ExpensesDashboard = () => {
-    const { user } = useAuthStore();
+    const { user, hasPermission } = useAuthStore();
     const { expenses, isLoading, addExpense, updateStatus, deleteExpense, getStats } = useExpenseStore();
     const { confirm } = useDialog();
+
+    const canSubmit = hasPermission(PERMISSIONS.SUBMIT_EXPENSE);
+    const canManage = hasPermission(PERMISSIONS.MANAGE_EXPENSES);
 
     // State
     const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
@@ -142,98 +146,100 @@ export const ExpensesDashboard = () => {
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Entry Form */}
-                    <div className="glass p-6 rounded-2xl h-fit">
-                        <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-                            <Plus className="w-5 h-5 text-success" />
-                            Add New Expense
-                        </h3>
+                    {canSubmit && (
+                        <div className="glass p-6 rounded-2xl h-fit">
+                            <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                                <Plus className="w-5 h-5 text-success" />
+                                Add New Expense
+                            </h3>
 
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-xs text-dark-muted mb-1"><InfoTip id="expenseDate" label="Date" /></label>
-                                <input
-                                    type="date"
-                                    value={form.date}
-                                    onChange={e => setForm({ ...form, date: e.target.value })}
-                                    className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white"
-                                />
-                            </div>
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs text-dark-muted mb-1"><InfoTip id="expenseDate" label="Date" /></label>
+                                    <input
+                                        type="date"
+                                        value={form.date}
+                                        onChange={e => setForm({ ...form, date: e.target.value })}
+                                        className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white"
+                                    />
+                                </div>
 
-                            <div>
-                                <label className="block text-xs text-dark-muted mb-1"><InfoTip id="expenseCategory" label="Category" /></label>
-                                <select
-                                    value={form.category}
-                                    onChange={e => setForm({ ...form, category: e.target.value as any })}
-                                    className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white"
+                                <div>
+                                    <label className="block text-xs text-dark-muted mb-1"><InfoTip id="expenseCategory" label="Category" /></label>
+                                    <select
+                                        value={form.category}
+                                        onChange={e => setForm({ ...form, category: e.target.value as any })}
+                                        className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white"
+                                    >
+                                        <option value="TEA">Tea / Snacks</option>
+                                        <option value="TRANSPORT">Transport / Petrol</option>
+                                        <option value="MAINTENANCE">Maintenance / Repairs</option>
+                                        <option value="S_ADVANCE">Staff Advance (Casual)</option>
+                                        <option value="OTHER">Other / Misc</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs text-dark-muted mb-1"><InfoTip id="billAmount" label="Amount (₹)" /></label>
+                                    <input
+                                        type="number"
+                                        value={form.amount}
+                                        onChange={e => setForm({ ...form, amount: e.target.value })}
+                                        placeholder="0.00"
+                                        className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white font-mono text-lg"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs text-dark-muted mb-1">Description</label>
+                                    <input
+                                        type="text"
+                                        value={form.description}
+                                        onChange={e => setForm({ ...form, description: e.target.value })}
+                                        placeholder="e.g. Guest Tea, Stationary"
+                                        className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs text-dark-muted mb-1">Paid To (Optional)</label>
+                                    <input
+                                        type="text"
+                                        value={form.paidTo}
+                                        onChange={e => setForm({ ...form, paidTo: e.target.value })}
+                                        placeholder="Person Name / Shop"
+                                        className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs text-dark-muted mb-1">Receipt (Optional)</label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={e => setReceiptFile(e.target.files?.[0] || null)}
+                                        className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white text-sm file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-primary-600 file:text-white hover:file:bg-primary-500"
+                                    />
+                                    {receiptFile && <p className="text-xs text-dark-muted mt-1">{receiptFile.name}</p>}
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={isUploading}
+                                    className={clsx(
+                                        "w-full py-2 text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2",
+                                        isUploading ? "bg-primary-800" : "bg-primary-600 hover:bg-primary-500"
+                                    )}
                                 >
-                                    <option value="TEA">Tea / Snacks</option>
-                                    <option value="TRANSPORT">Transport / Petrol</option>
-                                    <option value="MAINTENANCE">Maintenance / Repairs</option>
-                                    <option value="S_ADVANCE">Staff Advance (Casual)</option>
-                                    <option value="OTHER">Other / Misc</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs text-dark-muted mb-1"><InfoTip id="billAmount" label="Amount (₹)" /></label>
-                                <input
-                                    type="number"
-                                    value={form.amount}
-                                    onChange={e => setForm({ ...form, amount: e.target.value })}
-                                    placeholder="0.00"
-                                    className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white font-mono text-lg"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs text-dark-muted mb-1">Description</label>
-                                <input
-                                    type="text"
-                                    value={form.description}
-                                    onChange={e => setForm({ ...form, description: e.target.value })}
-                                    placeholder="e.g. Guest Tea, Stationary"
-                                    className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs text-dark-muted mb-1">Paid To (Optional)</label>
-                                <input
-                                    type="text"
-                                    value={form.paidTo}
-                                    onChange={e => setForm({ ...form, paidTo: e.target.value })}
-                                    placeholder="Person Name / Shop"
-                                    className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs text-dark-muted mb-1">Receipt (Optional)</label>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={e => setReceiptFile(e.target.files?.[0] || null)}
-                                    className="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-white text-sm file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-primary-600 file:text-white hover:file:bg-primary-500"
-                                />
-                                {receiptFile && <p className="text-xs text-dark-muted mt-1">{receiptFile.name}</p>}
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={isUploading}
-                                className={clsx(
-                                    "w-full py-2 text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2",
-                                    isUploading ? "bg-primary-800" : "bg-primary-600 hover:bg-primary-500"
-                                )}
-                            >
-                                {isUploading ? <Clock className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                                {isUploading ? 'Uploading & Submitting...' : 'Submit Request'}
-                            </button>
-                        </form>
-                    </div>
+                                    {isUploading ? <Clock className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                                    {isUploading ? 'Uploading & Submitting...' : 'Submit Request'}
+                                </button>
+                            </form>
+                        </div>
+                    )}
 
                     {/* List & Stats */}
-                    <div className="lg:col-span-2 space-y-6">
+                    <div className={clsx("space-y-6", canSubmit ? "lg:col-span-2" : "lg:col-span-3")}>
                         {/* Stats Card */}
                         <div className="glass p-6 rounded-2xl flex items-center justify-between">
                             <div>
@@ -319,7 +325,7 @@ export const ExpensesDashboard = () => {
                                                         </td>
                                                         <td className="p-4 text-right">
                                                             <div className="flex items-center justify-end gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                                                                {exp.status === 'PENDING' && (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'ACCOUNT_ADMIN') && (
+                                                                {exp.status === 'PENDING' && canManage && (
                                                                     <>
                                                                         <button
                                                                             onClick={() => updateStatus(exp.id, 'APPROVED')}
@@ -337,16 +343,18 @@ export const ExpensesDashboard = () => {
                                                                         </button>
                                                                     </>
                                                                 )}
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        const ok = await confirm({ title: 'Expense Delete Karein?', message: `"${exp.description}" entry ko delete karna chahte hain?`, confirmLabel: 'Haan, Delete Karo', cancelLabel: 'Cancel', variant: 'danger' });
-                                                                        if (ok) deleteExpense(exp.id);
-                                                                    }}
-                                                                    className="p-1.5 hover:bg-red-500/20 text-dark-muted hover:text-red-500 rounded transition-colors"
-                                                                    title="Delete"
-                                                                >
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </button>
+                                                                {(canManage || (exp.status === 'PENDING' && exp.addedBy === user?.name)) && (
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            const ok = await confirm({ title: 'Expense Delete Karein?', message: `"${exp.description}" entry ko delete karna chahte hain?`, confirmLabel: 'Haan, Delete Karo', cancelLabel: 'Cancel', variant: 'danger' });
+                                                                            if (ok) deleteExpense(exp.id);
+                                                                        }}
+                                                                        className="p-1.5 hover:bg-red-500/20 text-dark-muted hover:text-red-500 rounded transition-colors"
+                                                                        title="Delete"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
