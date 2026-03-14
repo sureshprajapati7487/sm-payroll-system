@@ -157,11 +157,14 @@ export const useAuthStore = create<AuthState>()(
                 set({ user: null, token: null, isAuthenticated: false });
 
                 // --- PREVENT DATA BLEED ACROSS LOGINS ---
-                // Wipe local storage completely except for UI theme preferences
+                // Preserve system-level config keys that are NOT user-specific
+                // (role permissions are set by Super Admin and must survive logout)
                 try {
-                    const theme = localStorage.getItem('theme-storage');
+                    const PRESERVE_KEYS = ['theme-storage', 'role-permissions-v2'];
+                    const preserved: Record<string, string | null> = {};
+                    PRESERVE_KEYS.forEach(k => { preserved[k] = localStorage.getItem(k); });
                     localStorage.clear();
-                    if (theme) localStorage.setItem('theme-storage', theme);
+                    PRESERVE_KEYS.forEach(k => { if (preserved[k]) localStorage.setItem(k, preserved[k]!); });
                 } catch (e) {
                     console.error('Failed to clear local storage on logout', e);
                 }
