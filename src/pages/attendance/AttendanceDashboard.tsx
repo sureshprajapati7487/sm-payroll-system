@@ -92,7 +92,12 @@ export const AttendanceDashboard = () => {
     const isCheckedOut = !!currentUserRecord?.checkOut;
 
     // Filter Logic
+    const canViewAllAttendance = hasPermission(PERMISSIONS.VIEW_ATTENDANCE) || hasPermission(PERMISSIONS.VIEW_TEAM_ATTENDANCE);
+
     const activeEmployees = employees.filter(e => {
+        // Privacy filter: Unprivileged users only see themselves
+        if (!canViewAllAttendance && e.id !== user?.id) return false;
+
         const isProduction = e.department?.toLowerCase().includes('production') ||
             e.salaryType === 'PRODUCTION'; // Hide Production staff
         return e.status === 'ACTIVE' && !isProduction;
@@ -248,7 +253,7 @@ export const AttendanceDashboard = () => {
                     </div>
 
                     {/* Check In/Out UI (Only for Today & Non-Admins usually, but admins can self-mark) */}
-                    {isToday && !canManualUpdate && (
+                    {isToday && hasPermission(PERMISSIONS.MARK_OWN_ATTENDANCE) && !canManualUpdate && (
                         <>
                             {!isCheckedIn ? (
                                 <button

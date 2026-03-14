@@ -130,7 +130,7 @@ export const LeaveDashboard = () => {
 
     const canApprove = hasPermission(PERMISSIONS.APPROVE_LEAVES);
     const canManageLeaves = hasPermission(PERMISSIONS.APPROVE_LEAVES);
-    const isEmployee = user?.role === 'EMPLOYEE';
+    const canViewAllLeaves = hasPermission(PERMISSIONS.VIEW_ALL_LEAVES) || canApprove;
 
     // Get Target Employee Data
     const targetEmployee = employees.find(e => e.id === targetEmployeeId);
@@ -144,7 +144,7 @@ export const LeaveDashboard = () => {
     }, [user]);
 
     const visibleRequests = requests.filter(r => {
-        const roleMatch = isEmployee ? r.employeeId === user?.id : true;
+        const roleMatch = canViewAllLeaves ? true : r.employeeId === user?.id;
 
         // Search Filter (Employee Name)
         const empName = employees.find(e => e.id === r.employeeId)?.name.toLowerCase() || '';
