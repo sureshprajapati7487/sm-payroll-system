@@ -157,10 +157,19 @@ export const useAuthStore = create<AuthState>()(
                 set({ user: null, token: null, isAuthenticated: false });
 
                 // --- PREVENT DATA BLEED ACROSS LOGINS ---
-                // Preserve system-level config keys that are NOT user-specific
-                // (role permissions are set by Super Admin and must survive logout)
+                // Preserve system/company-level config — these belong to the COMPANY,
+                // not the logged-in user. Super Admin shouldn't have to reconfigure on every login.
+                // Only employee/payroll/session data is cleared.
                 try {
-                    const PRESERVE_KEYS = ['theme-storage', 'role-permissions-v2'];
+                    const PRESERVE_KEYS = [
+                        'theme-storage',        // UI theme selection
+                        'theme-store-v2',       // Extended theme store
+                        'role-permissions-v2',  // Role Access Control settings
+                        'system-config-storage',// System-wide configuration
+                        'sm-custom-fields-v1',  // Custom employee fields
+                        'sm-payroll-workflows', // Workflow rules
+                        'multi-company-store',  // Active company selection
+                    ];
                     const preserved: Record<string, string | null> = {};
                     PRESERVE_KEYS.forEach(k => { preserved[k] = localStorage.getItem(k); });
                     localStorage.clear();
