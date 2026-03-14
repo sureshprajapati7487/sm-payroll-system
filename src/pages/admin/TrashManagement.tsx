@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useDialog } from '@/components/DialogProvider';
+import { useAuthStore } from '@/store/authStore';
+import { PERMISSIONS } from '@/config/permissions';
 
 interface TrashItem {
     id: string;
@@ -26,6 +28,10 @@ export const TrashManagement = () => {
     ]);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, step: number } | null>(null);
     const { toast } = useDialog();
+
+    const { hasPermission } = useAuthStore();
+    const canRestore = hasPermission(PERMISSIONS.RESTORE_DELETED);
+    const canManageTrash = hasPermission(PERMISSIONS.MANAGE_TRASH);
 
     const filteredItems = items.filter(item => item.type === activeTab && item.isDeleted);
 
@@ -140,27 +146,31 @@ export const TrashManagement = () => {
                                             </td>
                                             <td className="p-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleRestore(item.id)}
-                                                        className="flex items-center gap-1 px-3 py-1.5 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm transition-all"
-                                                    >
-                                                        <RefreshCw className="w-4 h-4" />
-                                                        Restore
-                                                    </button>
+                                                    {canRestore && (
+                                                        <button
+                                                            onClick={() => handleRestore(item.id)}
+                                                            className="flex items-center gap-1 px-3 py-1.5 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm transition-all"
+                                                        >
+                                                            <RefreshCw className="w-4 h-4" />
+                                                            Restore
+                                                        </button>
+                                                    )}
 
-                                                    <button
-                                                        onClick={() => handlePermanentDelete(item.id)}
-                                                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition-all ${isConfirming
-                                                            ? 'bg-red-500 text-white'
-                                                            : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
-                                                            }`}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                        {isConfirming
-                                                            ? `Click ${4 - deleteConfirm.step} more time${deleteConfirm.step < 3 ? 's' : ''}`
-                                                            : 'Delete Forever'
-                                                        }
-                                                    </button>
+                                                    {canManageTrash && (
+                                                        <button
+                                                            onClick={() => handlePermanentDelete(item.id)}
+                                                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition-all ${isConfirming
+                                                                ? 'bg-red-500 text-white'
+                                                                : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
+                                                                }`}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                            {isConfirming
+                                                                ? `Click ${4 - deleteConfirm.step} more time${deleteConfirm.step < 3 ? 's' : ''}`
+                                                                : 'Delete Forever'
+                                                            }
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

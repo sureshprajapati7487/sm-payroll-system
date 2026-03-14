@@ -100,15 +100,15 @@ const NAV_GROUPS = [
     {
         label: 'System',
         items: [
-            { label: 'Audit Logs', path: '/admin/audit-logs', icon: ShieldCheck, perm: PERMISSIONS.NAV_SYSTEM },
-            { label: 'Database Backup', path: '/admin/backup', icon: Database, perm: PERMISSIONS.NAV_SYSTEM },
-            { label: 'Bulk Import', path: '/admin/bulk-import', icon: Upload, perm: PERMISSIONS.NAV_SYSTEM },
-            { label: 'Trash', path: '/admin/trash', icon: Trash2, perm: PERMISSIONS.NAV_SYSTEM },
-            { label: 'Drafts', path: '/admin/drafts', icon: GitBranch, perm: PERMISSIONS.NAV_SYSTEM },
-            { label: 'Data Check', path: '/admin/consistency', icon: ShieldCheck, perm: PERMISSIONS.NAV_SYSTEM },
-            { label: 'Security Alerts', path: '/security/alerts', icon: ShieldAlert, perm: PERMISSIONS.NAV_SYSTEM },
+            { label: 'Audit Logs', path: '/admin/audit-logs', icon: ShieldCheck, perm: PERMISSIONS.VIEW_AUDIT_LOGS },
+            { label: 'Database Backup', path: '/admin/backup', icon: Database, perm: PERMISSIONS.DATABASE_BACKUP },
+            { label: 'Bulk Import', path: '/admin/bulk-import', icon: Upload, perm: PERMISSIONS.BULK_IMPORT },
+            { label: 'Trash', path: '/admin/trash', icon: Trash2, perm: PERMISSIONS.MANAGE_TRASH },
+            { label: 'Drafts', path: '/admin/drafts', icon: GitBranch, perm: PERMISSIONS.MANAGE_TRASH },
+            { label: 'Data Check', path: '/admin/consistency', icon: ShieldCheck, perm: PERMISSIONS.DATA_CONSISTENCY_CHECK },
+            { label: 'Security Alerts', path: '/security/alerts', icon: ShieldAlert, perm: PERMISSIONS.VIEW_SECURITY_ALERTS },
             { label: 'Help Center', path: '/help', icon: FileText, perm: null }, // Null perm means always visible
-            { label: 'Company', path: '/company/switcher', icon: Database, perm: PERMISSIONS.NAV_SYSTEM },
+            { label: 'Company', path: '/company/switcher', icon: Database, perm: PERMISSIONS.MANAGE_COMPANY_SWITCH },
             {
                 label: 'Settings', path: '/settings', icon: Settings, perm: PERMISSIONS.MANAGE_SETTINGS,
                 subItems: [

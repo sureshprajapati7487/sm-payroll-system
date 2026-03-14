@@ -848,17 +848,17 @@ export const ConfigurationPage = () => {
                 {/* Row 1: Core Settings */}
                 <div className="flex flex-wrap gap-1.5">
                     {[
-                        { id: 'departments', label: 'Departments', icon: <Building2 className="w-3.5 h-3.5" />, color: 'primary' },
-                        { id: 'workAllocation', label: 'Work Allocation', icon: <span className="text-xs">🏭</span>, color: 'violet' },
-                        { id: 'shifts', label: 'Shifts', icon: <Clock className="w-3.5 h-3.5" />, color: 'primary' },
-                        { id: 'rules', label: 'Payroll Rules', icon: <Gavel className="w-3.5 h-3.5" />, color: 'primary' },
-                        { id: 'salaryTypes', label: 'Salary Types', icon: <IndianRupee className="w-3.5 h-3.5" />, color: 'primary' },
-                        { id: 'attendance', label: 'Attendance', icon: <CalendarCheck className="w-3.5 h-3.5" />, color: 'primary' },
-                        { id: 'holidays', label: 'Holidays', icon: <Calendar className="w-3.5 h-3.5" />, color: 'primary' },
-                        { id: 'salesman', label: 'Salesman', icon: <span className="text-xs">🛒</span>, color: 'orange' },
-                        { id: 'punch', label: 'Punch System', icon: <Camera className="w-3.5 h-3.5" />, color: 'emerald' },
-                        { id: 'statutory', label: 'Statutory', icon: <Shield className="w-3.5 h-3.5" />, color: 'primary' },
-                    ].map(tab => {
+                        { id: 'departments', label: 'Departments', icon: <Building2 className="w-3.5 h-3.5" />, color: 'primary', req: PERMISSIONS.MANAGE_DEPARTMENTS },
+                        { id: 'workAllocation', label: 'Work Allocation', icon: <span className="text-xs">🏭</span>, color: 'violet', req: PERMISSIONS.MANAGE_WORK_GROUPS },
+                        { id: 'shifts', label: 'Shifts', icon: <Clock className="w-3.5 h-3.5" />, color: 'primary', req: PERMISSIONS.MANAGE_SHIFTS },
+                        { id: 'rules', label: 'Payroll Rules', icon: <Gavel className="w-3.5 h-3.5" />, color: 'primary', req: PERMISSIONS.MANAGE_SETTINGS },
+                        { id: 'salaryTypes', label: 'Salary Types', icon: <IndianRupee className="w-3.5 h-3.5" />, color: 'primary', req: PERMISSIONS.MANAGE_SETTINGS },
+                        { id: 'attendance', label: 'Attendance', icon: <CalendarCheck className="w-3.5 h-3.5" />, color: 'primary', req: PERMISSIONS.MANAGE_SETTINGS },
+                        { id: 'holidays', label: 'Holidays', icon: <Calendar className="w-3.5 h-3.5" />, color: 'primary', req: PERMISSIONS.MANAGE_HOLIDAYS },
+                        { id: 'salesman', label: 'Salesman', icon: <span className="text-xs">🛒</span>, color: 'orange', req: PERMISSIONS.MANAGE_SETTINGS },
+                        { id: 'punch', label: 'Punch System', icon: <Camera className="w-3.5 h-3.5" />, color: 'emerald', req: PERMISSIONS.MANAGE_SETTINGS },
+                        { id: 'statutory', label: 'Statutory', icon: <Shield className="w-3.5 h-3.5" />, color: 'primary', req: PERMISSIONS.MANAGE_STATUTORY },
+                    ].filter(tab => !tab.req || hasPermission(tab.req)).map(tab => {
                         const isActive = activeTab === tab.id;
                         const colorMap: Record<string, string> = {
                             primary: 'bg-primary-600 text-white shadow-primary-600/30',
