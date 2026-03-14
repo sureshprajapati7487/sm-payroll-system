@@ -29,23 +29,23 @@ const NAV_GROUPS = [
         label: 'Main',
         items: [
             { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, perm: PERMISSIONS.NAV_DASHBOARD },
-            { label: 'Employees', path: '/employees', icon: Users, perm: PERMISSIONS.NAV_EMPLOYEES },
+            { label: 'Employees', path: '/employees', icon: Users, perm: PERMISSIONS.VIEW_EMPLOYEES },
             {
-                label: 'Attendance', path: '/attendance', icon: CalendarClock, perm: PERMISSIONS.NAV_ATTENDANCE,
+                label: 'Attendance', path: '/attendance', icon: CalendarClock, perm: PERMISSIONS.VIEW_ATTENDANCE,
                 subItems: [
                     { label: 'Holiday Manager', path: '/attendance/holidays', icon: CalendarClock, perm: PERMISSIONS.MANAGE_HOLIDAYS },
                     { label: 'Face Kiosk', path: '/attendance/kiosk', icon: ShieldCheck, perm: PERMISSIONS.USE_FACE_KIOSK },
                 ],
             },
             {
-                label: 'Salesman', path: '/salesman', icon: ShoppingBag, perm: PERMISSIONS.NAV_SALESMAN,
+                label: 'Salesman', path: '/salesman', icon: ShoppingBag, perm: PERMISSIONS.VIEW_SALESMAN,
                 subItems: [
                     { label: 'Client / Party List', path: '/salesman/clients', icon: Building2, perm: PERMISSIONS.VIEW_CLIENTS },
                 ],
             },
 
             {
-                label: 'Production', path: '/production', icon: Factory, perm: PERMISSIONS.NAV_PRODUCTION,
+                label: 'Production', path: '/production', icon: Factory, perm: PERMISSIONS.VIEW_PRODUCTION,
                 subItems: [
                     { label: 'Rate Manager', path: '/production/rates', icon: IndianRupee, perm: PERMISSIONS.MANAGE_PRODUCTION_RATES },
                     { label: 'Work Groups', path: '/production/workgroups', icon: Users, perm: PERMISSIONS.MANAGE_WORK_GROUPS },
@@ -57,17 +57,17 @@ const NAV_GROUPS = [
     {
         label: 'Finance',
         items: [
-            { label: 'Leaves', path: '/leaves', icon: CalendarClock, perm: PERMISSIONS.NAV_LEAVES },
-            { label: 'Loans', path: '/loans', icon: Wallet, perm: PERMISSIONS.NAV_LOANS },
+            { label: 'Leaves', path: '/leaves', icon: CalendarClock, perm: PERMISSIONS.VIEW_LEAVES },
+            { label: 'Loans', path: '/loans', icon: Wallet, perm: PERMISSIONS.VIEW_ALL_LOANS },
             { label: 'Approvals', path: '/approvals', icon: UserCheck, perm: PERMISSIONS.VIEW_APPROVALS },
             {
-                label: 'Payroll', path: '/payroll', icon: Banknote, perm: PERMISSIONS.NAV_PAYROLL,
+                label: 'Payroll', path: '/payroll', icon: Banknote, perm: PERMISSIONS.VIEW_PAYROLL,
                 subItems: [
                     { label: 'Payroll History', path: '/payroll/history', icon: BarChart2, perm: PERMISSIONS.VIEW_PAYROLL },
                     { label: 'Simulation', path: '/payroll/simulation', icon: FlaskConical, perm: PERMISSIONS.RUN_PAYROLL_SIMULATION },
                 ],
             },
-            { label: 'Expenses', path: '/expenses', icon: Wallet, perm: PERMISSIONS.NAV_EXPENSES },
+            { label: 'Expenses', path: '/expenses', icon: Wallet, perm: PERMISSIONS.SUBMIT_EXPENSE },
             { label: 'Finance Dashboard', path: '/finance/dashboard', icon: TrendingUp, perm: PERMISSIONS.VIEW_FINANCE_DASHBOARD },
             { label: 'Advance Salary', path: '/finance/advance-salary', icon: IndianRupee, perm: PERMISSIONS.MANAGE_ADVANCE_SALARY },
             { label: 'Dept Finance', path: '/finance/department', icon: BarChart2, perm: PERMISSIONS.VIEW_DEPT_FINANCE },
@@ -77,9 +77,9 @@ const NAV_GROUPS = [
     {
         label: 'Calculators',
         items: [
-            { label: 'CTC Calculator', path: '/calculators/ctc', icon: Calculator, perm: PERMISSIONS.NAV_CALCULATORS },
-            { label: 'TDS Calculator', path: '/calculators/tds', icon: Scale, perm: PERMISSIONS.NAV_CALCULATORS },
-            { label: 'PF / ESI Calc', path: '/calculators/pfesi', icon: FlaskConical, perm: PERMISSIONS.NAV_CALCULATORS },
+            { label: 'CTC Calculator', path: '/calculators/ctc', icon: Calculator, perm: PERMISSIONS.USE_CALCULATORS },
+            { label: 'TDS Calculator', path: '/calculators/tds', icon: Scale, perm: PERMISSIONS.USE_CALCULATORS },
+            { label: 'PF / ESI Calc', path: '/calculators/pfesi', icon: FlaskConical, perm: PERMISSIONS.USE_CALCULATORS },
         ],
     },
     {
@@ -129,19 +129,19 @@ const NAV_GROUPS = [
 // ── Mobile Bottom Nav — with permission keys (same store as desktop) ────────
 const BOTTOM_NAV = [
     { label: 'Home', path: '/dashboard', icon: LayoutDashboard, perm: PERMISSIONS.NAV_DASHBOARD },
-    { label: 'Attend', path: '/attendance', icon: CalendarClock, perm: PERMISSIONS.NAV_ATTENDANCE },
-    { label: 'Payroll', path: '/payroll', icon: Banknote, perm: PERMISSIONS.NAV_PAYROLL },
-    { label: 'Salesman', path: '/salesman', icon: ShoppingBag, perm: PERMISSIONS.NAV_SALESMAN },
+    { label: 'Attend', path: '/attendance', icon: CalendarClock, perm: PERMISSIONS.VIEW_ATTENDANCE },
+    { label: 'Payroll', path: '/payroll', icon: Banknote, perm: PERMISSIONS.VIEW_PAYROLL },
+    { label: 'Salesman', path: '/salesman', icon: ShoppingBag, perm: PERMISSIONS.VIEW_SALESMAN },
 ];
 
 // ── More menu items — with permission keys (same store as desktop) ────────────
 const MORE_ITEMS = [
-    { label: 'Staff', path: '/employees', icon: Users, perm: PERMISSIONS.NAV_EMPLOYEES },
-    { label: 'Leaves', path: '/leaves', icon: CalendarClock, perm: PERMISSIONS.NAV_LEAVES },
-    { label: 'Loans', path: '/loans', icon: Wallet, perm: PERMISSIONS.NAV_LOANS },
-    { label: 'Expenses', path: '/expenses', icon: Wallet, perm: PERMISSIONS.NAV_EXPENSES },
-    { label: 'Production', path: '/production', icon: Factory, perm: PERMISSIONS.NAV_PRODUCTION },
-    { label: 'Approvals', path: '/approvals', icon: UserCheck, perm: PERMISSIONS.NAV_APPROVALS },
+    { label: 'Staff', path: '/employees', icon: Users, perm: PERMISSIONS.VIEW_EMPLOYEES },
+    { label: 'Leaves', path: '/leaves', icon: CalendarClock, perm: PERMISSIONS.VIEW_LEAVES },
+    { label: 'Loans', path: '/loans', icon: Wallet, perm: PERMISSIONS.VIEW_ALL_LOANS },
+    { label: 'Expenses', path: '/expenses', icon: Wallet, perm: PERMISSIONS.SUBMIT_EXPENSE },
+    { label: 'Production', path: '/production', icon: Factory, perm: PERMISSIONS.VIEW_PRODUCTION },
+    { label: 'Approvals', path: '/approvals', icon: UserCheck, perm: PERMISSIONS.VIEW_APPROVALS },
     { label: 'Settings', path: '/settings', icon: Settings, perm: PERMISSIONS.MANAGE_SETTINGS },
     { label: 'Reports', path: '/reports/builder', icon: ShieldCheck, perm: PERMISSIONS.VIEW_REPORTS },
 ];
