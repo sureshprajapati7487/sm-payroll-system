@@ -160,6 +160,8 @@ export const ProductionDashboard = () => {
 
     const canAdd = hasPermission(PERMISSIONS.ADD_PRODUCTION);
     const canApprove = hasPermission(PERMISSIONS.APPROVE_PRODUCTION);
+    const canBulkAdd = hasPermission(PERMISSIONS.BULK_PRODUCTION_ENTRY);
+    const canManageRates = hasPermission(PERMISSIONS.MANAGE_PRODUCTION_RATES);
     const isEmployee = user?.role === 'EMPLOYEE';
 
     // ── Filtered entries (date range) ─────────────────────────────────────────
@@ -301,17 +303,17 @@ export const ProductionDashboard = () => {
                     <p className="text-dark-muted text-sm">Track quantity, rates, and approval workflow</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                    {!isEmployee && (
-                        <>
-                            <button onClick={() => setShowBulkEntry(true)}
-                                className="bg-primary-600 hover:bg-primary-500 text-white px-3 py-2 rounded-lg border border-primary-500/50 transition-colors flex items-center gap-2 text-xs font-bold">
-                                <Users className="w-4 h-4" /> Bulk Entry
-                            </button>
-                            <button onClick={() => setShowRateManager(true)}
-                                className="bg-primary-600/20 hover:bg-primary-600/30 text-primary-400 p-2 rounded-lg border border-primary-500/30 transition-colors" title="Manage Rates">
-                                <Factory className="w-4 h-4" />
-                            </button>
-                        </>
+                    {canBulkAdd && (
+                        <button onClick={() => setShowBulkEntry(true)}
+                            className="bg-primary-600 hover:bg-primary-500 text-white px-3 py-2 rounded-lg border border-primary-500/50 transition-colors flex items-center gap-2 text-xs font-bold">
+                            <Users className="w-4 h-4" /> Bulk Entry
+                        </button>
+                    )}
+                    {canManageRates && (
+                        <button onClick={() => setShowRateManager(true)}
+                            className="bg-primary-600/20 hover:bg-primary-600/30 text-primary-400 p-2 rounded-lg border border-primary-500/30 transition-colors" title="Manage Rates">
+                            <Factory className="w-4 h-4" />
+                        </button>
                     )}
 
                     {/* Bulk Approve — only show when there are pending entries + canApprove */}
