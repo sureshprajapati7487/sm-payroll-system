@@ -39,6 +39,11 @@ export const PERMISSIONS = {
     VIEW_EMPLOYEE_BANK: 'view_employee_bank',          // Bank/Aadhaar/PAN
     EXPORT_EMPLOYEES: 'export_employees',
 
+    // ── Self / Own Profile ────────────────────────────────────────────────
+    VIEW_OWN_PROFILE: 'view_own_profile',              // Khud ka profile dekhe
+    UPDATE_OWN_PROFILE: 'update_own_profile',          // Phone, address, emergency contact update
+    UPLOAD_OWN_DOCUMENTS: 'upload_own_documents',      // Aadhaar, PAN photo upload kare
+
     // ── Attendance ────────────────────────────────────────────────────────
     VIEW_ATTENDANCE: 'view_attendance',
     EDIT_ATTENDANCE: 'edit_attendance',
@@ -49,6 +54,10 @@ export const PERMISSIONS = {
     MANAGE_HOLIDAYS: 'manage_holidays',
     VIEW_ATTENDANCE_REPORTS: 'view_attendance_reports',
     USE_FACE_KIOSK: 'use_face_kiosk',
+    MARK_OWN_ATTENDANCE: 'mark_own_attendance',        // Punch In/Out
+    VIEW_OWN_ATTENDANCE: 'view_own_attendance',        // Sirf apni attendance history
+    REQUEST_REGULARIZATION: 'request_regularization',  // Galat punch correct karne ki request
+    VIEW_TEAM_ATTENDANCE: 'view_team_attendance',      // Manager - sirf team ki attendance
 
     // ── Payroll & Accounts ────────────────────────────────────────────────
     VIEW_PAYROLL: 'view_payroll',
@@ -65,6 +74,7 @@ export const PERMISSIONS = {
     VIEW_OWN_LOANS: 'view_own_loans',
     APPROVE_LOANS: 'approve_loans',
     VIEW_ALL_LOANS: 'view_all_loans',
+    REQUEST_LOAN: 'request_loan',                      // Employee loan ke liye apply kare
 
     // ── Leaves ────────────────────────────────────────────────────────────
     VIEW_LEAVES: 'view_leaves',
@@ -93,23 +103,37 @@ export const PERMISSIONS = {
     VIEW_COST_CENTERS: 'view_cost_centers',
     MANAGE_EXPENSES: 'manage_expenses',
     MANAGE_ADVANCE_SALARY: 'manage_advance_salary',
+    SUBMIT_EXPENSE: 'submit_expense',                  // Employee apna expense submit kare
+    VIEW_OWN_EXPENSES: 'view_own_expenses',            // Khud ke expenses dekhe
+    REQUEST_ADVANCE_SALARY: 'request_advance_salary',  // Employee advance salary maange
 
     // ── Reports ───────────────────────────────────────────────────────────
     VIEW_REPORTS: 'view_reports',
     BUILD_REPORTS: 'build_reports',
     EXPORT_REPORTS: 'export_reports',
     SCHEDULE_REPORTS: 'schedule_reports',
+    VIEW_OWN_REPORTS: 'view_own_reports',              // Employee khud ki reports dekhe
 
     // ── Statutory / Compliance ────────────────────────────────────────────
     VIEW_STATUTORY: 'view_statutory',
     MANAGE_STATUTORY: 'manage_statutory',
     VIEW_FORM16: 'view_form16',
 
+    // ── Announcements / Communication ─────────────────────────────────────
+    VIEW_ANNOUNCEMENTS: 'view_announcements',          // Notice/announcement dekhe
+    SEND_ANNOUNCEMENTS: 'send_announcements',          // Notice bheje (Admin/Manager)
+
+    // ── Configuration (non-dangerous) ─────────────────────────────────────
+    MANAGE_DEPARTMENTS: 'manage_departments',          // Department create/edit
+    MANAGE_SHIFTS: 'manage_shifts',                   // Shifts define/edit
+    MANAGE_WORK_GROUPS: 'manage_work_groups',          // Work groups manage
+
     // ── System / Admin Tools ──────────────────────────────────────────────
     VIEW_AUDIT_LOGS: 'view_audit_logs',
     DATABASE_BACKUP: 'database_backup',
     BULK_IMPORT: 'bulk_import',
     MANAGE_TRASH: 'manage_trash',
+    RESTORE_DELETED: 'restore_deleted',               // Trash se records restore
     VIEW_SECURITY_ALERTS: 'view_security_alerts',
     DATA_CONSISTENCY_CHECK: 'data_consistency_check',
     MANAGE_COMPANY_SWITCH: 'manage_company_switch',
@@ -123,6 +147,7 @@ export const PERMISSIONS = {
 
 } as const;
 
+
 export type PermissionKey = keyof typeof PERMISSIONS;
 export type PermissionValue = typeof PERMISSIONS[PermissionKey];
 
@@ -132,6 +157,7 @@ export type PermissionValue = typeof PERMISSIONS[PermissionKey];
 export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
     [Roles.SUPER_ADMIN]: Object.values(PERMISSIONS),
 
+    // ─────────────────────────────────────────────────────────────────────────
     [Roles.ADMIN]: [
         // Sidebar
         PERMISSIONS.NAV_DASHBOARD,
@@ -145,6 +171,11 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.NAV_EXPENSES,
         PERMISSIONS.NAV_SALESMAN,
         PERMISSIONS.NAV_CALCULATORS,
+        PERMISSIONS.NAV_REPORTS,
+
+        // Own Profile
+        PERMISSIONS.VIEW_OWN_PROFILE,
+        PERMISSIONS.UPDATE_OWN_PROFILE,
 
         // Employees
         PERMISSIONS.VIEW_EMPLOYEES,
@@ -156,6 +187,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.VIEW_EMPLOYEE_DOCUMENTS,
         PERMISSIONS.VIEW_EMPLOYEE_SALARY,
         PERMISSIONS.EXPORT_EMPLOYEES,
+        PERMISSIONS.BULK_IMPORT,
 
         // Attendance
         PERMISSIONS.VIEW_ATTENDANCE,
@@ -166,6 +198,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.APPROVE_REGULARIZATION,
         PERMISSIONS.MANAGE_HOLIDAYS,
         PERMISSIONS.VIEW_ATTENDANCE_REPORTS,
+        PERMISSIONS.VIEW_TEAM_ATTENDANCE,
         PERMISSIONS.USE_FACE_KIOSK,
 
         // Payroll
@@ -183,18 +216,38 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
 
         // Leaves
         PERMISSIONS.VIEW_LEAVES,
+        PERMISSIONS.REQUEST_LEAVES,
         PERMISSIONS.APPROVE_LEAVES,
         PERMISSIONS.VIEW_ALL_LEAVES,
         PERMISSIONS.MANAGE_LEAVE_BALANCE,
 
         // Production
         PERMISSIONS.VIEW_PRODUCTION,
+        PERMISSIONS.ADD_PRODUCTION,
         PERMISSIONS.APPROVE_PRODUCTION,
         PERMISSIONS.VIEW_PRODUCTION_REPORTS,
 
         // Salesman
         PERMISSIONS.VIEW_SALESMAN,
         PERMISSIONS.VIEW_CLIENTS,
+
+        // Finance
+        PERMISSIONS.MANAGE_EXPENSES,
+        PERMISSIONS.VIEW_OWN_EXPENSES,
+        PERMISSIONS.SUBMIT_EXPENSE,
+
+        // Reports
+        PERMISSIONS.VIEW_REPORTS,
+        PERMISSIONS.EXPORT_REPORTS,
+
+        // Announcements
+        PERMISSIONS.VIEW_ANNOUNCEMENTS,
+        PERMISSIONS.SEND_ANNOUNCEMENTS,
+
+        // Configuration
+        PERMISSIONS.MANAGE_DEPARTMENTS,
+        PERMISSIONS.MANAGE_SHIFTS,
+        PERMISSIONS.MANAGE_WORK_GROUPS,
 
         // Approvals
         PERMISSIONS.VIEW_APPROVALS,
@@ -203,13 +256,11 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         // Calculators
         PERMISSIONS.USE_CALCULATORS,
 
-        // Expenses
-        PERMISSIONS.MANAGE_EXPENSES,
-
         // Settings
         PERMISSIONS.MANAGE_SETTINGS,
     ],
 
+    // ─────────────────────────────────────────────────────────────────────────
     [Roles.ACCOUNT_ADMIN]: [
         // Sidebar
         PERMISSIONS.NAV_DASHBOARD,
@@ -225,6 +276,10 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.NAV_REPORTS,
         PERMISSIONS.NAV_STATUTORY,
         PERMISSIONS.NAV_APPROVALS,
+
+        // Own Profile
+        PERMISSIONS.VIEW_OWN_PROFILE,
+        PERMISSIONS.UPDATE_OWN_PROFILE,
 
         // Employees
         PERMISSIONS.VIEW_EMPLOYEES,
@@ -244,6 +299,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.ADD_MANUAL_PUNCH,
         PERMISSIONS.MANAGE_HOLIDAYS,
         PERMISSIONS.VIEW_ATTENDANCE_REPORTS,
+        PERMISSIONS.APPROVE_REGULARIZATION,
 
         // Payroll
         PERMISSIONS.VIEW_PAYROLL,
@@ -282,15 +338,23 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.VIEW_COST_CENTERS,
         PERMISSIONS.MANAGE_EXPENSES,
         PERMISSIONS.MANAGE_ADVANCE_SALARY,
+        PERMISSIONS.VIEW_OWN_EXPENSES,
+        PERMISSIONS.SUBMIT_EXPENSE,
 
         // Reports
         PERMISSIONS.VIEW_REPORTS,
         PERMISSIONS.BUILD_REPORTS,
         PERMISSIONS.EXPORT_REPORTS,
+        PERMISSIONS.SCHEDULE_REPORTS,
+        PERMISSIONS.VIEW_OWN_REPORTS,
 
         // Statutory
         PERMISSIONS.VIEW_STATUTORY,
         PERMISSIONS.VIEW_FORM16,
+
+        // Announcements
+        PERMISSIONS.VIEW_ANNOUNCEMENTS,
+        PERMISSIONS.SEND_ANNOUNCEMENTS,
 
         // Approvals
         PERMISSIONS.VIEW_APPROVALS,
@@ -300,6 +364,7 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.USE_CALCULATORS,
     ],
 
+    // ─────────────────────────────────────────────────────────────────────────
     [Roles.MANAGER]: [
         // Sidebar
         PERMISSIONS.NAV_DASHBOARD,
@@ -307,20 +372,40 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.NAV_ATTENDANCE,
         PERMISSIONS.NAV_PRODUCTION,
         PERMISSIONS.NAV_LEAVES,
+        PERMISSIONS.NAV_LOANS,
         PERMISSIONS.NAV_APPROVALS,
+        PERMISSIONS.NAV_EXPENSES,
         PERMISSIONS.NAV_CALCULATORS,
 
-        // Employees (team only, enforced in component)
+        // Own Profile
+        PERMISSIONS.VIEW_OWN_PROFILE,
+        PERMISSIONS.UPDATE_OWN_PROFILE,
+        PERMISSIONS.UPLOAD_OWN_DOCUMENTS,
+
+        // Employees (team only — scope enforced in component)
         PERMISSIONS.VIEW_EMPLOYEES,
+        PERMISSIONS.ADD_EMPLOYEE,
+        PERMISSIONS.EDIT_EMPLOYEE,
+        PERMISSIONS.VIEW_EMPLOYEE_PERSONAL,
+        PERMISSIONS.VIEW_EMPLOYEE_DOCUMENTS,
 
-        // Attendance (team only)
+        // Attendance
         PERMISSIONS.VIEW_ATTENDANCE,
+        PERMISSIONS.VIEW_OWN_ATTENDANCE,
+        PERMISSIONS.VIEW_TEAM_ATTENDANCE,
+        PERMISSIONS.APPROVE_ATTENDANCE,
+        PERMISSIONS.MANUAL_ATTENDANCE,
+        PERMISSIONS.ADD_MANUAL_PUNCH,
+        PERMISSIONS.APPROVE_REGULARIZATION,
         PERMISSIONS.VIEW_ATTENDANCE_REPORTS,
+        PERMISSIONS.MARK_OWN_ATTENDANCE,
 
-        // Production
-        PERMISSIONS.VIEW_PRODUCTION,
-        PERMISSIONS.ADD_PRODUCTION,
-        PERMISSIONS.VIEW_PRODUCTION_REPORTS,
+        // Payroll
+        PERMISSIONS.VIEW_PAYSLIP,
+
+        // Loans
+        PERMISSIONS.VIEW_OWN_LOANS,
+        PERMISSIONS.REQUEST_LOAN,
 
         // Leaves
         PERMISSIONS.VIEW_LEAVES,
@@ -328,24 +413,59 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
         PERMISSIONS.APPROVE_LEAVES,
         PERMISSIONS.VIEW_ALL_LEAVES,
 
+        // Production
+        PERMISSIONS.VIEW_PRODUCTION,
+        PERMISSIONS.ADD_PRODUCTION,
+        PERMISSIONS.APPROVE_PRODUCTION,
+        PERMISSIONS.BULK_PRODUCTION_ENTRY,
+        PERMISSIONS.VIEW_PRODUCTION_REPORTS,
+
+        // Finance
+        PERMISSIONS.MANAGE_EXPENSES,
+        PERMISSIONS.VIEW_OWN_EXPENSES,
+        PERMISSIONS.SUBMIT_EXPENSE,
+        PERMISSIONS.MANAGE_ADVANCE_SALARY,
+
+        // Announcements
+        PERMISSIONS.VIEW_ANNOUNCEMENTS,
+        PERMISSIONS.SEND_ANNOUNCEMENTS,
+
+        // Configuration
+        PERMISSIONS.MANAGE_DEPARTMENTS,
+        PERMISSIONS.MANAGE_SHIFTS,
+        PERMISSIONS.MANAGE_WORK_GROUPS,
+
         // Approvals
         PERMISSIONS.VIEW_APPROVALS,
         PERMISSIONS.PROCESS_APPROVALS,
+
+        // Reports
+        PERMISSIONS.VIEW_OWN_REPORTS,
 
         // Calculators
         PERMISSIONS.USE_CALCULATORS,
     ],
 
+    // ─────────────────────────────────────────────────────────────────────────
     [Roles.EMPLOYEE]: [
         // Sidebar
         PERMISSIONS.NAV_DASHBOARD,
         PERMISSIONS.NAV_ATTENDANCE,
         PERMISSIONS.NAV_LEAVES,
         PERMISSIONS.NAV_LOANS,
+        PERMISSIONS.NAV_PRODUCTION,
+
+        // Own Profile
+        PERMISSIONS.VIEW_OWN_PROFILE,
+        PERMISSIONS.UPDATE_OWN_PROFILE,
+        PERMISSIONS.UPLOAD_OWN_DOCUMENTS,
 
         // Attendance (own only)
         PERMISSIONS.VIEW_ATTENDANCE,
+        PERMISSIONS.VIEW_OWN_ATTENDANCE,
+        PERMISSIONS.MARK_OWN_ATTENDANCE,
         PERMISSIONS.USE_FACE_KIOSK,
+        PERMISSIONS.REQUEST_REGULARIZATION,
 
         // Leaves
         PERMISSIONS.VIEW_LEAVES,
@@ -353,15 +473,28 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
 
         // Loans (own only)
         PERMISSIONS.VIEW_OWN_LOANS,
+        PERMISSIONS.REQUEST_LOAN,
 
         // Payslips (own only)
         PERMISSIONS.VIEW_PAYSLIP,
 
-        // Production (own view)
+        // Finance (self-service)
+        PERMISSIONS.SUBMIT_EXPENSE,
+        PERMISSIONS.VIEW_OWN_EXPENSES,
+        PERMISSIONS.REQUEST_ADVANCE_SALARY,
+
+        // Production (own work)
         PERMISSIONS.VIEW_PRODUCTION,
         PERMISSIONS.ADD_PRODUCTION,
+        PERMISSIONS.VIEW_OWN_REPORTS,
+
+        // Announcements
+        PERMISSIONS.VIEW_ANNOUNCEMENTS,
 
         // Calculators
         PERMISSIONS.USE_CALCULATORS,
     ],
 };
+
+
+
