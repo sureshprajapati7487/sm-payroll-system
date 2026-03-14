@@ -54,10 +54,9 @@ router.get('/', async (req, res) => {
         // Filters
         if (status && status !== 'All') {
             where.status = status;
-        } else if (!status) {
-            // Default: do not show INACTIVE employees (soft-deleted)
-            where.status = { [Op.ne]: 'INACTIVE' };
         }
+        // Note: No longer hiding INACTIVE by default — show all employees,
+        // let the frontend filter panel control what's visible.
         if (department && department !== 'All') where.department = department;
         if (shift && shift !== 'All') where.shift = shift;
 
@@ -88,7 +87,7 @@ router.get('/', async (req, res) => {
     } catch (e) { addError(e, 'GET /api/employees'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
-router.post('/', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
+router.post('/', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER']), async (req, res) => {
     try {
         const data = { ...req.body };
 
@@ -111,7 +110,7 @@ router.post('/', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (
     catch (e) { addError(e, 'POST /api/employees'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
-router.put('/:id', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
+router.put('/:id', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER']), async (req, res) => {
     try {
         // Cross-tenant ownership check
         if (req.companyId) {
