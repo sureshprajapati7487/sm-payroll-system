@@ -172,7 +172,7 @@ export const LeaveDashboard = () => {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0 max-w-full w-full">
             <div>
                 <h1 className="text-2xl font-bold text-dark-text mb-1">Leave Management</h1>
                 <p className="text-dark-muted">Request time off and manage approvals</p>
@@ -184,7 +184,7 @@ export const LeaveDashboard = () => {
                     <div className="lg:col-span-2"><SkeletonList items={5} /></div>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0 max-w-full w-full">
                     {/* Request Form */}
                     <div className="glass p-6 rounded-2xl h-fit border-l-4 border-primary-500">
                         <h3 className="font-bold text-white mb-4 flex items-center gap-2">

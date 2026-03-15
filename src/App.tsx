@@ -132,10 +132,8 @@ const AuthGuard = ({ children }: { children: JSX.Element }) => {
 };
 
 import { useDataSync } from '@/hooks/useDataSync';
-import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { useGlobalGPS } from '@/hooks/useGlobalGPS';
 import { useBackgroundServices } from '@/hooks/useBackgroundServices';
-import { SessionTimeoutModal } from '@/components/SessionTimeoutModal';
 
 function App() {
     const { fetchCompanies } = useMultiCompanyStore();
@@ -152,16 +150,14 @@ function App() {
     // Smart Auto-Sync: every 30s, only when tab is visible
     useDataSync(30000);
 
-    // Session Timeout: 30 min inactivity → 2 min countdown → auto-logout
-    const { showWarning, secondsLeft, extendSession, doLogout } = useSessionTimeout(30 * 60 * 1000);
 
     const { isAuthenticated } = useAuthStore();
 
-    // ── Global GPS: Login ke baad request, Logout tak active ──
-    useGlobalGPS(isAuthenticated);
+    // ── Global GPS: App Load request, Always active ──
+    useGlobalGPS();
 
     // ── Background Services: Wake Lock + Custom SW + GPS Bridge ──
-    useBackgroundServices(isAuthenticated);
+    useBackgroundServices();
 
     const { currentCompanyId } = useMultiCompanyStore();
 
@@ -180,7 +176,9 @@ function App() {
             fetchGroups(currentCompanyId);
             fetchRolePermissions(currentCompanyId); // Load saved permissions from DB
         }
-    }, [isAuthenticated, currentCompanyId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Zustand store functions are stable references — safe to omit from deps
+    }, [isAuthenticated, currentCompanyId]); // eslint-disable-line
 
     return (
         <ErrorBoundary>
@@ -194,13 +192,6 @@ function App() {
                     <InstallPWA />
                     <SecurityAlertToast />
 
-                    {showWarning && (
-                        <SessionTimeoutModal
-                            secondsLeft={secondsLeft}
-                            onStayLoggedIn={extendSession}
-                            onLogout={doLogout}
-                        />
-                    )}
                     <Routes>
                         {/* Public Routes — AuthGuard: already logged-in users seedha /dashboard jao */}
                         <Route path="/" element={<AuthGuard><LoginPage /></AuthGuard>} />

@@ -301,7 +301,7 @@ export const ReportBuilder = () => {
                 )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full min-w-0 max-w-full">
                 {/* ── Config Panel ── */}
                 <div className="glass rounded-2xl p-6 space-y-5">
                     {/* Report Type */}
@@ -394,7 +394,7 @@ export const ReportBuilder = () => {
                 </div>
 
                 {/* ── Preview Panel ── */}
-                <div className="lg:col-span-2 glass rounded-2xl p-6 min-h-[500px]">
+                <div className="lg:col-span-2 glass rounded-2xl p-6 min-h-[500px] min-w-0 max-w-full w-full">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                             <FileText className="w-5 h-5" />
@@ -422,7 +422,7 @@ export const ReportBuilder = () => {
                             </button>
                         </div>
                     ) : (
-                        <div className="overflow-auto max-h-[500px]">
+                        <div className="overflow-x-auto overflow-y-auto max-h-[500px] w-full">
                             <table className="w-full text-sm">
                                 <thead className="bg-dark-bg sticky top-0 z-10">
                                     <tr>

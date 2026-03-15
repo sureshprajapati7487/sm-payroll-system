@@ -222,9 +222,9 @@ export const AttendanceDashboard = () => {
     }, [activeActionId]);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 w-full min-w-0 max-w-full overflow-x-hidden">
             {/* Header: Date Navigation & Actions */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col gap-2">
                 <div>
                     <h1 className="text-2xl font-bold text-dark-text mb-1">Attendance &amp; Timing</h1>
                     <div className="flex items-center gap-2 text-dark-muted text-sm">
@@ -243,78 +243,74 @@ export const AttendanceDashboard = () => {
                     </div>
                 </div>
 
-                {/* Main Actions */}
-                <div className="flex items-center gap-3">
-                    {/* Live Clock for Everyone */}
+                {/* Main Actions — all visible, wrap to next line on mobile */}
+                <div className="flex items-center gap-2 flex-wrap w-full">
+                    {/* Live Clock — desktop only */}
                     <div className="hidden md:flex flex-col items-end mr-4">
                         <div className="text-[10px] text-dark-muted uppercase tracking-widest">Office Time</div>
                         <LiveClock />
                     </div>
 
-                    {/* Check In/Out UI (Only for Today & Non-Admins usually, but admins can self-mark) */}
+                    {/* Check In/Out — for non-admin employees */}
                     {isToday && hasPermission(PERMISSIONS.MARK_OWN_ATTENDANCE) && !canManualUpdate && (
                         <>
                             {!isCheckedIn ? (
                                 <button
                                     onClick={() => { setScanMode('IN'); setIsScanOpen(true); }}
-                                    className="px-5 py-2.5 bg-success hover:bg-success/90 text-white rounded-xl font-bold shadow-lg shadow-success/20 flex items-center gap-2 transition-all"
+                                    className="flex-1 min-w-[120px] px-3 py-2 bg-success text-white rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
                                 >
                                     <MapPin className="w-4 h-4" /> Check In
                                 </button>
                             ) : !isCheckedOut ? (
                                 <button
                                     onClick={() => { setScanMode('OUT'); setIsScanOpen(true); }}
-                                    className="px-5 py-2.5 bg-danger hover:bg-danger/90 text-white rounded-xl font-bold shadow-lg shadow-danger/20 flex items-center gap-2 transition-all"
+                                    className="flex-1 min-w-[120px] px-3 py-2 bg-danger text-white rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
                                 >
                                     <Clock className="w-4 h-4" /> Check Out
                                 </button>
                             ) : (
-                                <div className="px-4 py-2 bg-dark-card border border-success/30 text-success rounded-xl flex items-center gap-2 text-sm font-medium">
-                                    <CheckCircle className="w-4 h-4" /> Shift Completed
+                                <div className="px-3 py-2 bg-dark-card border border-success/30 text-success rounded-xl flex items-center gap-2 text-xs font-medium">
+                                    <CheckCircle className="w-4 h-4" /> Shift Done
                                 </div>
                             )}
                         </>
                     )}
 
-                    {/* Admin Actions */}
-                    {(hasPermission(PERMISSIONS.EXPORT_REPORTS) || canManualUpdate || hasPermission(PERMISSIONS.USE_FACE_KIOSK)) && (
-                        <>
-                            {hasPermission(PERMISSIONS.EXPORT_REPORTS) && (
-                                <button onClick={handleExport} className="p-2 bg-dark-card border border-dark-border hover:bg-dark-card/80 rounded-lg text-dark-muted hover:text-white transition-colors" title="Export Excel">
-                                    <FileSpreadsheet className="w-5 h-5" />
-                                </button>
-                            )}
-                            {canManualUpdate && (
-                                <button
-                                    onClick={() => { setAdminPunchEmpId(undefined); setAdminPunchOpen(true); }}
-                                    className="flex items-center gap-1.5 px-3 py-2 bg-violet-600/20 border border-violet-500/30 hover:bg-violet-600/30 rounded-lg text-violet-400 hover:text-violet-300 transition-colors text-sm font-bold"
-                                    title="Admin Manual Punch"
-                                >
-                                    <UserPlus className="w-4 h-4" /> Manual Punch
-                                </button>
-                            )}
-                            {hasPermission(PERMISSIONS.USE_FACE_KIOSK) && (
-                                <button
-                                    onClick={() => navigate('/attendance/kiosk')}
-                                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600/30 rounded-lg text-emerald-400 hover:text-emerald-300 transition-colors text-sm font-bold"
-                                    title="Face Kiosk Mode"
-                                >
-                                    <ScanFace className="w-4 h-4" /> Face Kiosk
-                                </button>
-                            )}
-                        </>
+                    {/* Admin Actions — compact, all visible */}
+                    {hasPermission(PERMISSIONS.EXPORT_REPORTS) && (
+                        <button onClick={handleExport}
+                            className="p-2.5 bg-dark-card border border-dark-border rounded-lg text-dark-muted hover:text-white transition-colors"
+                            title="Export Excel">
+                            <FileSpreadsheet className="w-4 h-4" />
+                        </button>
                     )}
-
+                    {canManualUpdate && (
+                        <button
+                            onClick={() => { setAdminPunchEmpId(undefined); setAdminPunchOpen(true); }}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-violet-600/20 border border-violet-500/30 rounded-lg text-violet-400 text-xs font-bold"
+                        >
+                            <UserPlus className="w-3.5 h-3.5" /> Manual Punch
+                        </button>
+                    )}
+                    {hasPermission(PERMISSIONS.USE_FACE_KIOSK) && (
+                        <button
+                            onClick={() => navigate('/attendance/kiosk')}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 border border-emerald-500/30 rounded-lg text-emerald-400 text-xs font-bold"
+                        >
+                            <ScanFace className="w-3.5 h-3.5" /> Face Kiosk
+                        </button>
+                    )}
                     {hasPermission(PERMISSIONS.MANAGE_HOLIDAYS) && (
                         <button
                             onClick={() => navigate('/attendance/holidays')}
-                            className="p-2 bg-dark-card border border-dark-border hover:bg-dark-card/80 rounded-lg text-dark-muted hover:text-white transition-colors"
+                            className="p-2.5 bg-dark-card border border-dark-border rounded-lg text-dark-muted hover:text-white transition-colors"
                         >
-                            <CalendarCheck className="w-5 h-5" />
+                            <CalendarCheck className="w-4 h-4" />
                         </button>
                     )}
                 </div>
             </div>
+
 
             {/* Error Banner */}
             <AnimatePresence>
@@ -424,13 +420,13 @@ export const AttendanceDashboard = () => {
             })()}
 
             {/* Main Content Area */}
-            <div className="flex flex-col lg:flex-row gap-6">
+            <div className="flex flex-col lg:flex-row gap-6 w-full min-w-0 max-w-full">
 
                 {/* Left: Attendance List */}
-                <div className="flex-1 glass rounded-2xl overflow-hidden flex flex-col min-h-[500px]">
+                <div className="flex-1 glass rounded-2xl overflow-hidden flex flex-col min-h-[400px] min-w-0 w-full max-w-full">
                     {/* Toolbar */}
-                    <div className="p-4 border-b border-dark-border/50 flex flex-wrap gap-3 items-center justify-between">
-                        <div className="relative flex-1 min-w-[200px]">
+                    <div className="p-4 border-b border-dark-border/50 flex flex-wrap gap-3 items-center justify-between min-w-0">
+                        <div className="relative flex-1 min-w-0">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-muted" />
                             <input
                                 type="text"
@@ -469,7 +465,7 @@ export const AttendanceDashboard = () => {
                     </div>
 
                     {/* Table */}
-                    <div className="flex-1 overflow-auto bg-dark-bg/20 min-h-[400px]">
+                    <div className="flex-1 overflow-x-auto overflow-y-auto bg-dark-bg/20 min-h-[300px] w-full">
                         <table className="w-full text-left text-sm whitespace-nowrap">
                             <thead className="bg-dark-bg/50 text-dark-muted sticky top-0 z-10 backdrop-blur-md">
                                 <tr>

@@ -24,6 +24,43 @@ function cn(...inputs: (string | undefined | null | false)[]) {
     return twMerge(clsx(inputs));
 }
 
+// ── Smart Avatar: shows photo or initials fallback ───────────────────────────
+function AvatarInitials({ name, avatar, size = 8 }: { name?: string; avatar?: string; size?: number }) {
+    const initials = (name || 'U')
+        .split(' ')
+        .map(w => w[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+    const sizeClass = `w-${size} h-${size}`;
+    if (avatar) {
+        return (
+            <img
+                src={avatar}
+                alt={name || 'User'}
+                className={`${sizeClass} rounded-full border-2 border-primary-500/40 shrink-0 object-cover`}
+                onError={(e) => {
+                    // On broken image: hide img and show initials div
+                    const el = e.currentTarget;
+                    el.style.display = 'none';
+                    const parent = el.parentElement;
+                    if (parent) {
+                        const div = document.createElement('div');
+                        div.className = `${sizeClass} rounded-full border-2 border-primary-500/40 shrink-0 flex items-center justify-center bg-gradient-to-br from-primary-500 to-violet-600 text-white font-bold text-xs`;
+                        div.textContent = initials;
+                        parent.insertBefore(div, el);
+                    }
+                }}
+            />
+        );
+    }
+    return (
+        <div className={`${sizeClass} rounded-full border-2 border-primary-500/40 shrink-0 flex items-center justify-center bg-gradient-to-br from-primary-500 to-violet-600 text-white font-bold text-xs`}>
+            {initials}
+        </div>
+    );
+}
+
 // ── Sidebar Nav Groups ──────────────────────────────────────────────────────
 const NAV_GROUPS = [
     {
@@ -140,11 +177,13 @@ const MORE_ITEMS = [
     { label: 'Staff', path: '/employees', icon: Users, perm: PERMISSIONS.VIEW_EMPLOYEES },
     { label: 'Leaves', path: '/leaves', icon: CalendarClock, perm: PERMISSIONS.VIEW_LEAVES },
     { label: 'Loans', path: '/loans', icon: Wallet, perm: PERMISSIONS.VIEW_ALL_LOANS },
-    { label: 'Expenses', path: '/expenses', icon: Wallet, perm: PERMISSIONS.SUBMIT_EXPENSE },
+    { label: 'Expenses', path: '/expenses', icon: IndianRupee, perm: PERMISSIONS.SUBMIT_EXPENSE },
     { label: 'Production', path: '/production', icon: Factory, perm: PERMISSIONS.VIEW_PRODUCTION },
     { label: 'Approvals', path: '/approvals', icon: UserCheck, perm: PERMISSIONS.VIEW_APPROVALS },
+    { label: 'Finance', path: '/finance/dashboard', icon: TrendingUp, perm: PERMISSIONS.VIEW_FINANCE_DASHBOARD },
+    { label: 'Statutory', path: '/statutory/reports', icon: Scale, perm: PERMISSIONS.VIEW_STATUTORY },
+    { label: 'Reports', path: '/reports/builder', icon: BarChart2, perm: PERMISSIONS.VIEW_REPORTS },
     { label: 'Settings', path: '/settings', icon: Settings, perm: PERMISSIONS.MANAGE_SETTINGS },
-    { label: 'Reports', path: '/reports/builder', icon: ShieldCheck, perm: PERMISSIONS.VIEW_REPORTS },
 ];
 
 // ── Translation keys ───────────────────────────────────────────────────────
@@ -219,7 +258,7 @@ export const DashboardLayout = () => {
                 <div>
                     <h1 className="font-extrabold text-[15px] tracking-tight text-dark-text leading-none">SM PAYROLL</h1>
                     <p className="text-[10px] text-dark-muted uppercase tracking-widest mt-0.5 flex items-center gap-1">
-                        <Zap className="w-2.5 h-2.5 text-primary-500" /> System v1.0
+                        <Zap className="w-2.5 h-2.5 text-primary-500" /> v2.0.0
                     </p>
                 </div>
             </div>
@@ -340,7 +379,7 @@ export const DashboardLayout = () => {
             {/* User card + logout */}
             <div className="px-3 pb-4 pt-2 border-t border-dark-border space-y-2">
                 <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-dark-border/20 border border-dark-border">
-                    <img src={user?.avatar} alt="avatar" className="w-8 h-8 rounded-full border-2 border-primary-500/40 shrink-0" />
+                    <AvatarInitials name={user?.name} avatar={user?.avatar} size={8} />
                     <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-dark-text truncate">{user?.name}</p>
                         <p className="text-[10px] text-primary-500 font-bold uppercase tracking-wide truncate">
@@ -431,7 +470,7 @@ export const DashboardLayout = () => {
                             </div>
                             {/* User strip + logout */}
                             <div className="px-4 py-3 border-t border-dark-border flex items-center gap-3">
-                                <img src={user?.avatar} alt="avatar" className="w-8 h-8 rounded-full border-2 border-primary-500/40 shrink-0" />
+                                <AvatarInitials name={user?.name} avatar={user?.avatar} size={8} />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs font-semibold text-dark-text truncate">{user?.name}</p>
                                     <p className="text-[10px] text-primary-500 font-bold uppercase">{user?.role?.replace(/_/g, ' ')}</p>
@@ -447,14 +486,20 @@ export const DashboardLayout = () => {
 
             {/* ── Main Content ─────────────────────────────────────────────── */}
             <main className={cn(
-                "flex-1 md:ml-[220px] relative transition-all duration-300",
+                "flex-1 md:ml-[220px] relative transition-all duration-300 min-w-0 w-full max-w-full",
                 useAuthStore.getState().impersonatedRole ? "mt-10" : "mt-0"
             )}>
-                {/* Mobile sticky header */}
-                <div className={cn(
-                    "md:hidden flex items-center justify-between px-4 py-3 bg-dark-card border-b border-dark-border sticky z-20",
-                    useAuthStore.getState().impersonatedRole ? "top-10" : "top-0"
-                )}>
+                {/* Mobile sticky header — safe-area-inset-top for Android status bar */}
+                <div
+                    className={cn(
+                        "md:hidden flex items-center justify-between px-4 bg-dark-card border-b border-dark-border sticky z-20",
+                        useAuthStore.getState().impersonatedRole ? "top-10" : "top-0"
+                    )}
+                    style={{
+                        paddingTop: 'max(12px, env(safe-area-inset-top, 12px))',
+                        paddingBottom: '12px',
+                    }}
+                >
                     <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center shadow-md shadow-primary-500/30">
                             <ShieldAlert className="text-white w-4 h-4" />
@@ -472,8 +517,13 @@ export const DashboardLayout = () => {
                     </div>
                 </div>
 
-                {/* Page content — pb-24 on mobile to avoid bottom nav overlap */}
-                <div className="p-4 md:p-6 max-w-7xl mx-auto pb-24 md:pb-6 overflow-x-hidden">
+                {/* Page content — extra bottom padding for bottom nav + Android nav bar */}
+                <div
+                    className="p-4 md:p-6 max-w-7xl mx-auto overflow-x-hidden w-full min-w-0"
+                    style={{
+                        paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 0px))'
+                    }}
+                >
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={location.pathname}

@@ -9,6 +9,7 @@ import {
     Clock, User, MapPin, Navigation, UserPlus, Hash,
     Coffee, Trash2
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useAuthStore } from '@/store/authStore';
 import { useAttendanceStore } from '@/store/attendanceStore';
 import { useEmployeeStore } from '@/store/employeeStore';
@@ -537,9 +538,14 @@ export const CameraPunchWidget = () => {
             `}</style>
 
             {/* ── FAB ─────────────────────────────────────────────────────── */}
-            <button
+            <motion.button
+                drag
+                dragMomentum={false}
+                dragElastic={0.1}
+                whileDrag={{ scale: 1.05, cursor: 'grabbing' }}
                 onClick={() => setOpen(o => !o)}
-                className={`fixed bottom-[88px] md:bottom-6 right-4 md:right-6 z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-2xl border transition-all duration-300 hover:scale-[1.04] active:scale-95 select-none bg-gradient-to-br ${fabConfig.gradient} ${fabConfig.border} ${fabConfig.shadow}`}
+                style={{ touchAction: 'none' }} // Prevents page scrolling while dragging on mobile
+                className={`fixed bottom-[88px] md:bottom-6 right-4 md:right-6 z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-2xl border transition-colors duration-300 hover:scale-[1.04] active:scale-95 select-none bg-gradient-to-br cursor-grab ${fabConfig.gradient} ${fabConfig.border} ${fabConfig.shadow}`}
                 title={fabConfig.label}
             >
                 {/* Ping animation */}
@@ -560,7 +566,7 @@ export const CameraPunchWidget = () => {
 
                 {/* Status dot */}
                 <span className={`w-2 h-2 rounded-full shrink-0 ${fabConfig.dot} ${!isPunchedOut ? 'animate-pulse' : ''}`} />
-            </button>
+            </motion.button>
 
             {/* ── Popover ──────────────────────────────────────────────────── */}
             {open && (

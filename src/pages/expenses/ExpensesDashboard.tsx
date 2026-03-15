@@ -10,6 +10,7 @@ import { clsx } from 'clsx';
 import { SkeletonPage } from '@/components/SkeletonLoaders';
 import { useDialog } from '@/components/DialogProvider';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { getServerBaseUrl } from '@/lib/apiConfig';
 
 export const ExpensesDashboard = () => {
     const { user, hasPermission } = useAuthStore();
@@ -53,7 +54,7 @@ export const ExpensesDashboard = () => {
                 formData.append('receipt', receiptFile);
 
                 // Assuming you have an API client base URL configured
-                const response = await fetch('http://localhost:3000/api/upload/receipt', {
+                const response = await fetch(`${getServerBaseUrl()}/api/upload/receipt`, {
                     method: 'POST',
                     body: formData,
                 });

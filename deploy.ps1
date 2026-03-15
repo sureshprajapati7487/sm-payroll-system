@@ -61,9 +61,24 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 
-# ---- Step 4: Git commit ----
+# ---- Step 4: Sync to Android ----
 Write-Host ""
-Write-Host "[4/5] Committing: $message" -ForegroundColor Yellow
+Write-Host "[4/6] Syncing changes to Android App..." -ForegroundColor Yellow
+if (Test-Path "android") {
+    & npx cap sync android
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  Android Sync SUCCESS" -ForegroundColor Green
+    } else {
+        Write-Host "  Android Sync FAILED - warning only, continuing..." -ForegroundColor Red
+    }
+} else {
+    Write-Host "  No Android folder found - skipping sync" -ForegroundColor Gray
+}
+
+
+# ---- Step 5: Git commit ----
+Write-Host ""
+Write-Host "[5/6] Committing: $message" -ForegroundColor Yellow
 & git add .
 $gitStatus = & git status --porcelain
 if ($gitStatus) {
@@ -73,9 +88,9 @@ if ($gitStatus) {
     Write-Host "  Nothing new to commit" -ForegroundColor Green
 }
 
-# ---- Step 5: Push to GitHub ----
+# ---- Step 6: Push to GitHub ----
 Write-Host ""
-Write-Host "[5/5] Pushing to GitHub..." -ForegroundColor Yellow
+Write-Host "[6/6] Pushing to GitHub..." -ForegroundColor Yellow
 & git push origin main
 Write-Host "  Pushed OK" -ForegroundColor Green
 

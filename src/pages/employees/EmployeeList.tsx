@@ -172,7 +172,7 @@ export const EmployeeList = () => {
     };
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-5 min-w-0 max-w-full w-full">
             {credentialEmployee && (
                 <CredentialsModal employee={credentialEmployee} onClose={() => setCredentialEmployee(null)} />
             )}

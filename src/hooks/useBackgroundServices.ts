@@ -11,16 +11,16 @@
 import { useEffect, useRef } from 'react';
 import { useWakeLock } from './useWakeLock';
 
-export function useBackgroundServices(isLoggedIn: boolean) {
+export function useBackgroundServices() {
     const swRef = useRef<ServiceWorkerRegistration | null>(null);
     const gpsWatchRef = useRef<number | null>(null);
 
     // ── Wake Lock: screen on, GPS active ──
-    useWakeLock(isLoggedIn);
+    useWakeLock(true); // Changed to true unconditionally
 
     // ── Register Custom Service Worker ────────────────────────────────────────
     useEffect(() => {
-        if (!isLoggedIn || !('serviceWorker' in navigator)) return;
+        if (!('serviceWorker' in navigator)) return;
 
         const registerSW = async () => {
             try {
@@ -57,12 +57,12 @@ export function useBackgroundServices(isLoggedIn: boolean) {
         return () => {
             // Don't unregister SW on cleanup — it should persist
         };
-    }, [isLoggedIn]);
+    }, []);
 
     // ── GPS → Service Worker Bridge ───────────────────────────────────────────
     // Har GPS update ko SW ko bhejo taaki background mein store ho sake
     useEffect(() => {
-        if (!isLoggedIn || !('serviceWorker' in navigator)) return;
+        if (!('serviceWorker' in navigator)) return;
 
         const sendGPSToSW = (position: GeolocationPosition) => {
             navigator.serviceWorker.ready.then((reg) => {
@@ -92,12 +92,10 @@ export function useBackgroundServices(isLoggedIn: boolean) {
                 gpsWatchRef.current = null;
             }
         };
-    }, [isLoggedIn]);
+    }, []);
 
     // ── Visibility Change: re-request GPS permission on resume ────────────────
     useEffect(() => {
-        if (!isLoggedIn) return;
-
         const onVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 // User app pe wapas aaya — notify SW
@@ -109,5 +107,5 @@ export function useBackgroundServices(isLoggedIn: boolean) {
 
         document.addEventListener('visibilitychange', onVisibilityChange);
         return () => document.removeEventListener('visibilitychange', onVisibilityChange);
-    }, [isLoggedIn]);
+    }, []);
 }

@@ -585,11 +585,11 @@ export const ProductionDashboard = () => {
                 )}
 
                 {/* ── RIGHT ── */}
-                <div className={clsx('flex flex-col gap-4', (canAdd && viewMode === 'daily') ? 'lg:col-span-2' : 'lg:col-span-3')}>
+                <div className={clsx('flex flex-col gap-4 min-w-0 max-w-full w-full', (canAdd && viewMode === 'daily') ? 'lg:col-span-2' : 'lg:col-span-3')}>
 
                     {/* ─── Daily Entries Table ─── */}
                     {viewMode === 'daily' && (
-                        <div className="glass rounded-xl overflow-hidden flex flex-col flex-1">
+                        <div className="glass rounded-xl overflow-hidden flex flex-col flex-1 min-w-0 max-w-full w-full">
                             <div className="px-4 py-3 border-b border-dark-border/50 flex justify-between items-center">
                                 <div>
                                     <h3 className="font-bold text-white text-sm">Production Entries</h3>
@@ -600,7 +600,7 @@ export const ProductionDashboard = () => {
                                     <p className="text-lg font-bold text-success">₹ {totalApproved.toLocaleString('en-IN')}</p>
                                 </div>
                             </div>
-                            <div className="flex-1 overflow-auto max-h-[550px]">
+                            <div className="flex-1 overflow-x-auto overflow-y-auto max-h-[550px] w-full">
                                 <table className="w-full text-left text-xs">
                                     <thead className="bg-dark-bg/50 text-dark-muted sticky top-0 backdrop-blur-md uppercase tracking-wider font-bold text-[10px]">
                                         <tr>
@@ -684,7 +684,7 @@ export const ProductionDashboard = () => {
 
                     {/* ─── Monthly Summary Table ─── */}
                     {viewMode === 'summary' && (
-                        <div className="glass rounded-xl overflow-hidden">
+                        <div className="glass rounded-xl overflow-hidden min-w-0 max-w-full w-full">
                             <div className="px-4 py-3 border-b border-dark-border/50 flex justify-between items-center">
                                 <div>
                                     <h3 className="font-bold text-white text-sm flex items-center gap-2">
@@ -703,7 +703,7 @@ export const ProductionDashboard = () => {
                                     </button>
                                 </div>
                             </div>
-                            <div className="overflow-auto max-h-[600px]">
+                            <div className="overflow-x-auto overflow-y-auto max-h-[600px] w-full">
                                 <table className="w-full text-left text-xs">
                                     <thead className="bg-dark-bg/50 text-dark-muted sticky top-0 backdrop-blur-md uppercase tracking-wider font-bold text-[10px]">
                                         <tr>
@@ -781,7 +781,7 @@ export const ProductionDashboard = () => {
                     const approvalPct = totalAmt > 0 ? Math.round((totalApproved / totalAmt) * 100) : 0;
                     const bestItem = itemSummary[0];
                     return (
-                        <div className="lg:col-span-3 space-y-4">
+                        <div className="lg:col-span-3 space-y-4 min-w-0 max-w-full w-full">
 
                             {/* TOP STAT CARDS */}
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -810,7 +810,7 @@ export const ProductionDashboard = () => {
                             </div>
 
                             {/* TABLE PANEL */}
-                            <div className="glass rounded-xl overflow-hidden">
+                            <div className="glass rounded-xl overflow-hidden min-w-0 max-w-full w-full">
                                 {/* Header */}
                                 <div className="flex items-center justify-between px-5 py-3.5 border-b border-dark-border bg-dark-bg/40 flex-wrap gap-2">
                                     <div>
@@ -852,7 +852,7 @@ export const ProductionDashboard = () => {
                                     const grandTotal = sorted.reduce((s, r) => s + r.approved + r.pending + r.rejected, 0);
                                     const medals = ['🥇', '🥈', '🥉'];
                                     return (
-                                        <div className="overflow-auto">
+                                        <div className="overflow-x-auto w-full">
                                             <table className="w-full text-[11px]">
                                                 <thead className="bg-dark-bg/70 text-[10px] uppercase tracking-wider text-dark-muted sticky top-0">
                                                     <tr>

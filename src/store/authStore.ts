@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { User, Role } from '@/types';
 import { PermissionValue } from '@/config/permissions';
 import { audit, auditAnonymous } from '@/lib/auditLogger';
+import { CapacitorHttp } from '@capacitor/core';
 import { API_URL } from '@/lib/apiConfig';
 import { useRolePermissionsStore } from '@/store/rolePermissionsStore';
 import { useSecurityAlertsStore } from '@/store/securityAlertsStore';
@@ -38,15 +39,15 @@ export const useAuthStore = create<AuthState>()(
             loginWithCredentials: async (idOrEmail: string, password: string) => {
                 set({ isLoading: true });
                 try {
-                    const res = await fetch(`${API_URL}/auth/login`, {
-                        method: 'POST',
+                    const res = await CapacitorHttp.post({
+                        url: `${API_URL}/auth/login`,
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ idOrEmail: idOrEmail.trim(), password: password.trim() }),
+                        data: { idOrEmail: idOrEmail.trim(), password: password.trim() },
                     });
 
-                    const data = await res.json();
+                    const data = res.data;
 
-                    if (res.ok) {
+                    if (res.status >= 200 && res.status < 300) {
                         // ✅ Server login success
                         const { token, user, expiresIn } = data as { token: string; user: User; expiresIn?: number };
                         const tokenExpiresAt = Date.now() + (expiresIn ? expiresIn * 1000 : 15 * 60 * 1000);
@@ -115,34 +116,46 @@ export const useAuthStore = create<AuthState>()(
                         attemptsRemaining: data.attemptsRemaining,
                     };
 
-                } catch (e) {
+                } catch (e: any) {
                     console.error('Auth error:', e);
                     set({ isLoading: false });
+
+                    // Diagnostic Ping to see why it failed
+                    let specificError = 'Network error — is the server running?';
+                    try {
+                        const ping = await CapacitorHttp.get({ url: `${API_URL.replace('/auth/login', '')}/health` });
+                        if (ping.status >= 200) {
+                            specificError = 'Network error: Server is reachable but login failed (CORS/Payload issue).';
+                        }
+                    } catch (pingErr: any) {
+                        specificError = `Network connection failed: ${pingErr?.message || 'Check your internet connection or server status.'}`;
+                    }
+
                     auditAnonymous({
                         action: 'LOGIN_FAILED',
                         entityType: 'USER',
                         attemptedUserId: idOrEmail.trim(),
-                        details: { reason: 'network_error' },
+                        details: { reason: 'network_error', rawError: e?.message },
                         status: 'FAILED',
-                        errorMessage: 'Network error',
+                        errorMessage: specificError,
                     });
-                    return { error: 'Network error — is the server running?' };
+                    return { error: specificError };
                 }
             },
 
             // ── Refresh Access Token ────────────────────────────────────────
             refreshAccessToken: async () => {
                 try {
-                    const res = await fetch(`${API_URL}/auth/refresh`, {
-                        method: 'POST',
-                        credentials: 'include', // send httpOnly cookie
+                    const res = await CapacitorHttp.post({
+                        url: `${API_URL}/auth/refresh`,
+                        // Capacitor Http handles cookies automatically, but we can explicitly allow credentials if needed natively.
                     });
-                    if (!res.ok) {
+                    if (res.status < 200 || res.status >= 300) {
                         // Refresh token expired — force logout
                         get().logout();
                         return false;
                     }
-                    const { token, user, expiresIn } = await res.json();
+                    const { token, user, expiresIn } = res.data;
                     const tokenExpiresAt = Date.now() + (expiresIn ? expiresIn * 1000 : 15 * 60 * 1000);
                     set({ token, user, tokenExpiresAt });
 

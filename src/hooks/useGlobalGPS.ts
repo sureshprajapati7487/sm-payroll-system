@@ -1,17 +1,17 @@
 ﻿/**
- * useGlobalGPS.ts — Global GPS Permission + Session-Level Tracking
+ * useGlobalGPS.ts — Global GPS Permission + Always-On Background Tracking
  *
- * Rules (as required):
- *  1. Login ke baad IMMEDIATELY GPS permission maango (ek baar).
+ * Rules (as required by "App Install karne ke baad all Time GPS on rahe"):
+ *  1. App open hote hi IMMEDIATELY GPS permission maango (ek baar).
  *  2. Permission milte hi continuously track karo — kabhi band mat karo.
- *  3. SIRF logout pe GPS band hoga.
+ *  3. Logout hone par bhi background tracking band NAHI hogi.
  *  4. GPS icon ya koi bhi indicator UI mein nahi dikhega — sirf silently track karo.
  *
  * Usage: App.tsx mein ek baar call karo.
  */
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import type { BackgroundGeolocationPlugin, Location,  } from '@capacitor-community/background-geolocation';
+import type { BackgroundGeolocationPlugin, Location, } from '@capacitor-community/background-geolocation';
 
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
@@ -26,18 +26,18 @@ interface GlobalGPSReturn {
     isTracking: boolean;
 }
 
-export function useGlobalGPS(isLoggedIn: boolean): GlobalGPSReturn {
+export function useGlobalGPS(): GlobalGPSReturn {
     const [permission, setPermission] = useState<GpsPermission>(() => {
         return (localStorage.getItem(GPS_PERM_KEY) as GpsPermission) || 'unknown';
     });
     const [position, setPosition] = useState<{ lat: number; lng: number; accuracy?: number; isMocked?: boolean } | null>(null);
     const [isTracking, setIsTracking] = useState(false);
-    
+
     // Web Watch ID
     const watchIdRef = useRef<number | null>(null);
     // Capacitor Watcher ID
     const capWatcherIdRef = useRef<string | null>(null);
-    
+
     const hasRequestedRef = useRef(false); // Prevent double-requesting
 
     // -- Persist permission state ----------------------------------------------
@@ -52,7 +52,7 @@ export function useGlobalGPS(isLoggedIn: boolean): GlobalGPSReturn {
         if (typeof window !== 'undefined' && (window as any).Android?.isMockLocation) {
             return (window as any).Android.isMockLocation();
         }
-        
+
         // Capacitor Background Geolocation flag
         if (pos.isMock === true) return true;
 
@@ -97,7 +97,7 @@ export function useGlobalGPS(isLoggedIn: boolean): GlobalGPSReturn {
                                 isMocked: isMockLocation(location),
                             });
                             setIsTracking(true);
-                            
+
                             // Send to service worker just in case (optional for native, but keeps logic unified)
                             if ('serviceWorker' in navigator) {
                                 navigator.serviceWorker.ready.then((reg) => {
@@ -105,7 +105,7 @@ export function useGlobalGPS(isLoggedIn: boolean): GlobalGPSReturn {
                                         type: 'GPS_UPDATE',
                                         payload: { lat: location.latitude, lng: location.longitude, accuracy: location.accuracy, timestamp: location.time }
                                     });
-                                }).catch(() => {});
+                                }).catch(() => { });
                             }
                         }
                     }
@@ -144,24 +144,7 @@ export function useGlobalGPS(isLoggedIn: boolean): GlobalGPSReturn {
         }
     }, [updatePermission]);
 
-    // -- Stop GPS watchPosition (ONLY on logout) -------------------------------
-    const stopWatch = useCallback(() => {
-        if (Capacitor.isNativePlatform()) {
-            if (capWatcherIdRef.current !== null) {
-                BackgroundGeolocation.removeWatcher({ id: capWatcherIdRef.current });
-                capWatcherIdRef.current = null;
-                setIsTracking(false);
-                setPosition(null);
-            }
-        } else {
-            if (watchIdRef.current !== null) {
-                navigator.geolocation.clearWatch(watchIdRef.current);
-                watchIdRef.current = null;
-                setIsTracking(false);
-                setPosition(null);
-            }
-        }
-    }, []);
+
 
     // -- Request Permission (called immediately on login) ----------------------
     const requestPermission = useCallback(async () => {
@@ -215,24 +198,17 @@ export function useGlobalGPS(isLoggedIn: boolean): GlobalGPSReturn {
         }
     }, [updatePermission, startWatch]);
 
-    // -- Main Effect: Start GPS immediately on login, stop ONLY on logout ------
+    // -- Main Effect: Start GPS immediately on app load, never stop ------------
     useEffect(() => {
-        if (!isLoggedIn) {
-            // Logout: stop GPS, reset flag so it re-requests on next login
-            stopWatch();
-            hasRequestedRef.current = false;
-            return;
-        }
-
-        // Already logged in and watching — do nothing
+        // Already watching — do nothing
         if (watchIdRef.current !== null || capWatcherIdRef.current !== null) return;
 
-        // Request GPS permission immediately on login (only once per session)
+        // Request GPS permission immediately on mount (only once per session)
         if (!hasRequestedRef.current) {
             hasRequestedRef.current = true;
             requestPermission();
         }
-    }, [isLoggedIn, requestPermission, stopWatch]);
+    }, [requestPermission]);
 
     // -- Cleanup on app unmount (e.g. page refresh) ----------------------------
     // NOTE: We do NOT stop on route changes or component re-renders — only on logout
