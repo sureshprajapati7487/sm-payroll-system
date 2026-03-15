@@ -15,7 +15,9 @@ import { Capacitor } from '@capacitor/core';
 const isNative = Capacitor.isNativePlatform();
 
 // ── Android Dev (Local IP) ─────────────────
-// Not used in Production mode
+// Set this to your PC's local IP address (ipconfig) so your phone can reach your local server
+const LOCAL_WIFI_IP = '192.168.1.83';
+const DEV_API = `http://${LOCAL_WIFI_IP}:3000/api`;
 
 // ── Production URLs (Vercel/Render) ─────────────
 const rawEnv = (import.meta.env.VITE_API_URL || 'https://sm-payroll-system.onrender.com').replace(/\/api\/?$/, '').replace(/\/$/, '');
@@ -23,14 +25,14 @@ const PROD_API = `${rawEnv}/api`;
 
 // ── Resolution Logic ─────────────────────────────────────────────────────────
 export const API_URL: string =
-    isNative ? PROD_API : // Android always points to live server now
+    isNative ? DEV_API : // <--- Android now points to LOCAL PC during testing! Change to PROD_API when releasing.
         (import.meta.env.VITE_API_URL ? PROD_API : '/api'); // Web uses proxy in dev or PROD in prod
 
 export const getApiUrl = () => API_URL;
 
 // ── Helper: full URL for direct fetch calls ────────
 export const getServerBaseUrl = (): string => {
-    if (isNative) return PROD_API.replace('/api', '');
+    if (isNative) return DEV_API.replace('/api', '');
     if (import.meta.env.VITE_API_URL) return PROD_API.replace('/api', '');
     return 'http://localhost:3000';
 };

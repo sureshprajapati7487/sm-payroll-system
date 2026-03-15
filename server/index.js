@@ -168,6 +168,8 @@ const ALLOWED_ORIGINS = [
     'https://localhost',
     'https://sm-payroll-system.vercel.app',  // production frontend
     'https://192.168.1.3:5173',              // local network dev
+    'http://192.168.1.83:5173',              // User's Local PC IP (Vite)
+    'http://192.168.1.83:3000',              // User's Local PC IP (Backend)
     process.env.FRONTEND_URL,
 ].filter(Boolean);
 
