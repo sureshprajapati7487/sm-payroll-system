@@ -38,7 +38,8 @@ const applyWatermark = (doc: jsPDF, text: string) => {
 export const generatePayslipPDF = async (
     employeeData: Record<string, any>,
     month: string,
-    year: number
+    year: number,
+    user?: any
 ): Promise<Blob> => {
     return new Promise((resolve) => {
         const doc = new jsPDF();
@@ -124,7 +125,14 @@ export const generatePayslipPDF = async (
         doc.text("This is a computer generated document and does not require a physical signature.", 105, 280, { align: "center" });
 
         // Add Watermark
-        applyWatermark(doc, "SM INDUSTRIES - CONFIDENTIAL");
+        const roleStr = user?.role ? user.role.toUpperCase() : 'SYSTEM';
+        applyWatermark(doc, `${roleStr} - CONFIDENTIAL`);
+
+        if (user) {
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            doc.text(`Downloaded by ${user.name} (${user.id}) on ${new Date().toLocaleString()}`, 14, 285);
+        }
 
         const pdfOutput = doc.output('blob');
         resolve(pdfOutput);
@@ -133,7 +141,8 @@ export const generatePayslipPDF = async (
 
 export const generateForm16PDF = async (
     employeeData: Record<string, any>,
-    financialYear: string
+    financialYear: string,
+    user?: any
 ): Promise<Blob> => {
     return new Promise((resolve) => {
         const doc = new jsPDF();
@@ -143,7 +152,15 @@ export const generateForm16PDF = async (
         doc.text(`Employee: ${employeeData.name || 'N/A'}`, 14, 30);
         doc.text(`Income Tax Rules 1962`, 14, 40);
 
-        applyWatermark(doc, `FORM 16 - ${financialYear}`);
+        const roleStr = user?.role ? user.role.toUpperCase() : 'SYSTEM';
+        applyWatermark(doc, `FORM 16 - ${financialYear} - ${roleStr}`);
+
+        if (user) {
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            const pageHeight = doc.internal.pageSize.height || doc.internal.pageSize.getHeight();
+            doc.text(`Downloaded by ${user.name} (${user.id}) on ${new Date().toLocaleString()}`, 14, pageHeight - 10);
+        }
 
         const pdfOutput = doc.output('blob');
         resolve(pdfOutput);

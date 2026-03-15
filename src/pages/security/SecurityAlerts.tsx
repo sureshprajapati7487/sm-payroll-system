@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { AlertTriangle, Shield, User, Clock, CheckCircle, Eye, XCircle } from 'lucide-react';
-import { useSecurityAlertsStore, SecurityAlert } from '@/store/securityAlertsStore';
+import { AlertTriangle, Shield, User, Clock, CheckCircle, Eye, XCircle, Trash2, CheckCheck, Filter } from 'lucide-react';
+import { useSecurityAlertsStore, SecurityAlert, SecurityAlertType } from '@/store/securityAlertsStore';
 
 export const SecurityAlerts = () => {
-    const { alerts, markAsRead, acknowledgeAlert, getUnreadCount, getCriticalCount } = useSecurityAlertsStore();
+    const { alerts, markAsRead, acknowledgeAlert, acknowledgeAll, deleteAlert, getUnreadCount, getCriticalCount } = useSecurityAlertsStore();
     const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
+    const [selectedType, setSelectedType] = useState<SecurityAlertType | 'all'>('all');
     const [selectedAlert, setSelectedAlert] = useState<SecurityAlert | null>(null);
 
-    const filteredAlerts = selectedSeverity === 'all'
-        ? alerts
-        : alerts.filter(a => a.severity === selectedSeverity);
+    const filteredAlerts = alerts.filter(a => {
+        const matchSeverity = selectedSeverity === 'all' || a.severity === selectedSeverity;
+        const matchType = selectedType === 'all' || a.type === selectedType;
+        return matchSeverity && matchType;
+    });
 
     const getSeverityColor = (severity: string) => {
         switch (severity) {
@@ -31,9 +34,24 @@ export const SecurityAlerts = () => {
             case 'security_setting_change': return '⚙️';
             case 'failed_login': return '🚫';
             case 'suspicious_ip': return '🌐';
+            case 'permission_denied': return '🚫';
+            case 'access_denied': return '🛑';
+            case 'data_export': return '📤';
             default: return '⚠️';
         }
     };
+
+    const ALERT_TYPES: { value: SecurityAlertType | 'all', label: string }[] = [
+        { value: 'all', label: 'All Event Types' },
+        { value: 'god_mode_enabled', label: 'God Mode' },
+        { value: 'role_change', label: 'Role Changes' },
+        { value: 'permission_escalation', label: 'Permission Escalation' },
+        { value: 'permission_denied', label: 'Permission Denied' },
+        { value: 'failed_login', label: 'Failed Logins' },
+        { value: 'data_export', label: 'Data Exports' },
+        { value: 'salary_access', label: 'Salary Data Access' },
+        { value: 'bulk_delete', label: 'Bulk Deletes' },
+    ];
 
     const handleAlertClick = (alert: SecurityAlert) => {
         setSelectedAlert(alert);
@@ -44,12 +62,23 @@ export const SecurityAlerts = () => {
 
     return (
         <div className="p-6 space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                    <Shield className="w-8 h-8 text-primary-500" />
-                    Security Alerts
-                </h1>
-                <p className="text-dark-muted mt-1">Monitor critical system events and admin actions</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                        <Shield className="w-8 h-8 text-primary-500" />
+                        Security Alerts
+                    </h1>
+                    <p className="text-dark-muted mt-1">Monitor critical system events and admin actions</p>
+                </div>
+                {alerts.some(a => !a.isAcknowledged) && (
+                    <button
+                        onClick={() => acknowledgeAll()}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-medium rounded-xl shadow-lg transition-all"
+                    >
+                        <CheckCheck className="w-4 h-4" />
+                        Acknowledge All
+                    </button>
+                )}
             </div>
 
             {/* Stats */}
@@ -91,21 +120,36 @@ export const SecurityAlerts = () => {
                 </div>
             </div>
 
-            {/* Filter */}
-            <div className="glass rounded-2xl p-4">
-                <div className="flex gap-3 flex-wrap">
+            {/* Filters */}
+            <div className="glass rounded-2xl p-4 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                <div className="flex gap-2 flex-wrap">
                     {['all', 'critical', 'high', 'medium', 'low'].map(severity => (
                         <button
                             key={severity}
                             onClick={() => setSelectedSeverity(severity)}
-                            className={`px-4 py-2 rounded-lg transition-all ${selectedSeverity === severity
-                                    ? 'bg-primary-500 text-white'
-                                    : 'bg-dark-surface text-dark-muted hover:bg-white/5'
+                            className={`px-4 py-2 rounded-lg transition-all text-sm font-medium ${selectedSeverity === severity
+                                ? 'bg-primary-500 text-white'
+                                : 'bg-dark-surface text-dark-muted hover:bg-white/5'
                                 }`}
                         >
                             {severity.charAt(0).toUpperCase() + severity.slice(1)}
                         </button>
                     ))}
+                </div>
+
+                <div className="relative min-w-[200px]">
+                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                        <Filter className="h-4 w-4 text-dark-muted" />
+                    </div>
+                    <select
+                        value={selectedType}
+                        onChange={(e) => setSelectedType(e.target.value as any)}
+                        className="form-select w-full bg-dark-bg border border-dark-border rounded-xl pl-10 pr-10 py-2.5 text-dark-text text-sm focus:border-primary-500 hover:border-dark-border/80 transition-colors"
+                    >
+                        {ALERT_TYPES.map(type => (
+                            <option key={type.value} value={type.value}>{type.label}</option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
@@ -130,7 +174,7 @@ export const SecurityAlerts = () => {
                                     <div className="flex items-start gap-4">
                                         <div className="text-3xl">{getAlertIcon(alert.type)}</div>
 
-                                        <div className="flex-1 min-w-0">
+                                        <div className="flex-1 min-w-0 group">
                                             <div className="flex items-start justify-between gap-4 mb-2">
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 mb-1">
@@ -142,9 +186,22 @@ export const SecurityAlerts = () => {
                                                     <p className="text-dark-muted text-sm">{alert.description}</p>
                                                 </div>
 
-                                                <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getSeverityColor(alert.severity)}`}>
-                                                    {alert.severity.toUpperCase()}
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wider border ${getSeverityColor(alert.severity)}`}>
+                                                        {alert.severity.toUpperCase()}
+                                                    </span>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            deleteAlert(alert.id);
+                                                            if (selectedAlert?.id === alert.id) setSelectedAlert(null);
+                                                        }}
+                                                        className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-lg transition-all"
+                                                        title="Delete Alert"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             <div className="flex items-center gap-4 text-xs text-dark-muted">
@@ -227,10 +284,15 @@ export const SecurityAlerts = () => {
 
                                 {selectedAlert.metadata && Object.keys(selectedAlert.metadata).length > 0 && (
                                     <div className="p-4 bg-dark-surface rounded-xl">
-                                        <div className="text-sm text-dark-muted mb-2">Additional Details</div>
-                                        <pre className="text-xs text-white font-mono overflow-x-auto">
-                                            {JSON.stringify(selectedAlert.metadata, null, 2)}
-                                        </pre>
+                                        <div className="text-sm text-dark-muted mb-3">Additional Context</div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {Object.entries(selectedAlert.metadata).map(([key, val]) => (
+                                                <div key={key} className="bg-dark-bg border border-dark-border px-3 py-1.5 rounded-lg flex items-center gap-2">
+                                                    <span className="text-[10px] uppercase tracking-wide text-dark-muted font-bold select-none">{key}</span>
+                                                    <span className="text-sm text-white font-mono break-all">{String(val)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
 

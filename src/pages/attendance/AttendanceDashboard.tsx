@@ -80,7 +80,6 @@ export const AttendanceDashboard = () => {
     const [locationStatus, setLocationStatus] = useState<'IDLE' | 'FETCHING' | 'SUCCESS' | 'ERROR'>('IDLE');
     const [locationError, setLocationError] = useState('');
 
-    const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
     const canManualUpdate = hasPermission(PERMISSIONS.MANUAL_ATTENDANCE);
 
     // -- Derived Data --
@@ -278,25 +277,31 @@ export const AttendanceDashboard = () => {
                     )}
 
                     {/* Admin Actions */}
-                    {(isAdmin || canManualUpdate) && (
+                    {(hasPermission(PERMISSIONS.EXPORT_REPORTS) || canManualUpdate || hasPermission(PERMISSIONS.USE_FACE_KIOSK)) && (
                         <>
-                            <button onClick={handleExport} className="p-2 bg-dark-card border border-dark-border hover:bg-dark-card/80 rounded-lg text-dark-muted hover:text-white transition-colors" title="Export Excel">
-                                <FileSpreadsheet className="w-5 h-5" />
-                            </button>
-                            <button
-                                onClick={() => { setAdminPunchEmpId(undefined); setAdminPunchOpen(true); }}
-                                className="flex items-center gap-1.5 px-3 py-2 bg-violet-600/20 border border-violet-500/30 hover:bg-violet-600/30 rounded-lg text-violet-400 hover:text-violet-300 transition-colors text-sm font-bold"
-                                title="Admin Manual Punch"
-                            >
-                                <UserPlus className="w-4 h-4" /> Manual Punch
-                            </button>
-                            <button
-                                onClick={() => navigate('/attendance/kiosk')}
-                                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600/30 rounded-lg text-emerald-400 hover:text-emerald-300 transition-colors text-sm font-bold"
-                                title="Face Kiosk Mode"
-                            >
-                                <ScanFace className="w-4 h-4" /> Face Kiosk
-                            </button>
+                            {hasPermission(PERMISSIONS.EXPORT_REPORTS) && (
+                                <button onClick={handleExport} className="p-2 bg-dark-card border border-dark-border hover:bg-dark-card/80 rounded-lg text-dark-muted hover:text-white transition-colors" title="Export Excel">
+                                    <FileSpreadsheet className="w-5 h-5" />
+                                </button>
+                            )}
+                            {canManualUpdate && (
+                                <button
+                                    onClick={() => { setAdminPunchEmpId(undefined); setAdminPunchOpen(true); }}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-violet-600/20 border border-violet-500/30 hover:bg-violet-600/30 rounded-lg text-violet-400 hover:text-violet-300 transition-colors text-sm font-bold"
+                                    title="Admin Manual Punch"
+                                >
+                                    <UserPlus className="w-4 h-4" /> Manual Punch
+                                </button>
+                            )}
+                            {hasPermission(PERMISSIONS.USE_FACE_KIOSK) && (
+                                <button
+                                    onClick={() => navigate('/attendance/kiosk')}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600/30 rounded-lg text-emerald-400 hover:text-emerald-300 transition-colors text-sm font-bold"
+                                    title="Face Kiosk Mode"
+                                >
+                                    <ScanFace className="w-4 h-4" /> Face Kiosk
+                                </button>
+                            )}
                         </>
                     )}
 
@@ -357,7 +362,7 @@ export const AttendanceDashboard = () => {
             </div>
 
             {/* ── Shift-Wise Summary ────────────────────────────────────────────── */}
-            {isAdmin && (() => {
+            {hasPermission(PERMISSIONS.VIEW_ATTENDANCE) && (() => {
                 // Compute per-shift stats using employee's assigned shift
                 const ALL_SHIFTS: ShiftType[] = ['GENERAL', 'MORNING', 'EVENING', 'NIGHT'];
                 const SHIFT_COLORS: Record<ShiftType, string> = {

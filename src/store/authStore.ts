@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User } from '@/types';
+import { User, Role } from '@/types';
 import { PermissionValue } from '@/config/permissions';
 import { audit, auditAnonymous } from '@/lib/auditLogger';
 import { API_URL } from '@/lib/apiConfig';
 import { useRolePermissionsStore } from '@/store/rolePermissionsStore';
+import { useSecurityAlertsStore } from '@/store/securityAlertsStore';
 
 interface AuthState {
     user: User | null;
@@ -12,6 +13,8 @@ interface AuthState {
     isAuthenticated: boolean;
     isLoading: boolean;
     tokenExpiresAt: number | null; // epoch ms
+    impersonatedRole: Role | null;
+    setImpersonatedRole: (role: Role | null) => void;
     loginWithCredentials: (idOrEmail: string, password: string) => Promise<{ error: string; attemptsRemaining?: number; retryAfter?: number } | null>;
     refreshAccessToken: () => Promise<boolean>;
     startAutoRefresh: () => void;
@@ -27,6 +30,9 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             isLoading: false,
             tokenExpiresAt: null,
+            impersonatedRole: null,
+
+            setImpersonatedRole: (role) => set({ impersonatedRole: role }),
 
             // Real JWT login — calls server, returns null on success or error object on failure
             loginWithCredentials: async (idOrEmail: string, password: string) => {
@@ -66,6 +72,15 @@ export const useAuthStore = create<AuthState>()(
                             status: 'FAILED',
                             errorMessage: data.error || 'Too many attempts',
                         });
+                        useSecurityAlertsStore.getState().addAlert({
+                            type: 'failed_login',
+                            severity: 'critical',
+                            title: '🔒 Account Locked — Rate Limited',
+                            description: `Login for "${idOrEmail.trim()}" blocked due to too many failed attempts.`,
+                            userId: idOrEmail.trim(),
+                            userName: idOrEmail.trim(),
+                            metadata: { reason: 'rate_limited' },
+                        });
                         return {
                             error: data.error || 'Too many attempts. Please wait.',
                             retryAfter: data.retryAfter || data.lockedFor || 900,
@@ -85,6 +100,15 @@ export const useAuthStore = create<AuthState>()(
                         },
                         status: 'FAILED',
                         errorMessage: data.error || 'Invalid Login ID or Password',
+                    });
+                    useSecurityAlertsStore.getState().addAlert({
+                        type: 'failed_login',
+                        severity: 'high',
+                        title: '⚠️ Failed Login Attempt',
+                        description: `Login failed for "${idOrEmail.trim()}". ${data.attemptsRemaining != null ? `${data.attemptsRemaining} attempt(s) remaining.` : ''}`,
+                        userId: idOrEmail.trim(),
+                        userName: idOrEmail.trim(),
+                        metadata: { reason: 'invalid_credentials', attemptsRemaining: data.attemptsRemaining },
                     });
                     return {
                         error: data.error || 'Invalid Login ID or Password',
@@ -178,9 +202,11 @@ export const useAuthStore = create<AuthState>()(
             },
 
             hasPermission: (permission: PermissionValue) => {
-                const { user } = get();
+                const { user, impersonatedRole } = get();
                 if (!user) return false;
-                return useRolePermissionsStore.getState().hasPermission(user.role, permission);
+
+                const roleToCheck = impersonatedRole || user.role;
+                return useRolePermissionsStore.getState().hasPermission(roleToCheck, permission);
             },
         }),
         {
@@ -189,6 +215,7 @@ export const useAuthStore = create<AuthState>()(
                 user: state.user,
                 token: state.token,
                 isAuthenticated: state.isAuthenticated,
+                // Do NOT persist impersonatedRole so it resets on hard refresh
             }),
             // On app startup: validate stored token (clear expired / mock tokens)
             onRehydrateStorage: () => (state) => {

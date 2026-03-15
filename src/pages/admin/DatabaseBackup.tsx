@@ -9,6 +9,10 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { useDialog } from '@/components/DialogProvider';
+import { PasswordConfirmModal } from '@/components/PasswordConfirmModal';
+import { useDeviceType } from '@/hooks/useDeviceType';
+import { useSecurityStore } from '@/store/securityStore';
+import { useAuthStore } from '@/store/authStore';
 
 interface BackupFile {
     filename: string;
@@ -64,12 +68,16 @@ const DEFAULT_CFG: BackupConfig = {
 
 
 export function DatabaseBackup() {
+    const { user } = useAuthStore();
+    const { currentIp, allowedIps } = useSecurityStore();
+    const isIpAllowed = user?.role === 'SUPER_ADMIN' || (currentIp && allowedIps.includes(currentIp));
     const [status, setStatus] = useState<BackupStatus | null>(null);
     const [loading, setLoading] = useState(true);
     const [backing, setBacking] = useState(false);
     const [deleting, setDeleting] = useState<string | null>(null);
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [activeTab, setActiveTab] = useState<Tab>('history');
+    const [showBackupConfirm, setShowBackupConfirm] = useState(false);
     const { confirm } = useDialog();
 
     // Config state — initialize with DEFAULT_CFG so JSX never reads .enabled on undefined
@@ -77,6 +85,7 @@ export function DatabaseBackup() {
     const [cfgLoading, setCfgLoading] = useState(false);
     const [savingCfg, setSavingCfg] = useState(false);
     const [newTime, setNewTime] = useState('');
+    const { isDesktop } = useDeviceType();
 
     const showMsg = (type: 'success' | 'error', text: string) => {
         setMessage({ type, text });
@@ -137,6 +146,7 @@ export function DatabaseBackup() {
             showMsg('error', '❌ Network error — server se connect nahi hua');
         } finally {
             setBacking(false);
+            setShowBackupConfirm(false);
         }
     };
 
@@ -237,8 +247,24 @@ export function DatabaseBackup() {
         { id: 'whatsapp', label: 'WhatsApp', icon: <MessageCircle className="w-4 h-4" /> },
     ];
 
+    if (!isDesktop) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[500px] text-center px-4">
+                <div className="w-20 h-20 bg-red-500/10 flex items-center justify-center rounded-full mb-6 relative">
+                    <Database className="w-10 h-10 text-red-500 opacity-50" />
+                    <X className="w-6 h-6 text-red-400 absolute bottom-4 right-4 bg-dark-bg rounded-full border border-dark-bg" />
+                    <Smartphone className="w-8 h-8 text-red-400 absolute -bottom-2 -left-2 bg-dark-bg rounded-full p-1" />
+                </div>
+                <h2 className="text-2xl font-bold text-dark-text mb-3">Desktop Environment Required</h2>
+                <p className="text-dark-muted max-w-sm leading-relaxed">
+                    Database Backup is a highly sensitive infrastructure operation. It is strictly isolated to <strong className="text-white">Desktop devices</strong> to ensure reliable network stability and security during massive data dumps.
+                </p>
+            </div>
+        );
+    }
+
     return (
-        <div className="p-6 max-w-4xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-6">
 
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -327,11 +353,11 @@ export function DatabaseBackup() {
                             <div className="text-sm text-dark-muted">Abhi backup lo</div>
                         </div>
                     </div>
-                    <button onClick={handleBackupNow} disabled={backing}
+                    <button onClick={() => isIpAllowed ? setShowBackupConfirm(true) : showMsg('error', 'Manual backup is restricted to the Office IP network.')} disabled={backing || !isIpAllowed}
                         className={clsx('flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap border',
-                            backing ? 'bg-dark-surface text-dark-muted border-dark-border cursor-not-allowed'
+                            backing || !isIpAllowed ? 'bg-dark-surface text-dark-muted border-dark-border cursor-not-allowed'
                                 : 'bg-primary-600 hover:bg-primary-500 text-white border-primary-500/50 shadow-lg shadow-primary-500/20')}>
-                        {backing ? <><RefreshCw className="w-4 h-4 animate-spin" /> Saving...</> : <><Download className="w-4 h-4" /> Backup Now</>}
+                        {backing ? <><RefreshCw className="w-4 h-4 animate-spin" /> Saving...</> : !isIpAllowed ? <><AlertCircle className="w-4 h-4" /> Locked (IP)</> : <><Download className="w-4 h-4" /> Backup Now</>}
                     </button>
                 </div>
                 {/* Auto-backup Toggle */}
@@ -596,6 +622,16 @@ export function DatabaseBackup() {
                     </ul>
                 </div>
             </div>
+
+            <PasswordConfirmModal
+                isOpen={showBackupConfirm}
+                onClose={() => setShowBackupConfirm(false)}
+                title="Confirm Manual Backup"
+                description="This will immediately snapshot the entire database. It might cause slight latency for other active users for a few seconds."
+                actionLabel="Generate Details & Backup"
+                actionVariant="primary"
+                onConfirm={handleBackupNow}
+            />
         </div>
     );
 }

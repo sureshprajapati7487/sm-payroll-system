@@ -3,11 +3,12 @@ import { Shield, Plus, X, Clock, Eye, LogOut, Key, Check, AlertCircle } from 'lu
 import { useAuditStore } from '@/store/auditStore';
 import { useAuthStore } from '@/store/authStore';
 import { apiFetch } from '@/lib/apiClient';
+import { PERMISSIONS } from '@/config/permissions';
 
 // ── Logout Password Card ──────────────────────────────────────────────────────
 function LogoutPasswordCard() {
-    const { user } = useAuthStore();
-    const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+    const { hasPermission } = useAuthStore();
+    const canManageSettings = hasPermission(PERMISSIONS.MANAGE_SETTINGS);
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [currentMasked, setCurrentMasked] = useState<string | null>(null);
@@ -67,7 +68,7 @@ function LogoutPasswordCard() {
                 </div>
             )}
 
-            {isSuperAdmin ? (
+            {canManageSettings ? (
                 <div className="space-y-3">
                     <input
                         type="text"

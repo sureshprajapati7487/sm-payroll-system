@@ -8,6 +8,7 @@ import {
 import { clsx } from 'clsx';
 import { exportToExcel, exportLoansToPDF } from '@/utils/exportUtils';
 import { FileText, FileSpreadsheet } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore';
 
 interface LoanSummaryModalProps {
     onClose: () => void;
@@ -16,6 +17,7 @@ interface LoanSummaryModalProps {
 export const LoanSummaryModal = ({ onClose }: LoanSummaryModalProps) => {
     const { loans } = useLoanStore();
     const { employees } = useEmployeeStore();
+    const user = useAuthStore(s => s.user);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<string>('ALL');
 
@@ -58,7 +60,7 @@ export const LoanSummaryModal = ({ onClose }: LoanSummaryModalProps) => {
                         {/* Export Buttons */}
                         <div className="flex gap-2">
                             <button
-                                onClick={() => exportToExcel(filteredLoans, 'Loan_Summary')}
+                                onClick={() => exportToExcel(filteredLoans, 'Loan_Summary', user)}
                                 className="flex items-center gap-2 px-3 py-1.5 bg-green-600/20 text-green-500 hover:bg-green-600 hover:text-white rounded-lg text-sm transition-colors border border-green-600/30"
                                 title="Export to Excel"
                             >
@@ -66,7 +68,7 @@ export const LoanSummaryModal = ({ onClose }: LoanSummaryModalProps) => {
                                 Excel
                             </button>
                             <button
-                                onClick={() => exportLoansToPDF(filteredLoans, employees)}
+                                onClick={() => exportLoansToPDF(filteredLoans, employees, user)}
                                 className="flex items-center gap-2 px-3 py-1.5 bg-red-600/20 text-red-500 hover:bg-red-600 hover:text-white rounded-lg text-sm transition-colors border border-red-600/30"
                                 title="Export to PDF"
                             >

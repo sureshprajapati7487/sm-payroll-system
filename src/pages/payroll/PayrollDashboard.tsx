@@ -8,6 +8,7 @@ import { calculateSalary } from '@/utils/salaryCalculator';
 import { useAttendanceStore } from '@/store/attendanceStore';
 import { useProductionStore } from '@/store/productionStore';
 import { useLoanStore } from '@/store/loanStore';
+import { useSecurityStore } from '@/store/securityStore';
 import {
     Banknote,
     Printer,
@@ -22,12 +23,15 @@ import { PayrollDisbursementModal } from '@/components/payroll/PayrollDisburseme
 import { EmployeeHistoryModal } from '@/components/payroll/EmployeeHistoryModal';
 import { Employee } from '@/types';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { PasswordConfirmModal } from '@/components/PasswordConfirmModal';
 
 export const PayrollDashboard = () => {
     const navigate = useNavigate();
     const { user, hasPermission } = useAuthStore();
     const { slips, generateMonthlyPayroll, advanceState, fetchPayroll, isLoading, isSaving } = usePayrollStore();
     const { employees } = useEmployeeStore();
+    const { currentIp, allowedIps } = useSecurityStore();
+    const isIpAllowed = user?.role === 'SUPER_ADMIN' || (currentIp && allowedIps.includes(currentIp));
 
     // Default to current month YYYY-MM
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -44,6 +48,7 @@ export const PayrollDashboard = () => {
     const [showLoanModal, setShowLoanModal] = useState(false);
     const [showDisbursementModal, setShowDisbursementModal] = useState(false);
     const [selectedHistoryEmployee, setSelectedHistoryEmployee] = useState<Employee | null>(null);
+    const [lockConfirmId, setLockConfirmId] = useState<string | null>(null);
     const { confirm } = useDialog();
 
     // Fetch payroll data from server when month changes
@@ -90,7 +95,14 @@ export const PayrollDashboard = () => {
 
     const handleActionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const val = e.target.value;
-        if (val === 'GENERATE') handleGenerate();
+        if (val === 'GENERATE') {
+            if (!isIpAllowed) {
+                alert('Payroll generation is temporarily restricted to the office network for security.');
+                e.target.value = '';
+                return;
+            }
+            handleGenerate();
+        }
         if (val === 'REPORT') setShowDisbursementModal(true);
         if (val === 'LOANS') setShowLoanModal(true);
         if (val === 'HISTORY') navigate('/payroll/history');
@@ -151,7 +163,7 @@ export const PayrollDashboard = () => {
                             defaultValue=""
                         >
                             <option value="" disabled>Select Action...</option>
-                            {canGenerate && <option value="GENERATE">{isSaving ? '⏳ Saving...' : '⚡ Generate Salary Slips'}</option>}
+                            {canGenerate && <option value="GENERATE" disabled={!isIpAllowed}>{!isIpAllowed ? '🚫 Generate (Office IP Req.)' : isSaving ? '⏳ Saving...' : '⚡ Generate Salary Slips'}</option>}
                             {canViewAllSlips && <option value="REPORT">📊 Final Disbursement Report</option>}
                             {canViewAllSlips && <option value="TOGGLE_PENDING">{showPendingOnly ? '☑ Show All Records' : '☐ Show Pending Only'}</option>}
                             {canManageLoans && <option value="LOANS">💰 Manage Loans</option>}
@@ -309,7 +321,7 @@ export const PayrollDashboard = () => {
                                                             )}
                                                             {slip.status === 'FINAL_APPROVED' && canLock && (
                                                                 <button
-                                                                    onClick={() => advanceState(slip.id, 'lock')}
+                                                                    onClick={() => setLockConfirmId(slip.id)}
                                                                     className="p-1.5 text-success hover:bg-success/10 rounded transition-colors"
                                                                     title="Lock & Finalize Deductions"
                                                                 >
@@ -351,6 +363,20 @@ export const PayrollDashboard = () => {
                     onClose={() => setSelectedHistoryEmployee(null)}
                 />
             )}
+            <PasswordConfirmModal
+                isOpen={!!lockConfirmId}
+                onClose={() => setLockConfirmId(null)}
+                title="Confirm Payroll Lock"
+                description="Once locked, the salary slip cannot be altered and all auto-deductions (like loans) will be permanently recorded for this month."
+                actionLabel="Lock Payroll Now"
+                actionVariant="warning"
+                onConfirm={() => {
+                    if (lockConfirmId) {
+                        advanceState(lockConfirmId, 'lock');
+                        setLockConfirmId(null);
+                    }
+                }}
+            />
         </div>
     );
 };

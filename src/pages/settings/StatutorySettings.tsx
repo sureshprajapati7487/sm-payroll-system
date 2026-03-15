@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { Save, Trash2, CalendarCheck, Shield } from 'lucide-react';
-import { Roles } from '@/types';
+import { PERMISSIONS } from '@/config/permissions';
 import { InfoTip } from '@/components/ui/InfoTip';
 
 interface StatutoryRule {
@@ -17,9 +17,9 @@ interface StatutoryRule {
 }
 
 export const StatutorySettings = () => {
-    const { user } = useAuthStore();
+    const { hasPermission } = useAuthStore();
     const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
-    const isAdmin = user?.role === Roles.SUPER_ADMIN || user?.role === Roles.ADMIN || user?.role === Roles.ACCOUNT_ADMIN;
+    const isAdmin = hasPermission(PERMISSIONS.MANAGE_STATUTORY);
 
     const [rules, setRules] = useState<StatutoryRule[]>([]);
     const [loading, setLoading] = useState(false);

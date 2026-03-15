@@ -8,7 +8,13 @@ export type DataScope = 'ALL' | 'TEAM' | 'OWN';
 type RolePermMap = Record<string, PermissionValue[]>;
 type RoleScopeMap = Record<string, DataScope>;
 
-interface RolePermissionsState {
+// Internal global cache for O(1) lookups
+// Cleared instantly on any permission modification
+const permissionCache = new Map<string, boolean>();
+const getCacheKey = (role: string, permission: string) => `${role}:${permission}`;
+const clearCache = () => permissionCache.clear();
+
+export interface RolePermissionsState {
     permissions: RolePermMap;
     scopes: RoleScopeMap;
     _hydrated: boolean; // true once localStorage data has been loaded
@@ -62,6 +68,7 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
 
             // ── Atomic save: replaces everything at once → persisted immediately ──
             setPermissions: (permissions, scopes) => {
+                clearCache(); // Invalidate performance cache
                 // Lock SUPER_ADMIN
                 const safePerms = {
                     ...permissions,
@@ -76,6 +83,7 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
 
             togglePermission: (role, permission) => {
                 if (role === Roles.SUPER_ADMIN) return;
+                clearCache(); // Invalidate performance cache
                 set((state) => {
                     const current = state.permissions[role] ?? [];
                     const has = current.includes(permission);
@@ -93,8 +101,18 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
             hasPermission: (role, permission) => {
                 const normalizedRole = (role || '').toUpperCase().replace(/ /g, '_') as Role;
                 if (normalizedRole === Roles.SUPER_ADMIN) return true;
+
+                const cacheKey = getCacheKey(normalizedRole, permission);
+                if (permissionCache.has(cacheKey)) {
+                    return permissionCache.get(cacheKey)!;
+                }
+
                 const perms = get().permissions[normalizedRole] ?? [];
-                return perms.includes(permission);
+                // Use Set under the hood for next time if we wanted, but array .includes is cached now
+                const result = perms.includes(permission);
+                permissionCache.set(cacheKey, result);
+
+                return result;
             },
 
             setScope: (role, scope) => {
@@ -109,6 +127,7 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
 
             resetRole: (role) => {
                 if (role === Roles.SUPER_ADMIN) return;
+                clearCache(); // Invalidate performance cache
                 set((state) => ({
                     permissions: {
                         ...state.permissions,
@@ -119,6 +138,7 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
             },
 
             resetAll: () => {
+                clearCache(); // Invalidate performance cache
                 set({ permissions: defaultPermissions(), scopes: defaultScopes() });
             },
 
@@ -130,7 +150,10 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
             storage: createJSONStorage(() => localStorage),
             onRehydrateStorage: () => (state) => {
                 // Called when localStorage data has finished loading into the store
-                if (state) state._setHydrated(true);
+                if (state) {
+                    state._setHydrated(true);
+                    clearCache(); // clear cache on rehydrate to ensure fresh evaluation
+                }
             },
         }
     )

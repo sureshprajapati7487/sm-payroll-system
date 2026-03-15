@@ -8,6 +8,9 @@ import { apiFetch } from '@/lib/apiClient';
 import { audit } from '@/lib/auditLogger';
 import { useAuthStore } from './authStore';
 import { useRolePermissionsStore } from './rolePermissionsStore';
+import { useNotificationStore } from './notificationStore';
+import { NotificationType } from '@/types';
+import { PERMISSIONS } from '@/config/permissions';
 
 interface PayrollState {
     slips: SalarySlip[];
@@ -88,6 +91,14 @@ const useInternalPayrollStore = create<PayrollState>((set, get) => ({
                 entityType: 'PAYROLL',
                 details: { month, employeeCount: slipsCount, totalNetPay },
                 status: 'SUCCESS',
+            });
+
+            // ── Notify all users who can generate payroll ─────────────────────
+            useNotificationStore.getState().addNotification({
+                type: NotificationType.PAYROLL_GENERATED,
+                targetPermissions: [PERMISSIONS.GENERATE_PAYROLL],
+                title: `Payroll Generated — ${month}`,
+                message: `${slipsCount} salary slips generated. Total payout: ₹${totalNetPay.toLocaleString('en-IN')}.`,
             });
 
         } catch (err) {

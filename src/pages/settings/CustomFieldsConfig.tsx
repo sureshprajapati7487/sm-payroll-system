@@ -3,10 +3,12 @@ import { Plus, Trash2, Edit2, Save, Settings2 } from 'lucide-react';
 import { useCustomFieldStore, CustomFieldType, CustomField } from '@/store/customFieldStore';
 import { useAuthStore } from '@/store/authStore';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { PERMISSIONS } from '@/config/permissions';
 
 export const CustomFieldsConfig: React.FC = () => {
     const { fields, addField, updateField, deleteField } = useCustomFieldStore();
-    const isAdmin = useAuthStore(s => s.user?.role === 'SUPER_ADMIN' || s.user?.role === 'ADMIN');
+    const { hasPermission } = useAuthStore();
+    const isAdmin = hasPermission(PERMISSIONS.MANAGE_SETTINGS);
 
     const [editingId, setEditingId] = useState<string | null>(null);
     const [draft, setDraft] = useState<Partial<CustomField>>({});

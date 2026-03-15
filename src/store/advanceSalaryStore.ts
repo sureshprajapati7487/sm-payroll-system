@@ -91,6 +91,17 @@ export const useInternalAdvanceSalaryStore = create<AdvanceSalaryState>((set, ge
 
     // ── Approve → PATCH /api/advance-salary/:id/status ───────────────────────
     approveRequest: async (requestId, approvedBy = 'Admin') => {
+        const user = useAuthStore.getState().user;
+        const request = get().requests.find(r => r.id === requestId);
+
+        if (!request) return;
+
+        // 🛡️ Advance > ₹50,000 requires Account Admin +
+        if (request.amount > 50000 && user?.role !== 'ACCOUNT_ADMIN' && user?.role !== 'SUPER_ADMIN') {
+            alert('Security Guard: Advance requests over ₹50,000 can only be approved by an Account Admin or Super Admin.');
+            return;
+        }
+
         set(s => ({ requests: s.requests.map(r => r.id === requestId ? { ...r, status: 'approved' as const, approvedBy, approvedDate: new Date().toISOString() } : r) }));
         try {
             await apiFetch(`/finance/advances/${requestId}/approve`, {

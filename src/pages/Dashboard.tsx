@@ -7,13 +7,15 @@ import { useLoanStore } from '@/store/loanStore';
 import { useAuthStore } from '@/store/authStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { useAuditStore } from '@/store/auditStore';
+import { useExpenseStore } from '@/store/expenseStore';
 import { useNavigate } from 'react-router-dom';
 import {
     Users, Clock, TrendingUp, Wallet, AlertCircle,
     CalendarX, CheckSquare, BadgeDollarSign, AlertTriangle,
     ShieldCheck, LogIn, LogOut, UserPlus, Trash2, Edit3,
-    Eye, ArrowRight, Activity
+    Eye, ArrowRight, Activity, DollarSign
 } from 'lucide-react';
+import { PERMISSIONS } from '@/config/permissions';
 import {
     AreaChart,
     Area,
@@ -35,10 +37,11 @@ export const Dashboard = () => {
     const { records } = useAttendanceStore();
     const { entries } = useProductionStore();
     const { loans } = useLoanStore();
-    const { user } = useAuthStore();
+    const { user, hasPermission } = useAuthStore();
     const { currentCompanyId } = useMultiCompanyStore();
     const { logs: auditLogs } = useAuditStore();
     const { stats, fetchDashboardStats } = useAnalyticsStore();
+    const { getStats: getExpenseStats, fetchExpenses } = useExpenseStore();
     const navigate = useNavigate();
 
     // --- COMMON VARIABLES ---
@@ -52,8 +55,8 @@ export const Dashboard = () => {
         : employees;
 
     // --- ROLE CHECKS ---
-    const isEmployee = user?.role === 'EMPLOYEE';
-    const isManager = user?.role === 'MANAGER';
+    const isManager = hasPermission(PERMISSIONS.VIEW_TEAM_ATTENDANCE) && !hasPermission(PERMISSIONS.VIEW_REPORTS);
+    const isEmployee = !hasPermission(PERMISSIONS.VIEW_TEAM_ATTENDANCE) && !hasPermission(PERMISSIONS.VIEW_REPORTS);
 
     // ── C3: Auto-redirect ALL users on small screens to Mobile Dashboard ──────
     useEffect(() => {
@@ -73,8 +76,11 @@ export const Dashboard = () => {
     useEffect(() => {
         if (!isEmployee && currentCompanyId) {
             fetchDashboardStats(currentCompanyId, currentMonth);
+            if (hasPermission(PERMISSIONS.VIEW_FINANCE_DASHBOARD)) {
+                fetchExpenses(currentMonth);
+            }
         }
-    }, [currentCompanyId, currentMonth, isEmployee]);
+    }, [currentCompanyId, currentMonth, isEmployee, hasPermission]);
 
     // 1. Employee View (Strictly Personal)
     if (isEmployee) {
@@ -196,6 +202,10 @@ export const Dashboard = () => {
     const hasPayrollData = payrollDistribution.length > 0;
     const activeLoans = { length: activeLoansCount }; // shim for JSX rendering below
 
+    // Calculate Estimated P&L (Production - Payroll - Expenses)
+    const expenseStats = getExpenseStats(currentMonth);
+    const estimatedProfit = monthProduction - netPayrollThisMonth - expenseStats.total;
+    const profitMargin = monthProduction > 0 ? ((estimatedProfit / monthProduction) * 100).toFixed(1) : 0;
 
     return (
         <div className="space-y-6">
@@ -205,7 +215,7 @@ export const Dashboard = () => {
             </div>
 
             {/* KPI Cards Row 1 */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-6">
                 <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-10"><Users className="w-16 h-16 text-primary-400" /></div>
                     <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">Total Staff</p>
@@ -234,36 +244,60 @@ export const Dashboard = () => {
                     )}
                 </div>
 
-                <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-10"><TrendingUp className="w-16 h-16 text-success" /></div>
-                    <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">This Month Production</p>
-                    <div className="flex items-baseline gap-1">
-                        <h3 className="text-3xl font-bold text-white">₹ {(monthProduction / 1000).toFixed(1)}k</h3>
+                {hasPermission(PERMISSIONS.VIEW_PRODUCTION) && (
+                    <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-10"><TrendingUp className="w-16 h-16 text-success" /></div>
+                        <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">This Month Production</p>
+                        <div className="flex items-baseline gap-1">
+                            <h3 className="text-3xl font-bold text-white">₹ {(monthProduction / 1000).toFixed(1)}k</h3>
+                        </div>
+                        <div className="mt-2 text-xs flex items-center gap-1">
+                            {momChange !== null ? (
+                                <>
+                                    <TrendingUp className="w-3 h-3" style={{ color: momChange >= 0 ? '#10b981' : '#ef4444' }} />
+                                    <span style={{ color: momChange >= 0 ? '#10b981' : '#ef4444' }}>
+                                        {momChange >= 0 ? '+' : ''}{momChange}% vs last month
+                                    </span>
+                                </>
+                            ) : (
+                                <span className="text-dark-muted">No previous month data</span>
+                            )}
+                        </div>
                     </div>
-                    <div className="mt-2 text-xs flex items-center gap-1">
-                        {momChange !== null ? (
-                            <>
-                                <TrendingUp className="w-3 h-3" style={{ color: momChange >= 0 ? '#10b981' : '#ef4444' }} />
-                                <span style={{ color: momChange >= 0 ? '#10b981' : '#ef4444' }}>
-                                    {momChange >= 0 ? '+' : ''}{momChange}% vs last month
-                                </span>
-                            </>
-                        ) : (
-                            <span className="text-dark-muted">No previous month data</span>
-                        )}
-                    </div>
-                </div>
+                )}
 
-                <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet className="w-16 h-16 text-danger" /></div>
-                    <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">Outstanding Loans</p>
-                    <div className="flex items-baseline gap-1">
-                        <h3 className="text-3xl font-bold text-danger">₹ {(totalOutstanding / 1000).toFixed(1)}k</h3>
+                {hasPermission(PERMISSIONS.VIEW_ALL_LOANS) && (
+                    <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet className="w-16 h-16 text-danger" /></div>
+                        <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">Outstanding Loans</p>
+                        <div className="flex items-baseline gap-1">
+                            <h3 className="text-3xl font-bold text-danger">₹ {(totalOutstanding / 1000).toFixed(1)}k</h3>
+                        </div>
+                        <div className="mt-2 text-xs text-dark-muted flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> {activeLoans.length} active loans
+                        </div>
                     </div>
-                    <div className="mt-2 text-xs text-dark-muted flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" /> {activeLoans.length} active loans
+                )}
+
+                {hasPermission(PERMISSIONS.VIEW_FINANCE_DASHBOARD) && (
+                    <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-10"><DollarSign className="w-16 h-16 text-primary-400" /></div>
+                        <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">Est. Profit (P&L)</p>
+                        <div className="flex items-baseline gap-1">
+                            <h3 className={`text-3xl font-bold ${estimatedProfit >= 0 ? 'text-success' : 'text-danger'}`}>
+                                ₹ {(estimatedProfit / 1000).toFixed(1)}k
+                            </h3>
+                        </div>
+                        <div className="mt-2 text-xs flex items-center gap-1 justify-between">
+                            <span className={estimatedProfit >= 0 ? 'text-success' : 'text-danger'}>
+                                {profitMargin}% margin
+                            </span>
+                            <span className="text-dark-muted shadow-sm">
+                                {expenseStats.count > 0 ? `₹${(expenseStats.total / 1000).toFixed(1)}k exp.` : 'No expenses'}
+                            </span>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* KPI Cards Row 2 — Pending Approvals + Net Payroll */}
@@ -290,29 +324,33 @@ export const Dashboard = () => {
                     </div>
                 </div>
 
-                <div className={`glass p-4 rounded-xl border flex items-center gap-4 ${pendingLoans > 0 ? 'border-orange-500/30' : 'border-dark-border'
-                    }`}>
-                    <div className={`p-2.5 rounded-lg ${pendingLoans > 0 ? 'bg-orange-500/20' : 'bg-dark-surface'}`}>
-                        <AlertTriangle className={`w-5 h-5 ${pendingLoans > 0 ? 'text-orange-400' : 'text-dark-muted'}`} />
+                {hasPermission(PERMISSIONS.VIEW_ALL_LOANS) && (
+                    <div className={`glass p-4 rounded-xl border flex items-center gap-4 ${pendingLoans > 0 ? 'border-orange-500/30' : 'border-dark-border'
+                        }`}>
+                        <div className={`p-2.5 rounded-lg ${pendingLoans > 0 ? 'bg-orange-500/20' : 'bg-dark-surface'}`}>
+                            <AlertTriangle className={`w-5 h-5 ${pendingLoans > 0 ? 'text-orange-400' : 'text-dark-muted'}`} />
+                        </div>
+                        <div>
+                            <p className="text-dark-muted text-xs">Pending Loans</p>
+                            <p className={`text-xl font-bold ${pendingLoans > 0 ? 'text-orange-400' : 'text-white'}`}>{pendingLoans}</p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-dark-muted text-xs">Pending Loans</p>
-                        <p className={`text-xl font-bold ${pendingLoans > 0 ? 'text-orange-400' : 'text-white'}`}>{pendingLoans}</p>
-                    </div>
-                </div>
+                )}
 
-                <div className="glass p-4 rounded-xl border border-emerald-500/30 flex items-center gap-4">
-                    <div className="p-2.5 rounded-lg bg-emerald-500/20">
-                        <BadgeDollarSign className="w-5 h-5 text-emerald-400" />
+                {hasPermission(PERMISSIONS.VIEW_PAYROLL) && (
+                    <div className="glass p-4 rounded-xl border border-emerald-500/30 flex items-center gap-4">
+                        <div className="p-2.5 rounded-lg bg-emerald-500/20">
+                            <BadgeDollarSign className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <div>
+                            <p className="text-dark-muted text-xs">Net Payroll ({currentMonth})</p>
+                            <p className="text-xl font-bold text-emerald-400">
+                                {netPayrollThisMonth > 0 ? `₹ ${netPayrollThisMonth.toLocaleString('en-IN')}` : '—'}
+                            </p>
+                            {slipsGenerated > 0 && <p className="text-xs text-dark-muted">{slipsGenerated} slips</p>}
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-dark-muted text-xs">Net Payroll ({currentMonth})</p>
-                        <p className="text-xl font-bold text-emerald-400">
-                            {netPayrollThisMonth > 0 ? `₹ ${netPayrollThisMonth.toLocaleString('en-IN')}` : '—'}
-                        </p>
-                        {slipsGenerated > 0 && <p className="text-xs text-dark-muted">{slipsGenerated} slips</p>}
-                    </div>
-                </div>
+                )}
             </div>
 
             {/* Charts Row 1 */}
@@ -342,59 +380,63 @@ export const Dashboard = () => {
                 </div>
 
                 {/* Payroll Distribution */}
-                <div className="glass p-4 md:p-6 rounded-2xl border border-dark-border h-[250px] md:h-[350px]">
-                    <h3 className="font-bold text-white mb-2">Payroll Breakdown — {currentMonth}</h3>
-                    <p className="text-xs text-dark-muted mb-4">{slipsGenerated} slips generated</p>
-                    {!hasPayrollData ? (
-                        <div className="h-[75%] flex flex-col items-center justify-center text-dark-muted opacity-50 gap-2">
-                            <BadgeDollarSign className="w-12 h-12" />
-                            <p className="text-sm">No payroll generated for {currentMonth}</p>
-                        </div>
-                    ) : (
-                        <div className="flex items-center justify-center h-[80%]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={payrollDistribution} cx="50%" cy="50%"
-                                        innerRadius={55} outerRadius={95} paddingAngle={5} dataKey="value">
-                                        {payrollDistribution.map((_, index) => (
-                                            <Cell key={`cell-${index}`} fill={PAYROLL_COLORS[index % PAYROLL_COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip
-                                        contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
-                                        formatter={(v: number) => [`₹${v.toLocaleString('en-IN')}`, '']}
-                                    />
-                                    <Legend wrapperStyle={{ paddingTop: '16px', fontSize: '12px' }} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-                    )}
-                </div>
-
+                {hasPermission(PERMISSIONS.VIEW_PAYROLL) && (
+                    <div className="glass p-4 md:p-6 rounded-2xl border border-dark-border h-[250px] md:h-[350px]">
+                        <h3 className="font-bold text-white mb-2">Payroll Breakdown — {currentMonth}</h3>
+                        <p className="text-xs text-dark-muted mb-4">{slipsGenerated} slips generated</p>
+                        {!hasPayrollData ? (
+                            <div className="h-[75%] flex flex-col items-center justify-center text-dark-muted opacity-50 gap-2">
+                                <BadgeDollarSign className="w-12 h-12" />
+                                <p className="text-sm">No payroll generated for {currentMonth}</p>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center h-[80%]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie data={payrollDistribution} cx="50%" cy="50%"
+                                            innerRadius={55} outerRadius={95} paddingAngle={5} dataKey="value">
+                                            {payrollDistribution.map((_, index) => (
+                                                <Cell key={`cell-${index}`} fill={PAYROLL_COLORS[index % PAYROLL_COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
+                                            formatter={(v: number) => [`₹${v.toLocaleString('en-IN')}`, '']}
+                                        />
+                                        <Legend wrapperStyle={{ paddingTop: '16px', fontSize: '12px' }} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Production Chart */}
-            <div className="glass p-6 rounded-2xl border border-dark-border">
-                <h3 className="font-bold text-white mb-6">Production Output by Department</h3>
-                <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={productionData} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={true} vertical={false} />
-                            <XAxis type="number" stroke="#94a3b8" />
-                            <YAxis dataKey="name" type="category" stroke="#fff" width={100} />
-                            <Tooltip
-                                cursor={{ fill: 'transparent' }}
-                                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
-                            />
-                            <Bar dataKey="units" fill="#10B981" radius={[0, 4, 4, 0]} barSize={20} />
-                        </BarChart>
-                    </ResponsiveContainer>
+            {hasPermission(PERMISSIONS.VIEW_PRODUCTION) && (
+                <div className="glass p-6 rounded-2xl border border-dark-border">
+                    <h3 className="font-bold text-white mb-6">Production Output by Department</h3>
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={productionData} layout="vertical">
+                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={true} vertical={false} />
+                                <XAxis type="number" stroke="#94a3b8" />
+                                <YAxis dataKey="name" type="category" stroke="#fff" width={100} />
+                                <Tooltip
+                                    cursor={{ fill: 'transparent' }}
+                                    contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
+                                />
+                                <Bar dataKey="units" fill="#10B981" radius={[0, 4, 4, 0]} barSize={20} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* ── Recent Activity Log ────────────────────────────────── */}
-            <ActivityLogCard logs={auditLogs} onViewAll={() => navigate('/admin/audit-logs')} />
-
+            {hasPermission(PERMISSIONS.VIEW_AUDIT_LOGS) && (
+                <ActivityLogCard logs={auditLogs} onViewAll={() => navigate('/admin/audit-logs')} />
+            )}
         </div>
     );
 };

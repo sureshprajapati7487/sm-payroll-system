@@ -43,7 +43,7 @@ export const useMultiCompanyStore = create<MultiCompanyState>()(
             fetchCompanies: async () => {
                 set({ isLoading: true });
                 try {
-                    const res = await apiFetch(`/companies`, { skipAuth: true });
+                    const res = await apiFetch(`/companies`);
                     if (!res.ok) {
                         set({ isLoading: false });
                         return;

@@ -10,6 +10,7 @@ import { exportToExcel } from '@/utils/exportUtils';
 import { clsx } from 'clsx';
 import { sendPayslipWhatsApp, sendBulkPayslipWhatsApp } from '@/utils/whatsappService';
 import { useDialog } from '@/components/DialogProvider';
+import { useAuthStore } from '@/store/authStore';
 
 interface PayrollDisbursementModalProps {
     month: string;
@@ -24,6 +25,7 @@ export const PayrollDisbursementModal = ({ month, onClose }: PayrollDisbursement
     const [selectedSlips, setSelectedSlips] = useState<Set<string>>(new Set());
     const [waBulkProgress, setWaBulkProgress] = useState<{ done: number; total: number } | null>(null);
     const { confirm } = useDialog();
+    const user = useAuthStore(s => s.user);
 
     const slips = getSlipsByMonth(month);
 
@@ -159,7 +161,7 @@ export const PayrollDisbursementModal = ({ month, onClose }: PayrollDisbursement
                                         Status: s.status
                                     };
                                 });
-                                exportToExcel(data, `Salary_Disbursement_${month}`);
+                                exportToExcel(data, `Salary_Disbursement_${month}`, user);
                             }}
                             className="flex items-center gap-2 px-3 py-2 bg-dark-bg/50 border border-dark-border hover:bg-white/10 text-white rounded-lg transition-colors"
                             title="Export to Excel"

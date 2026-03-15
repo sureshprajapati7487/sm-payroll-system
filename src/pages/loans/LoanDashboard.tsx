@@ -310,7 +310,7 @@ export const LoanDashboard = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Request Form (Visible to All) */}
-                {(canManage || user?.role === 'EMPLOYEE') && (
+                {(canManage || hasPermission(PERMISSIONS.REQUEST_LOAN)) && (
                     <div className="glass p-6 rounded-2xl h-fit">
                         <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                             <Banknote className="w-5 h-5 text-warning" />

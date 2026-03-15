@@ -83,7 +83,7 @@ export const PayrollHistory = () => {
                 'Status': s.status
             };
         });
-        exportToExcel(data, `Payroll_Register_${selectedMonth}`);
+        exportToExcel(data, `Payroll_Register_${selectedMonth}`, user);
     };
 
     const handleExportPDF = () => {
@@ -92,7 +92,7 @@ export const PayrollHistory = () => {
             const emp = employees.find(e => e.id === s.employeeId);
             return { ...s, employeeId: emp?.name || s.employeeId } as any; // Hack: Using employeeId field to store Name for the generic utility
         });
-        exportPayrollToPDF(slipsWithNames, selectedMonth);
+        exportPayrollToPDF(slipsWithNames, selectedMonth, user);
     };
 
     return (

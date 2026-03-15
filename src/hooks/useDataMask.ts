@@ -14,6 +14,7 @@ export const useDataMask = () => {
     const { hasPermission } = useAuthStore();
 
     const canViewBank = hasPermission(PERMISSIONS.VIEW_EMPLOYEE_BANK);
+    const canViewFullBank = hasPermission(PERMISSIONS.VIEW_FULL_BANK_DETAILS);
     const canViewSalary = hasPermission(PERMISSIONS.VIEW_EMPLOYEE_SALARY);
     const canViewPersonal = hasPermission(PERMISSIONS.VIEW_EMPLOYEE_PERSONAL);
 
@@ -23,6 +24,7 @@ export const useDataMask = () => {
      */
     const maskAadhaar = (aadhaar?: string | null): string => {
         if (!aadhaar) return '—';
+        if (canViewFullBank) return aadhaar;
         if (!canViewPersonal) return '••••-••••-••••';
         const digits = aadhaar.replace(/\D/g, '');
         if (digits.length !== 12) return '••••-••••-••••';
@@ -35,6 +37,7 @@ export const useDataMask = () => {
      */
     const maskPAN = (pan?: string | null): string => {
         if (!pan) return '—';
+        if (canViewFullBank) return pan;
         if (!canViewPersonal) return '••••••••••';
         const clean = pan.trim().toUpperCase();
         if (clean.length !== 10) return '••••••••••';
@@ -48,6 +51,7 @@ export const useDataMask = () => {
      */
     const maskAccount = (accountNo?: string | null): string => {
         if (!accountNo) return '—';
+        if (canViewFullBank) return accountNo;
         const last4 = accountNo.slice(-4);
         if (!canViewBank) return '••••-••••-••••';
         return `••••-••••-${last4}`;
@@ -59,6 +63,7 @@ export const useDataMask = () => {
      */
     const maskIFSC = (ifsc?: string | null): string => {
         if (!ifsc) return '—';
+        if (canViewFullBank) return ifsc;
         if (!canViewBank) return `${(ifsc?.slice(0, 4) || '••••')}•••••••`;
         return ifsc;
     };
@@ -80,6 +85,7 @@ export const useDataMask = () => {
         maskIFSC,
         maskSalary,
         canViewBank,
+        canViewFullBank,
         canViewSalary,
         canViewPersonal,
     };

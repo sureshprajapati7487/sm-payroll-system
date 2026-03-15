@@ -175,7 +175,6 @@ const PUBLIC_PATHS = [
     { method: 'DELETE', path: '/api/health/errors' },
     { method: 'GET', path: '/api/health/deep' },
     { method: 'POST', path: '/api/status/errors/report' },
-    { method: 'GET', path: '/api/companies' },
     { method: 'POST', path: '/api/companies' },
     { method: 'GET', path: '/api/clients/export' },
     { method: 'GET', path: '/api/clients/demo-export' },
@@ -914,7 +913,14 @@ app.put('/api/auth/logout-password', async (req, res) => {
 
 // ── COMPANY ROUTES ────────────────────────────────────────────────────────────
 app.get('/api/companies', async (req, res) => {
-    try { res.json(await Company.findAll()); }
+    try {
+        if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+        if (req.user.role === 'SUPER_ADMIN') {
+            res.json(await Company.findAll());
+        } else {
+            res.json(await Company.findAll({ where: { id: req.user.companyId } }));
+        }
+    }
     catch (e) { addError(e, 'GET /api/companies'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 app.post('/api/companies', async (req, res) => {

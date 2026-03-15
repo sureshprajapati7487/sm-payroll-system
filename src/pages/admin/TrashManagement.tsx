@@ -3,6 +3,7 @@ import { Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { useDialog } from '@/components/DialogProvider';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/config/permissions';
+import { ReasonConfirmModal } from '@/components/ReasonConfirmModal';
 
 interface TrashItem {
     id: string;
@@ -26,7 +27,7 @@ export const TrashManagement = () => {
             isDeleted: true
         }
     ]);
-    const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, step: number } | null>(null);
+    const [deleteConfirmItem, setDeleteConfirmItem] = useState<TrashItem | null>(null);
     const { toast } = useDialog();
 
     const { hasPermission } = useAuthStore();
@@ -40,18 +41,6 @@ export const TrashManagement = () => {
             item.id === id ? { ...item, isDeleted: false } : item
         ));
         toast('Item successfully restore ho gaya!', 'success');
-    };
-
-    const handlePermanentDelete = (id: string) => {
-        if (deleteConfirm?.id === id && deleteConfirm.step === 3) {
-            setItems(items.filter(item => item.id !== id));
-            setDeleteConfirm(null);
-            toast('Item permanently delete ho gaya!', 'warning');
-        } else if (deleteConfirm?.id === id) {
-            setDeleteConfirm({ id, step: deleteConfirm.step + 1 });
-        } else {
-            setDeleteConfirm({ id, step: 1 });
-        }
     };
 
     const getDaysRemaining = (deletedAt: string) => {
@@ -125,7 +114,6 @@ export const TrashManagement = () => {
                             <tbody>
                                 {filteredItems.map((item) => {
                                     const daysLeft = getDaysRemaining(item.deletedAt);
-                                    const isConfirming = deleteConfirm?.id === item.id;
 
                                     return (
                                         <tr key={item.id} className="border-b border-dark-border hover:bg-white/5">
@@ -158,17 +146,11 @@ export const TrashManagement = () => {
 
                                                     {canManageTrash && (
                                                         <button
-                                                            onClick={() => handlePermanentDelete(item.id)}
-                                                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition-all ${isConfirming
-                                                                ? 'bg-red-500 text-white'
-                                                                : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
-                                                                }`}
+                                                            onClick={() => setDeleteConfirmItem(item)}
+                                                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm transition-all bg-red-500/20 hover:bg-red-500/30 text-red-400"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
-                                                            {isConfirming
-                                                                ? `Click ${4 - deleteConfirm.step} more time${deleteConfirm.step < 3 ? 's' : ''}`
-                                                                : 'Delete Forever'
-                                                            }
+                                                            Delete Forever
                                                         </button>
                                                     )}
                                                 </div>
@@ -194,6 +176,24 @@ export const TrashManagement = () => {
                     </div>
                 </div>
             </div>
+
+            <ReasonConfirmModal
+                isOpen={!!deleteConfirmItem}
+                onClose={() => setDeleteConfirmItem(null)}
+                title="Confirm Permanent Deletion"
+                description={`You are about to permanently delete "${deleteConfirmItem?.name}" from the trash. This action CANNOT be undone.`}
+                actionLabel="Delete Permanently"
+                actionVariant="danger"
+                matchText={deleteConfirmItem ? `DELETE ${deleteConfirmItem.name}` : undefined}
+                onConfirm={(reason) => {
+                    if (deleteConfirmItem) {
+                        console.log(`Permanently deleted ${deleteConfirmItem.id} for reason: ${reason}`);
+                        setItems(items.filter(item => item.id !== deleteConfirmItem.id));
+                        setDeleteConfirmItem(null);
+                        toast('Item permanently delete ho gaya!', 'warning');
+                    }
+                }}
+            />
         </div>
     );
 };

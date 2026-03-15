@@ -37,6 +37,7 @@ export const PERMISSIONS = {
     VIEW_EMPLOYEE_DOCUMENTS: 'view_employee_documents',
     VIEW_EMPLOYEE_SALARY: 'view_employee_salary',     // Salary column in list
     VIEW_EMPLOYEE_BANK: 'view_employee_bank',          // Bank/Aadhaar/PAN
+    VIEW_FULL_BANK_DETAILS: 'view_full_bank_details',  // View unmasked Bank/Aadhaar/PAN
     EXPORT_EMPLOYEES: 'export_employees',
 
     // ── Self / Own Profile ────────────────────────────────────────────────
@@ -386,8 +387,6 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionValue[]> = {
 
         // Employees (team only — scope enforced in component)
         PERMISSIONS.VIEW_EMPLOYEES,
-        PERMISSIONS.ADD_EMPLOYEE,
-        PERMISSIONS.EDIT_EMPLOYEE,
         PERMISSIONS.VIEW_EMPLOYEE_PERSONAL,
         PERMISSIONS.VIEW_EMPLOYEE_DOCUMENTS,
 

@@ -17,6 +17,7 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { notificationService } from '@/utils/notificationService';
 import { AuditLogDrawer } from '@/components/AuditLogDrawer';
 import { LogoutConfirmModal } from '@/components/LogoutConfirmModal';
+import { ImpersonationBanner } from '@/components/ui/ImpersonationBanner';
 import { useTranslation } from 'react-i18next';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -361,9 +362,13 @@ export const DashboardLayout = () => {
 
     return (
         <div className="min-h-screen bg-dark-bg text-dark-text flex font-sans">
+            <ImpersonationBanner />
 
             {/* ── Desktop Sidebar ──────────────────────────────────────────── */}
-            <aside className="hidden md:flex w-[220px] flex-col bg-dark-card border-r border-dark-border fixed h-full z-10">
+            <aside className={cn(
+                "hidden md:flex w-[220px] flex-col bg-dark-card border-r border-dark-border fixed h-full z-10 transition-all duration-300",
+                useAuthStore.getState().impersonatedRole ? "top-10" : "top-0"
+            )}>
                 {renderSidebarContent()}
             </aside>
 
@@ -441,9 +446,15 @@ export const DashboardLayout = () => {
             </AnimatePresence>
 
             {/* ── Main Content ─────────────────────────────────────────────── */}
-            <main className="flex-1 md:ml-[220px] relative">
+            <main className={cn(
+                "flex-1 md:ml-[220px] relative transition-all duration-300",
+                useAuthStore.getState().impersonatedRole ? "mt-10" : "mt-0"
+            )}>
                 {/* Mobile sticky header */}
-                <div className="md:hidden flex items-center justify-between px-4 py-3 bg-dark-card border-b border-dark-border sticky top-0 z-20">
+                <div className={cn(
+                    "md:hidden flex items-center justify-between px-4 py-3 bg-dark-card border-b border-dark-border sticky z-20",
+                    useAuthStore.getState().impersonatedRole ? "top-10" : "top-0"
+                )}>
                     <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-violet-600 flex items-center justify-center shadow-md shadow-primary-500/30">
                             <ShieldAlert className="text-white w-4 h-4" />

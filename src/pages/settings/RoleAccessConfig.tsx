@@ -15,6 +15,10 @@ import { Roles, Role } from '@/types';
 import type { PermissionValue } from '@/config/permissions';
 import { WarningModal } from '@/components/ui/WarningModal';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { useAuditStore } from '@/store/auditStore';
+import { useNavigate } from 'react-router-dom';
+import { useDialog } from '@/components/DialogProvider';
+import { useSecurityAlerts } from '@/hooks/useSecurityAlerts';
 
 // ─── Permission Groups with full hierarchy ────────────────────────────────────
 const PERMISSION_GROUPS: {
@@ -395,10 +399,63 @@ const EDITABLE_ROLES: { role: Role; label: string; emoji: string; gradFrom: stri
     { role: Roles.EMPLOYEE, label: 'Employee', emoji: '👤', gradFrom: 'from-slate-600', gradTo: 'to-slate-800', ring: 'ring-slate-400' },
 ];
 
+// ─── Quick Presets ───────────────────────────────────────────────────────────
+const PRESETS: { id: string; label: string; icon: React.ReactNode; scope: DataScope; color: string; border: string; bg: string; perms: string[] }[] = [
+    {
+        id: 'preset:factory', label: 'Factory Floor Manager', icon: <Factory className="w-5 h-5" />, scope: 'TEAM', color: 'text-amber-400', border: 'border-amber-500/30 hover:border-amber-500/60', bg: 'bg-amber-500/10 hover:bg-amber-500/20',
+        perms: [
+            PERMISSIONS.NAV_DASHBOARD, PERMISSIONS.NAV_ATTENDANCE, PERMISSIONS.NAV_PRODUCTION, PERMISSIONS.NAV_EMPLOYEES,
+            PERMISSIONS.VIEW_EMPLOYEES, PERMISSIONS.VIEW_EMPLOYEE_PERSONAL, PERMISSIONS.VIEW_OWN_PROFILE,
+            PERMISSIONS.VIEW_ATTENDANCE, PERMISSIONS.APPROVE_ATTENDANCE, PERMISSIONS.MANUAL_ATTENDANCE, PERMISSIONS.ADD_MANUAL_PUNCH, PERMISSIONS.VIEW_TEAM_ATTENDANCE, PERMISSIONS.USE_FACE_KIOSK,
+            PERMISSIONS.MARK_OWN_ATTENDANCE, PERMISSIONS.VIEW_OWN_ATTENDANCE, PERMISSIONS.REQUEST_REGULARIZATION,
+            PERMISSIONS.VIEW_PRODUCTION, PERMISSIONS.ADD_PRODUCTION, PERMISSIONS.APPROVE_PRODUCTION, PERMISSIONS.VIEW_PRODUCTION_REPORTS
+        ]
+    },
+    {
+        id: 'preset:hr', label: 'HR Executive', icon: <Users className="w-5 h-5" />, scope: 'ALL', color: 'text-blue-400', border: 'border-blue-500/30 hover:border-blue-500/60', bg: 'bg-blue-500/10 hover:bg-blue-500/20',
+        perms: [
+            PERMISSIONS.NAV_DASHBOARD, PERMISSIONS.NAV_EMPLOYEES, PERMISSIONS.NAV_ATTENDANCE, PERMISSIONS.NAV_LEAVES, PERMISSIONS.NAV_APPROVALS,
+            PERMISSIONS.VIEW_EMPLOYEES, PERMISSIONS.ADD_EMPLOYEE, PERMISSIONS.EDIT_EMPLOYEE, PERMISSIONS.VIEW_EMPLOYEE_PERSONAL, PERMISSIONS.VIEW_EMPLOYEE_DOCUMENTS, PERMISSIONS.EXPORT_EMPLOYEES,
+            PERMISSIONS.VIEW_OWN_PROFILE, PERMISSIONS.UPDATE_OWN_PROFILE, PERMISSIONS.UPLOAD_OWN_DOCUMENTS,
+            PERMISSIONS.VIEW_ATTENDANCE, PERMISSIONS.EDIT_ATTENDANCE, PERMISSIONS.MANAGE_HOLIDAYS, PERMISSIONS.VIEW_ATTENDANCE_REPORTS,
+            PERMISSIONS.MARK_OWN_ATTENDANCE, PERMISSIONS.VIEW_OWN_ATTENDANCE, PERMISSIONS.REQUEST_REGULARIZATION,
+            PERMISSIONS.VIEW_LEAVES, PERMISSIONS.APPROVE_LEAVES, PERMISSIONS.MANAGE_LEAVES, PERMISSIONS.VIEW_ALL_LEAVES, PERMISSIONS.MANAGE_LEAVE_BALANCE,
+            PERMISSIONS.VIEW_APPROVALS, PERMISSIONS.PROCESS_APPROVALS
+        ]
+    },
+    {
+        id: 'preset:accountant', label: 'Accountant', icon: <Banknote className="w-5 h-5" />, scope: 'ALL', color: 'text-emerald-400', border: 'border-emerald-500/30 hover:border-emerald-500/60', bg: 'bg-emerald-500/10 hover:bg-emerald-500/20',
+        perms: [
+            PERMISSIONS.NAV_DASHBOARD, PERMISSIONS.NAV_PAYROLL, PERMISSIONS.NAV_EXPENSES, PERMISSIONS.NAV_FINANCE, PERMISSIONS.NAV_LOANS, PERMISSIONS.NAV_CALCULATORS, PERMISSIONS.NAV_REPORTS, PERMISSIONS.NAV_STATUTORY,
+            PERMISSIONS.VIEW_PAYROLL, PERMISSIONS.GENERATE_PAYROLL, PERMISSIONS.APPROVE_PAYROLL, PERMISSIONS.RUN_PAYROLL_SIMULATION, PERMISSIONS.VIEW_ALL_PAYSLIPS, PERMISSIONS.VIEW_SALARY,
+            PERMISSIONS.VIEW_FINANCE_DASHBOARD, PERMISSIONS.VIEW_DEPT_FINANCE, PERMISSIONS.VIEW_COST_CENTERS, PERMISSIONS.MANAGE_EXPENSES, PERMISSIONS.MANAGE_ADVANCE_SALARY,
+            PERMISSIONS.VIEW_OWN_EXPENSES, PERMISSIONS.SUBMIT_EXPENSE, PERMISSIONS.REQUEST_ADVANCE_SALARY,
+            PERMISSIONS.VIEW_ALL_LOANS, PERMISSIONS.MANAGE_LOANS, PERMISSIONS.APPROVE_LOANS,
+            PERMISSIONS.VIEW_REPORTS, PERMISSIONS.BUILD_REPORTS, PERMISSIONS.EXPORT_REPORTS, PERMISSIONS.SCHEDULE_REPORTS,
+            PERMISSIONS.VIEW_STATUTORY, PERMISSIONS.MANAGE_STATUTORY, PERMISSIONS.VIEW_FORM16,
+            PERMISSIONS.USE_CALCULATORS, PERMISSIONS.VIEW_EMPLOYEES, PERMISSIONS.VIEW_EMPLOYEE_FINANCIALS, PERMISSIONS.VIEW_EMPLOYEE_BANK, PERMISSIONS.EDIT_EMPLOYEE_FINANCIALS
+        ]
+    },
+    {
+        id: 'preset:sales', label: 'Sales Rep', icon: <ShoppingBag className="w-5 h-5" />, scope: 'OWN', color: 'text-rose-400', border: 'border-rose-500/30 hover:border-rose-500/60', bg: 'bg-rose-500/10 hover:bg-rose-500/20',
+        perms: [
+            PERMISSIONS.NAV_DASHBOARD, PERMISSIONS.NAV_SALESMAN, PERMISSIONS.VIEW_SALESMAN, PERMISSIONS.VIEW_CLIENTS,
+            PERMISSIONS.VIEW_OWN_PROFILE, PERMISSIONS.UPDATE_OWN_PROFILE, PERMISSIONS.MARK_OWN_ATTENDANCE, PERMISSIONS.VIEW_OWN_ATTENDANCE,
+            PERMISSIONS.REQUEST_REGULARIZATION, PERMISSIONS.VIEW_PAYSLIP, PERMISSIONS.VIEW_OWN_LOANS, PERMISSIONS.REQUEST_LOAN,
+            PERMISSIONS.REQUEST_LEAVES, PERMISSIONS.VIEW_OWN_EXPENSES, PERMISSIONS.SUBMIT_EXPENSE, PERMISSIONS.REQUEST_ADVANCE_SALARY,
+            PERMISSIONS.VIEW_OWN_REPORTS, PERMISSIONS.VIEW_ANNOUNCEMENTS
+        ]
+    }
+];
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export const RoleAccessConfig = () => {
     const { user } = useAuthStore();
     const { permissions, scopes, setPermissions, resetRole, resetAll, _hydrated } = useRolePermissionsStore();
+    const { addLog } = useAuditStore();
+    const navigate = useNavigate();
+    const { toast } = useDialog();
+    const { alertRoleChange } = useSecurityAlerts();
 
     // ── Draft state: local copy of permissions/scopes before Save ──────────────
     const [draftPerms, setDraftPerms] = useState<Record<string, string[]>>(() => {
@@ -477,12 +534,74 @@ export const RoleAccessConfig = () => {
     const saveChanges = () => {
         const permsToSave: Record<string, PermissionValue[]> = {};
         const scopesToSave: Record<string, DataScope> = {};
+
+        let hasChanges = false;
+        const details: any = {};
+        let hasDangerousChanges = false;
+
+        const isDanger = (pKey: string) => {
+            for (const group of PERMISSION_GROUPS) {
+                for (const sg of group.subGroups) {
+                    const perm = sg.permissions.find(p => p.key === pKey);
+                    if (perm) return !!perm.danger;
+                }
+            }
+            return false;
+        };
+
         EDITABLE_ROLES.forEach(({ role }) => {
-            permsToSave[role] = (draftPerms[role] ?? []) as PermissionValue[];
-            scopesToSave[role] = draftScopes[role] ?? scopes[role] ?? 'ALL';
+            const newPerms = (draftPerms[role] ?? []) as PermissionValue[];
+            const newScope = draftScopes[role] ?? scopes[role] ?? 'ALL';
+
+            permsToSave[role] = newPerms;
+            scopesToSave[role] = newScope;
+
+            const oldPerms = permissions[role] ?? [];
+            const oldScope = scopes[role] ?? 'ALL';
+
+            const added = newPerms.filter(p => !oldPerms.includes(p));
+            const removed = oldPerms.filter(p => !newPerms.includes(p));
+
+            if (added.length > 0 || removed.length > 0 || oldScope !== newScope) {
+                hasChanges = true;
+                details[role] = {};
+                if (added.length > 0) details[role].added = added;
+                if (removed.length > 0) details[role].removed = removed;
+                if (oldScope !== newScope) details[role].scope = { from: oldScope, to: newScope };
+
+                if (added.some(isDanger) || removed.some(isDanger)) {
+                    hasDangerousChanges = true;
+                }
+
+                // Fire Security Alert for the role modification
+                alertRoleChange(role, added.length, removed.length);
+            }
         });
+
         setPermissions(permsToSave as any, scopesToSave as any);
         setSavedAt(new Date().toLocaleTimeString());
+
+        if (hasChanges && user) {
+            addLog({
+                userId: user.id || 'system',
+                userName: user.name || 'Super Admin',
+                userRole: user.role,
+                action: 'PERMISSION_CHANGE',
+                entityType: 'SETTINGS',
+                entityId: 'role-permissions',
+                entityName: 'Role Permissions & Scopes',
+                details,
+                ipAddress: '127.0.0.1',
+                userAgent: navigator.userAgent,
+                status: 'SUCCESS'
+            });
+
+            if (hasDangerousChanges) {
+                toast('Sensitive permissions were modified! An audit log has been generated.', 'warning');
+            } else {
+                toast('Permissions saved successfully.', 'success');
+            }
+        }
     };
 
     // ── Discard: restore draft from persisted store ──────────────────────────
@@ -574,16 +693,30 @@ export const RoleAccessConfig = () => {
                         Super Admin controls — decide exactly what each role can see and do.
                     </p>
                 </div>
-                <button
-                    onClick={() => setWarning({
-                        isOpen: true, title: 'Reset ALL Roles?',
-                        message: 'This will reset every role back to factory defaults. All customizations will be lost.',
-                        onConfirm: () => handleResetAll(),
-                    })}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-sm font-medium transition-all border border-red-500/30 shrink-0"
-                >
-                    <RotateCcw className="w-4 h-4" /> Reset All Roles
-                </button>
+                <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
+                    <button
+                        onClick={() => useAuthStore.getState().setImpersonatedRole(selectedRole)}
+                        className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-xl text-sm font-bold transition-all border border-amber-500/30 shadow-lg shadow-amber-500/10"
+                    >
+                        <Eye className="w-4 h-4" /> Preview as {activeRoleMeta.label}
+                    </button>
+                    <button
+                        onClick={() => navigate('/admin/audit-logs?filter=permissions')}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-medium transition-all border border-slate-700"
+                    >
+                        <ShieldCheck className="w-4 h-4 text-yellow-400" /> Permission History
+                    </button>
+                    <button
+                        onClick={() => setWarning({
+                            isOpen: true, title: 'Reset ALL Roles?',
+                            message: 'This will reset every role back to factory defaults. All customizations will be lost.',
+                            onConfirm: () => handleResetAll(),
+                        })}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-sm font-medium transition-all border border-red-500/30"
+                    >
+                        <RotateCcw className="w-4 h-4" /> Reset All Roles
+                    </button>
+                </div>
             </div>
 
             {/* Role Selector Cards */}
@@ -621,6 +754,50 @@ export const RoleAccessConfig = () => {
                         </button>
                     );
                 })}
+            </div>
+
+            {/* Quick Presets */}
+            <div className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-5">
+                <div className="mb-4">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <Zap className="w-5 h-5 text-amber-400" />
+                        Quick Presets
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                        Apply pre-configured templates for <strong>{activeRoleMeta.label}</strong>
+                    </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {PRESETS.map((preset) => (
+                        <button
+                            key={preset.id}
+                            onClick={() => {
+                                setWarning({
+                                    isOpen: true,
+                                    title: `Apply ${preset.label}?`,
+                                    message: `This will overwrite current draft permissions and set visibility to ${preset.scope} for the ${activeRoleMeta.label} role.`,
+                                    onConfirm: () => {
+                                        setDraftPerms(prev => ({ ...prev, [selectedRole]: preset.perms }));
+                                        setDraftScopes(prev => ({ ...prev, [selectedRole]: preset.scope }));
+                                        toast(`Applied ${preset.label} preset to draft.`, 'success');
+                                    }
+                                });
+                            }}
+                            className={`flex flex-col gap-3 p-4 rounded-xl border transition-all text-left bg-slate-900/50 hover:-translate-y-0.5 ${preset.border} ${preset.bg}`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center ${preset.color}`}>
+                                    {preset.icon}
+                                </div>
+                                <div className="font-bold text-sm text-white">{preset.label}</div>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
+                                <span className="bg-slate-800 border border-slate-700 px-2 py-1 rounded-md">{preset.perms.length} perms</span>
+                                <span className="bg-slate-800 border border-slate-700 px-2 py-1 rounded-md text-[10px] uppercase tracking-wider">{preset.scope} Data</span>
+                            </div>
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Data Visibility Level */}

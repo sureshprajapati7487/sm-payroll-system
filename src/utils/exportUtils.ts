@@ -2,15 +2,37 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { LoanRecord as Loan } from '@/types';
+import { useSecurityAlertsStore } from '@/store/securityAlertsStore';
 
-export const exportToExcel = (data: any[], fileName: string) => {
+export const exportToExcel = (data: any[], fileName: string, user?: any) => {
     const ws = XLSX.utils.json_to_sheet(data);
+
+    if (user) {
+        XLSX.utils.sheet_add_aoa(ws, [
+            [],
+            [`CONFIDENTIAL — ${user.role || 'System'} DATA`],
+            [`Downloaded by ${user.name || 'Automated'} (${user.id || 'System'}) on ${new Date().toLocaleString()}`]
+        ], { origin: -1 });
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
     XLSX.writeFile(wb, `${fileName}.xlsx`);
+
+    if (user) {
+        useSecurityAlertsStore.getState().addAlert({
+            type: 'data_export',
+            severity: 'low',
+            title: `Data Export: ${fileName}`,
+            description: `${user.name || 'System'} exported ${data.length} records to Excel.`,
+            userId: user.id || 'system',
+            userName: user.name || 'System',
+            metadata: { fileName, recordCount: data.length, format: 'excel' }
+        });
+    }
 };
 
-export const exportPayrollToPDF = (slips: any[], period: string) => {
+export const exportPayrollToPDF = (slips: any[], period: string, user?: any) => {
     const doc = new jsPDF();
 
     // Header
@@ -57,11 +79,30 @@ export const exportPayrollToPDF = (slips: any[], period: string) => {
     doc.setFontSize(12);
     doc.text(`Total Payout: Rs. ${totalPayout.toLocaleString()}`, 14, finalY);
 
+    if (user) {
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        const pageHeight = doc.internal.pageSize.height || doc.internal.pageSize.getHeight();
+        doc.text(`CONFIDENTIAL — ${user.role || 'System'} DATA | Downloaded by ${user.name} on ${new Date().toLocaleString()}`, 14, pageHeight - 10);
+    }
+
     doc.save(`Payroll_Register_${period}.pdf`);
+
+    if (user) {
+        useSecurityAlertsStore.getState().addAlert({
+            type: 'data_export',
+            severity: 'low',
+            title: `Payroll Exported: ${period}`,
+            description: `${user.name || 'System'} exported payroll register for ${period} to PDF.`,
+            userId: user.id || 'system',
+            userName: user.name || 'System',
+            metadata: { period, recordCount: slips.length, format: 'pdf' }
+        });
+    }
 };
 
 
-export const exportLoansToPDF = (loans: Loan[], employees: any[]) => {
+export const exportLoansToPDF = (loans: Loan[], employees: any[], user?: any) => {
     const doc = new jsPDF();
 
     // Header
@@ -103,7 +144,26 @@ export const exportLoansToPDF = (loans: Loan[], employees: any[]) => {
     doc.setFontSize(12);
     doc.text(`Total Outstanding Balance: Rs. ${totalOutstanding.toLocaleString()}`, 14, finalY);
 
+    if (user) {
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        const pageHeight = doc.internal.pageSize.height || doc.internal.pageSize.getHeight();
+        doc.text(`CONFIDENTIAL — ${user.role || 'System'} DATA | Downloaded by ${user.name} on ${new Date().toLocaleString()}`, 14, pageHeight - 10);
+    }
+
     doc.save(`Loan_Summary_${new Date().toISOString().split('T')[0]}.pdf`);
+
+    if (user) {
+        useSecurityAlertsStore.getState().addAlert({
+            type: 'data_export',
+            severity: 'low',
+            title: `Loan Summary Exported`,
+            description: `${user.name || 'System'} exported loan summary to PDF.`,
+            userId: user.id || 'system',
+            userName: user.name || 'System',
+            metadata: { recordCount: loans.length, format: 'pdf' }
+        });
+    }
 };
 
 export const exportEmployeePayoutToExcel = (
@@ -111,7 +171,8 @@ export const exportEmployeePayoutToExcel = (
     month: string,
     salaryDetails: any,
     attendanceRecords: any[],
-    activeLoans: any[]
+    activeLoans: any[],
+    user?: any
 ) => {
     const wb = XLSX.utils.book_new();
     const sheetData: any[][] = [];
@@ -170,6 +231,12 @@ export const exportEmployeePayoutToExcel = (
         ]);
     });
 
+    if (user) {
+        sheetData.push(['']);
+        sheetData.push([`CONFIDENTIAL — ${user.role || 'System'} DATA`]);
+        sheetData.push([`Downloaded by ${user.name || 'Automated'} (${user.id || 'System'}) on ${new Date().toLocaleString()}`]);
+    }
+
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
     // Column Widths
@@ -177,4 +244,16 @@ export const exportEmployeePayoutToExcel = (
 
     XLSX.utils.book_append_sheet(wb, ws, 'Payout_Slip');
     XLSX.writeFile(wb, `${employee.name}_Payout_${month}.xlsx`);
+
+    if (user) {
+        useSecurityAlertsStore.getState().addAlert({
+            type: 'data_export',
+            severity: 'low',
+            title: `Employee Payout Exported`,
+            description: `${user.name || 'System'} exported payout slip for ${employee.name} (${month}) to Excel.`,
+            userId: user.id || 'system',
+            userName: user.name || 'System',
+            metadata: { employeeName: employee.name, month, format: 'excel' }
+        });
+    }
 };

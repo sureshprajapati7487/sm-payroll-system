@@ -97,13 +97,22 @@ const useInternalLoanStore = create<LoanState>()(
                     }],
                     skippedMonths: [],
                     allowedSkips: 2,
-                    settlementRequest: null,
                     // Workflow initialisation
                     ...(() => {
                         const activeWorkflow = useWorkflowStore.getState().getWorkflowByModule('loan');
-                        if (!activeWorkflow || activeWorkflow.steps.length === 0) return {};
+
+                        let steps = activeWorkflow?.steps;
+
+                        // 🛡️ Fallback to structural L1->L2 workflow if none exists
+                        if (!steps || steps.length === 0) {
+                            steps = [
+                                { id: 'l1', roleId: 'MANAGER', roleName: 'L1 Checker', stepOrder: 1 },
+                                { id: 'l2', roleId: 'ACCOUNT_ADMIN', roleName: 'L2 Approver', stepOrder: 2 },
+                            ];
+                        }
+
                         return {
-                            workflowApprovals: activeWorkflow.steps.map(step => ({
+                            workflowApprovals: steps.map(step => ({
                                 stepId: step.id,
                                 roleId: step.roleId,
                                 roleName: step.roleName,
@@ -180,13 +189,20 @@ const useInternalLoanStore = create<LoanState>()(
                         );
                         const totalOutstandingBalance = allEmployeeLoans.reduce((sum, l) => sum + l.balance, 0);
 
-                        useNotificationStore.getState().addNotification({
+                        const notifId = useNotificationStore.getState().addNotification({
+                            // ── Routing ─────────────────────────────────────────
+                            type: (await import('@/types')).NotificationType.LOAN_APPROVAL,
+                            targetUserIds: [newLoan.approverId as string],
+                            // ── Display ─────────────────────────────────────────
+                            title: `Loan Request — ${employee.name}`,
+                            message: `${employee.code} has requested ₹${newLoan.amount.toLocaleString('en-IN')} (${newLoan.type.replace('_', ' ')}) for ${newLoan.tenureMonths} months.`,
+                            // ── Legacy fields for LoanApprovalModal ─────────────
                             loanId: newLoan.id,
                             employeeId: newLoan.employeeId,
                             employeeName: employee.name,
                             employeeCode: employee.code,
                             amount: newLoan.amount,
-                            balance: totalOutstandingBalance, // ✅ TOTAL of all ACTIVE loans
+                            balance: totalOutstandingBalance,
                             emiAmount: newLoan.emiAmount,
                             tenureMonths: newLoan.tenureMonths,
                             loanType: newLoan.type,
@@ -195,12 +211,10 @@ const useInternalLoanStore = create<LoanState>()(
                             currentSalary: currentSalary,
                             workedDays: workedDays,
                             perDayRate: perDayRate,
-                            workInMonth: workInMonth, // ✅ Basic + OT only
+                            workInMonth: workInMonth,
                         });
                         sendLoanApprovalNotification(employee.name, newLoan.amount, newLoan.id);
-                        useNotificationStore.getState().setActiveNotification(
-                            useNotificationStore.getState().notifications[useNotificationStore.getState().notifications.length - 1]?.id
-                        );
+                        useNotificationStore.getState().setActiveNotification(notifId);
                     }
                 }
             },

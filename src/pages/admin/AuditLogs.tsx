@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { useAuditStore } from '@/store/auditStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
+import { useAuthStore } from '@/store/authStore';
+import { useDeviceType } from '@/hooks/useDeviceType';
 import { AuditLog, AuditAction } from '@/types/audit';
 
 // ── Action categories with colors ──────────────────────────────────────────
@@ -59,6 +61,8 @@ const ALL_ACTIONS: Array<AuditAction | ''> = [
 export const AuditLogs = () => {
     const { logs, isFetching, totalCount, fetchLogs, getLogs } = useAuditStore();
     const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
+    const user = useAuthStore(s => s.user);
+    const { isMobile } = useDeviceType();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterAction, setFilterAction] = useState<AuditAction | ''>('');
@@ -91,6 +95,16 @@ export const AuditLogs = () => {
     }, [fetchLogs, currentCompanyId, filterAction, filterStatus, filterEntity, startDate, endDate, page]);
 
     useEffect(() => { loadLogs(); }, [loadLogs]);
+
+    // Handle incoming filter=permissions link
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('filter') === 'permissions') {
+            setFilterAction('PERMISSION_CHANGE');
+            setFilterEntity('SETTINGS');
+            setShowFilters(true);
+        }
+    }, []);
 
     // Local filtering (for search + when backend unavailable)
     const baseSource = isBackendMode ? logs : getLogs({ action: filterAction || undefined, startDate, endDate });
@@ -138,14 +152,20 @@ export const AuditLogs = () => {
 
     // ── CSV Export ────────────────────────────────────────────────────────
     const exportCSV = () => {
-        const csv = [
-            ['Timestamp', 'User', 'Role', 'Action', 'Entity', 'Entity Name', 'Status', 'IP Address'].join(','),
-            ...filteredLogs.map(l => [
-                l.timestamp, l.userName, l.userRole, l.action,
-                l.entityType, l.entityName || '', l.status, l.ipAddress || ''
-            ].map(v => `"${v}"`).join(','))
-        ].join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
+        const headers = ['Timestamp', 'User', 'Role', 'Action', 'Entity', 'Entity Name', 'Status', 'IP Address'].join(',');
+        const rows = filteredLogs.map(l => [
+            l.timestamp, l.userName, l.userRole, l.action,
+            l.entityType, l.entityName || '', l.status, l.ipAddress || ''
+        ].map(v => `"${v}"`).join(','));
+        const footerInfo = [
+            '',
+            `"CONFIDENTIAL \— ${user?.role || 'System'} DATA"`,
+            `"Downloaded by ${user?.name || 'Automated'} (${user?.id || 'System'}) on ${new Date().toLocaleString()}"`
+        ];
+        const csv = [headers, ...rows, ...footerInfo].join('\n');
+
+        const bom = '\uFEFF';
+        const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = `audit_logs_${new Date().toISOString().slice(0, 10)}.csv`;
@@ -204,8 +224,27 @@ export const AuditLogs = () => {
                         Refresh
                     </button>
                     <button
+                        onClick={() => {
+                            setFilterAction('PERMISSION_CHANGE');
+                            setFilterEntity('SETTINGS');
+                            setShowFilters(true);
+                            setPage(1);
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 rounded-xl transition-all text-sm font-medium"
+                    >
+                        <ShieldCheck className="w-4 h-4" />
+                        Permission History
+                    </button>
+                    <button
                         onClick={exportCSV}
-                        className="flex items-center gap-2 px-4 py-2 bg-primary-500/20 hover:bg-primary-500/30 text-primary-400 rounded-xl transition-all text-sm font-medium"
+                        disabled={isMobile}
+                        title={isMobile ? "Export available on Desktop only" : "Download as CSV"}
+                        className={clsx(
+                            "flex items-center gap-2 px-4 py-2 rounded-xl transition-all text-sm font-medium",
+                            isMobile
+                                ? "bg-dark-border/30 text-dark-muted cursor-not-allowed"
+                                : "bg-primary-500/20 hover:bg-primary-500/30 text-primary-400"
+                        )}
                     >
                         <Download className="w-4 h-4" />
                         Export CSV

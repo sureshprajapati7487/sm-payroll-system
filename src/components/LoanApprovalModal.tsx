@@ -4,11 +4,13 @@ import { useNotificationStore } from '@/store/notificationStore';
 import { useLoanStore } from '@/store/loanStore';
 import { useAuthStore } from '@/store/authStore';
 import { useEmployeeStore } from '@/store/employeeStore';
+import { useRolePermissionsStore } from '@/store/rolePermissionsStore';
 import { LoanNotification } from '@/types';
 import { sendLoanApprovalWhatsApp, sendLoanRejectionWhatsApp } from '@/utils/whatsappService';
 
 export const LoanApprovalModal = () => {
     const { user } = useAuthStore();
+    const { permissions } = useRolePermissionsStore();
     const { notifications, activeNotificationId, setActiveNotification, markAsRead, clearNotification, getNotificationsForUser } = useNotificationStore();
     const { approveLoan, rejectLoan, loans } = useLoanStore();
     const { employees } = useEmployeeStore();
@@ -20,12 +22,11 @@ export const LoanApprovalModal = () => {
     // Get pending notifications for current user
     useEffect(() => {
         if (!user) return;
-
-        const userNotifications = getNotificationsForUser(user.id);
-        const unreadNotifications = userNotifications.filter(n => !n.isRead);
+        const userPerms: string[] = permissions[user.role] ?? [];
+        const userNotifications = getNotificationsForUser(user.id, user.role, userPerms);
+        const unreadNotifications = userNotifications.filter(n => !n.isRead && !!n.loanId);
 
         if (unreadNotifications.length > 0) {
-            // If there's no active notification, set the first unread one
             if (!activeNotificationId) {
                 setActiveNotification(unreadNotifications[0].id);
             }
@@ -47,7 +48,7 @@ export const LoanApprovalModal = () => {
         setActionLoading(true);
         try {
             setSavedNotification(currentNotification);
-            approveLoan(currentNotification.loanId);
+            approveLoan(currentNotification.loanId ?? '');
             markAsRead(currentNotification.id);
             clearNotification(currentNotification.id);
             setLastAction('approved');
@@ -63,7 +64,7 @@ export const LoanApprovalModal = () => {
         setActionLoading(true);
         try {
             setSavedNotification(currentNotification);
-            rejectLoan(currentNotification.loanId);
+            rejectLoan(currentNotification.loanId ?? '');
             markAsRead(currentNotification.id);
             clearNotification(currentNotification.id);
             setLastAction('rejected');
@@ -92,9 +93,9 @@ export const LoanApprovalModal = () => {
 
     const showNextNotification = () => {
         if (!user) return;
-
-        const userNotifications = getNotificationsForUser(user.id);
-        const unreadNotifications = userNotifications.filter(n => !n.isRead && n.id !== currentNotification?.id);
+        const userPerms: string[] = permissions[user.role] ?? [];
+        const userNotifications = getNotificationsForUser(user.id, user.role, userPerms);
+        const unreadNotifications = userNotifications.filter(n => !n.isRead && n.id !== currentNotification?.id && !!n.loanId);
 
         if (unreadNotifications.length > 0) {
             setActiveNotification(unreadNotifications[0].id);
@@ -170,7 +171,7 @@ export const LoanApprovalModal = () => {
                             <IndianRupee className="w-4 h-4 text-green-400" />
                             <span className="text-xs font-medium text-green-400">Naya Loan</span>
                         </div>
-                        <p className="text-2xl font-bold text-white">{formatCurrency(notif.amount)}</p>
+                        <p className="text-2xl font-bold text-white">{formatCurrency(notif.amount ?? 0)}</p>
                         <p className="text-xs text-dark-muted mt-1">Is request me sanction hone wala amount</p>
                     </div>
 
@@ -181,11 +182,11 @@ export const LoanApprovalModal = () => {
                             <span className="text-xs font-medium text-orange-400">Chal Raha Loan (Outstanding)</span>
                         </div>
                         <p className="text-2xl font-bold text-white">
-                            {formatCurrency(notif.balance + notif.amount)}
+                            {formatCurrency((notif.balance ?? 0) + (notif.amount ?? 0))}
                         </p>
                         <p className="text-xs text-dark-muted mt-1">
-                            {notif.balance > 0
-                                ? `Purana ${formatCurrency(notif.balance)} + Naya ${formatCurrency(notif.amount)}`
+                            {(notif.balance ?? 0) > 0
+                                ? `Purana ${formatCurrency(notif.balance ?? 0)} + Naya ${formatCurrency(notif.amount ?? 0)}`
                                 : 'Sirf naya loan ka amount'}
                         </p>
                     </div>
@@ -290,17 +291,17 @@ export const LoanApprovalModal = () => {
                                         if (emp && loan) {
                                             if (isApproved) {
                                                 sendLoanApprovalWhatsApp(emp, {
-                                                    amount: currentNotification.amount,
-                                                    emiAmount: currentNotification.emiAmount,
-                                                    tenureMonths: currentNotification.tenureMonths,
+                                                    amount: currentNotification.amount ?? 0,
+                                                    emiAmount: currentNotification.emiAmount ?? 0,
+                                                    tenureMonths: currentNotification.tenureMonths ?? 0,
                                                     type: currentNotification.loanType || loan.type,
                                                     reason: currentNotification.reason
                                                 });
                                             } else {
                                                 sendLoanRejectionWhatsApp(emp, {
-                                                    amount: currentNotification.amount,
-                                                    emiAmount: currentNotification.emiAmount,
-                                                    tenureMonths: currentNotification.tenureMonths,
+                                                    amount: currentNotification.amount ?? 0,
+                                                    emiAmount: currentNotification.emiAmount ?? 0,
+                                                    tenureMonths: currentNotification.tenureMonths ?? 0,
                                                     type: currentNotification.loanType || loan.type,
                                                     reason: currentNotification.reason
                                                 });
@@ -327,11 +328,15 @@ export const LoanApprovalModal = () => {
                 })()}
 
                 {/* Queue Info */}
-                {user && getNotificationsForUser(user.id).filter(n => !n.isRead).length > 1 && (
-                    <div className="text-center text-sm text-dark-muted">
-                        {getNotificationsForUser(user.id).filter(n => !n.isRead).length - 1} more pending approval{getNotificationsForUser(user.id).filter(n => !n.isRead).length > 2 ? 's' : ''}
-                    </div>
-                )}
+                {user && (() => {
+                    const userPerms: string[] = permissions[user.role] ?? [];
+                    const pendingLoans = getNotificationsForUser(user.id, user.role, userPerms).filter(n => !n.isRead && !!n.loanId);
+                    return pendingLoans.length > 1 ? (
+                        <div className="text-center text-sm text-dark-muted">
+                            {pendingLoans.length - 1} more pending approval{pendingLoans.length > 2 ? 's' : ''}
+                        </div>
+                    ) : null;
+                })()}
             </div>
         </div>
     );

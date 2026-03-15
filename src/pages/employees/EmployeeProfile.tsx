@@ -2,6 +2,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/config/permissions';
+import { useDataMask } from '@/hooks/useDataMask';
+import { MaskedField } from '@/components/MaskedField';
 import {
     ArrowLeft,
     MapPin,
@@ -18,7 +20,9 @@ export const EmployeeProfile = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { getEmployeeById } = useEmployeeStore();
-    const { hasPermission, user } = useAuthStore();
+    const { hasPermission } = useAuthStore();
+    const { maskSalary, maskAccount, maskAadhaar, maskPAN, maskIFSC,
+        canViewBank, canViewFullBank, canViewSalary } = useDataMask();
 
     const employee = getEmployeeById(id || '');
 
@@ -32,7 +36,7 @@ export const EmployeeProfile = () => {
     }
 
     // PRIVACY CHECK: Who can see sensitive financial data?
-    const canViewFinancials = hasPermission(PERMISSIONS.VIEW_EMPLOYEE_FINANCIALS) || user?.role === 'SUPER_ADMIN';
+    const canViewFinancials = hasPermission(PERMISSIONS.VIEW_EMPLOYEE_FINANCIALS);
 
     return (
         <div className="max-w-5xl mx-auto">
@@ -158,37 +162,66 @@ export const EmployeeProfile = () => {
                             <div>
                                 <p className="text-xs text-dark-muted mb-1">Basic Salary</p>
                                 <p className="text-2xl font-bold text-success">
-                                    {hasPermission(PERMISSIONS.VIEW_EMPLOYEE_SALARY) || user?.role === 'SUPER_ADMIN'
-                                        ? `₹${employee.basicSalary.toLocaleString()}`
-                                        : '₹****'}
+                                    <MaskedField
+                                        value={maskSalary(employee.basicSalary)}
+                                        isMasked={!canViewSalary}
+                                        tooltip="Requires VIEW_EMPLOYEE_SALARY permission"
+                                    />
                                 </p>
                             </div>
 
                             {employee.bankDetails ? (
-                                hasPermission(PERMISSIONS.VIEW_EMPLOYEE_BANK) || user?.role === 'SUPER_ADMIN' ? (
-                                    <div className="p-3 bg-dark-bg/50 rounded-xl border border-dark-border">
-                                        <div className="flex items-center gap-2 mb-2 text-primary-400">
-                                            <CreditCard className="w-4 h-4" />
-                                            <span className="text-xs font-bold tracking-wider">BANK DETAILS</span>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-xs text-dark-muted">Bank Name</p>
-                                            <p className="text-sm text-white font-medium">{employee.bankDetails.bankName}</p>
+                                <div className="p-3 bg-dark-bg/50 rounded-xl border border-dark-border">
+                                    <div className="flex items-center gap-2 mb-2 text-primary-400">
+                                        <CreditCard className="w-4 h-4" />
+                                        <span className="text-xs font-bold tracking-wider">BANK & GOVT DETAILS</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-dark-muted">Bank Name</p>
+                                        <p className="text-sm text-white font-medium">{employee.bankDetails.bankName}</p>
 
-                                            <p className="text-xs text-dark-muted mt-2">Account Number</p>
-                                            <p className="text-sm text-white font-mono tracking-wider">
-                                                •••• {employee.bankDetails.accountNumber.slice(-4)}
-                                            </p>
+                                        <p className="text-xs text-dark-muted mt-2">Account Number</p>
+                                        <p className="text-sm text-white font-mono tracking-wider">
+                                            <MaskedField
+                                                value={maskAccount(employee.bankDetails.accountNumber)}
+                                                isMasked={!canViewBank}
+                                                tooltip="Requires VIEW_EMPLOYEE_BANK permission"
+                                            />
+                                        </p>
+
+                                        <p className="text-xs text-dark-muted mt-2">IFSC Code</p>
+                                        <p className="text-sm text-white font-mono tracking-wider">
+                                            <MaskedField
+                                                value={maskIFSC(employee.bankDetails.ifscCode)}
+                                                isMasked={!canViewBank}
+                                                tooltip="Requires VIEW_EMPLOYEE_BANK permission"
+                                            />
+                                        </p>
+
+                                        <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-dark-border/50">
+                                            <div>
+                                                <p className="text-xs text-dark-muted">Aadhaar Number</p>
+                                                <p className="text-sm text-white font-mono tracking-wider mt-1">
+                                                    <MaskedField
+                                                        value={maskAadhaar(employee.bankDetails.aadharNumber)}
+                                                        isMasked={!canViewFullBank}
+                                                        tooltip="Requires VIEW_FULL_BANK_DETAILS permission"
+                                                    />
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-dark-muted">PAN Number</p>
+                                                <p className="text-sm text-white font-mono tracking-wider mt-1">
+                                                    <MaskedField
+                                                        value={maskPAN(employee.bankDetails.panCard)}
+                                                        isMasked={!canViewFullBank}
+                                                        tooltip="Requires VIEW_FULL_BANK_DETAILS permission"
+                                                    />
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
-                                ) : (
-                                    <div className="p-3 bg-dark-bg/50 rounded-xl border border-dark-border flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-dark-muted">
-                                            <Shield className="w-4 h-4" />
-                                            <span className="text-xs font-bold tracking-wider">BANK DETAILS HIDDEN</span>
-                                        </div>
-                                    </div>
-                                )
+                                </div>
                             ) : (
                                 <p className="text-sm text-dark-muted italic">No bank details attached.</p>
                             )}

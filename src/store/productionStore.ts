@@ -37,11 +37,23 @@ const useInternalProductionStore = create<ProductionState>((set, get) => ({
     },
 
     addEntry: async (entry) => {
+        // 🛡️ > 1000 Units Double Approval Guard
+        const isHuge = entry.qty > 1000;
+        let workflowApprovals = undefined;
+        if (isHuge) {
+            workflowApprovals = [
+                { stepId: 's1', roleId: 'MANAGER', roleName: 'Manager', status: 'PENDING' as const },
+                { stepId: 's2', roleId: 'PRODUCTION_ADMIN', roleName: 'Prod Admin', status: 'PENDING' as const },
+            ];
+        }
+
         const newEntry: ProductionEntry = {
             ...entry,
             id: Math.random().toString(36).substr(2, 9),
             totalAmount: entry.qty * entry.rate,
-            status: ProductionStatus.PENDING,
+            status: isHuge ? ProductionStatus.PENDING : ProductionStatus.APPROVED, // Huge entries must be approved
+            workflowApprovals,
+            currentWorkflowStep: isHuge ? 0 : undefined,
         };
         // Optimistic update
         set(state => ({ entries: [newEntry, ...state.entries] }));
@@ -62,11 +74,25 @@ const useInternalProductionStore = create<ProductionState>((set, get) => ({
     },
 
     addBulkEntries: async (entries) => {
+        // 🛡️ > 1000 Units Double Approval Guard
+        const processedEntries = entries.map(e => {
+            const isHuge = e.qty > 1000;
+            const workflowApprovals = isHuge ? [
+                { stepId: 's1', roleId: 'MANAGER', roleName: 'Manager', status: 'PENDING' as const },
+                { stepId: 's2', roleId: 'PRODUCTION_ADMIN', roleName: 'Prod Admin', status: 'PENDING' as const },
+            ] : undefined;
+            return {
+                ...e,
+                workflowApprovals,
+                currentWorkflowStep: isHuge ? 0 : undefined,
+            };
+        });
+
         try {
             const res = await apiFetch(`/production/bulk`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ entries }),
+                body: JSON.stringify({ entries: processedEntries }),
             });
 
             if (res.status === 207 || res.ok) {
@@ -101,6 +127,39 @@ const useInternalProductionStore = create<ProductionState>((set, get) => ({
     },
 
     approveEntry: async (id) => {
+        const user = useAuthStore.getState().user;
+        const entry = get().entries.find(e => e.id === id);
+
+        if (entry?.workflowApprovals && entry.workflowApprovals.length > 0) {
+            const stepIdx = entry.currentWorkflowStep ?? 0;
+            const updatedApprovals = entry.workflowApprovals.map((a, i) =>
+                i === stepIdx
+                    ? { ...a, status: 'APPROVED' as const, actorName: user?.name ?? '', actedAt: new Date().toISOString() }
+                    : a
+            );
+            const nextStep = stepIdx + 1;
+            const allDone = nextStep >= updatedApprovals.length;
+
+            const payload = {
+                status: allDone ? ProductionStatus.APPROVED : ProductionStatus.PENDING,
+                workflowApprovals: updatedApprovals,
+                currentWorkflowStep: allDone ? undefined : nextStep
+            };
+
+            set(state => ({ entries: state.entries.map(e => e.id === id ? { ...e, ...payload } : e) }));
+            try {
+                await apiFetch(`/production/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+            } catch (err) {
+                console.error('Failed to approve production entry:', err);
+                set(state => ({ entries: state.entries.map(e => e.id === id ? { ...e, status: ProductionStatus.PENDING } : e) }));
+            }
+            return;
+        }
+
         const payload = { status: ProductionStatus.APPROVED };
         // Optimistic update
         set(state => ({ entries: state.entries.map(e => e.id === id ? { ...e, ...payload } : e) }));

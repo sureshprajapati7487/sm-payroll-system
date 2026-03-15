@@ -5,12 +5,15 @@ export type SecurityAlertSeverity = 'critical' | 'high' | 'medium' | 'low';
 export type SecurityAlertType =
     | 'god_mode_enabled'
     | 'permission_escalation'
+    | 'permission_denied'
     | 'role_change'
     | 'salary_access'
     | 'bulk_delete'
     | 'security_setting_change'
     | 'failed_login'
-    | 'suspicious_ip';
+    | 'suspicious_ip'
+    | 'data_export'
+    | 'access_denied';
 
 export interface SecurityAlert {
     id: string;
@@ -32,9 +35,12 @@ interface SecurityAlertsState {
     addAlert: (alert: Omit<SecurityAlert, 'id' | 'timestamp' | 'isRead' | 'isAcknowledged'>) => void;
     markAsRead: (id: string) => void;
     acknowledgeAlert: (id: string) => void;
+    acknowledgeAll: () => void;
+    deleteAlert: (id: string) => void;
     clearOldAlerts: (days: number) => void;
     getUnreadCount: () => number;
     getCriticalCount: () => number;
+    getRecentUnacknowledged: (sinceMs?: number) => SecurityAlert[];
 }
 
 export const useSecurityAlertsStore = create<SecurityAlertsState>()(
@@ -77,6 +83,18 @@ export const useSecurityAlertsStore = create<SecurityAlertsState>()(
                 }));
             },
 
+            acknowledgeAll: () => {
+                set(state => ({
+                    alerts: state.alerts.map(a => ({ ...a, isAcknowledged: true, isRead: true }))
+                }));
+            },
+
+            deleteAlert: (id) => {
+                set(state => ({
+                    alerts: state.alerts.filter(a => a.id !== id)
+                }));
+            },
+
             clearOldAlerts: (days) => {
                 const cutoffDate = new Date();
                 cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -93,6 +111,14 @@ export const useSecurityAlertsStore = create<SecurityAlertsState>()(
 
             getCriticalCount: () => {
                 return get().alerts.filter(a => a.severity === 'critical' && !a.isAcknowledged).length;
+            },
+
+            getRecentUnacknowledged: (sinceMs = 30000) => {
+                const cutoff = new Date(Date.now() - sinceMs).toISOString();
+                return get().alerts.filter(
+                    a => !a.isAcknowledged && a.timestamp >= cutoff &&
+                        (a.severity === 'critical' || a.severity === 'high')
+                );
             }
         }),
         {

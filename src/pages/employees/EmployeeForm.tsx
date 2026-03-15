@@ -12,6 +12,7 @@ import { InfoTip } from '@/components/ui/InfoTip';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/config/permissions';
 import { useCustomFieldStore } from '@/store/customFieldStore';
+import { useDataMask } from '@/hooks/useDataMask';
 
 const DEFAULT_STATUTORY: StatutoryConfig = {
     pfApplicable: true,
@@ -121,8 +122,9 @@ export const EmployeeForm = () => {
     const { shifts } = useShiftStore();
     const { currentCompanyId } = useMultiCompanyStore();
     const { groups: workGroups, assignments: workAssignments, assignEmployee, unassignEmployee } = useWorkGroupStore();
-    const { hasPermission, user } = useAuthStore();
+    const { hasPermission } = useAuthStore();
     const { fields } = useCustomFieldStore();
+    const { maskAccount, maskIFSC, maskPAN, maskAadhaar, canViewFullBank } = useDataMask();
 
     const activeCustomFields = fields.filter(f => f.module === 'employee' && f.isActive);
     const isEditMode = !!id;
@@ -262,7 +264,7 @@ export const EmployeeForm = () => {
 
     const sc = formData.statutoryConfig!;
 
-    const canManageFinancials = hasPermission(PERMISSIONS.EDIT_EMPLOYEE_FINANCIALS) || user?.role === 'SUPER_ADMIN';
+    const canManageFinancials = hasPermission(PERMISSIONS.EDIT_EMPLOYEE_FINANCIALS);
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 pb-20">
@@ -321,7 +323,11 @@ export const EmployeeForm = () => {
                         </div>
                         <div className="space-y-1">
                             <InfoTip id="joiningDate" label="Joining Date" />
-                            <input type="date" value={formData.joiningDate} onChange={e => handleChange('joiningDate', e.target.value)} className={inputCls} />
+                            <input type="date" value={formData.joiningDate}
+                                onChange={e => handleChange('joiningDate', e.target.value)}
+                                disabled={isEditMode && !hasPermission(PERMISSIONS.MANAGE_ROLES)}
+                                className={`${inputCls} ${isEditMode && !hasPermission(PERMISSIONS.MANAGE_ROLES) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                title={isEditMode && !hasPermission(PERMISSIONS.MANAGE_ROLES) ? 'Only admins can change DOJ' : ''} />
                         </div>
                     </div>
                 </AccordionSection>
@@ -397,7 +403,13 @@ export const EmployeeForm = () => {
                         </div>
                         <div className="space-y-1">
                             <label className="text-xs text-dark-muted uppercase">Department</label>
-                            <select value={formData.department} onChange={e => handleChange('department', e.target.value)} className={inputCls}>
+                            <select
+                                value={formData.department}
+                                onChange={e => handleChange('department', e.target.value)}
+                                disabled={isEditMode && !hasPermission(PERMISSIONS.MANAGE_DEPARTMENTS)}
+                                className={`${inputCls} ${isEditMode && !hasPermission(PERMISSIONS.MANAGE_DEPARTMENTS) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                title={isEditMode && !hasPermission(PERMISSIONS.MANAGE_DEPARTMENTS) ? 'Only admins can change Department' : ''}
+                            >
                                 <option value="">Select Department</option>
                                 {departments.map(dept => (
                                     <option key={dept.id} value={dept.name}>
@@ -496,16 +508,16 @@ export const EmployeeForm = () => {
                                 <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-dark-border/50">
                                     <div className="space-y-1">
                                         <label className="text-xs text-dark-muted uppercase">Bank Name</label>
-                                        <input type="text" value={formData.bankDetails?.bankName} onChange={e => handleBankChange('bankName', e.target.value)}
-                                            className={inputCls} placeholder="e.g. HDFC Bank" />
+                                        <input type="text" value={formData.bankDetails?.bankName || ''} onChange={e => handleBankChange('bankName', e.target.value)}
+                                            className={inputCls} placeholder="e.g. HDFC Bank" disabled={!canViewFullBank} title={!canViewFullBank ? "You do not have permission to edit bank details." : ""} />
                                     </div>
                                     <div className="space-y-1">
                                         <InfoTip id="bankAccountNo" label="Account Number" />
-                                        <input type="text" value={formData.bankDetails?.accountNumber} onChange={e => handleBankChange('accountNumber', e.target.value)} className={inputCls} />
+                                        <input type="text" value={canViewFullBank ? (formData.bankDetails?.accountNumber || '') : maskAccount(formData.bankDetails?.accountNumber)} onChange={e => handleBankChange('accountNumber', e.target.value)} className={inputCls} disabled={!canViewFullBank} />
                                     </div>
                                     <div className="space-y-1">
                                         <InfoTip id="ifscCode" label="IFSC Code" />
-                                        <input type="text" value={formData.bankDetails?.ifscCode} onChange={e => handleBankChange('ifscCode', e.target.value)} className={inputCls} />
+                                        <input type="text" value={canViewFullBank ? (formData.bankDetails?.ifscCode || '') : maskIFSC(formData.bankDetails?.ifscCode)} onChange={e => handleBankChange('ifscCode', e.target.value)} className={inputCls} disabled={!canViewFullBank} />
                                     </div>
                                 </div>
                                 {/* KYC */}
@@ -515,8 +527,8 @@ export const EmployeeForm = () => {
                                         <div className="space-y-4">
                                             <div className="space-y-1">
                                                 <label className="text-xs text-dark-muted uppercase">PAN Card Number</label>
-                                                <input type="text" value={formData.bankDetails?.panCard} onChange={e => handleBankChange('panCard', e.target.value)}
-                                                    className={inputCls + ' uppercase'} placeholder="ABCDE1234F" maxLength={10} />
+                                                <input type="text" value={canViewFullBank ? (formData.bankDetails?.panCard || '') : maskPAN(formData.bankDetails?.panCard)} onChange={e => handleBankChange('panCard', e.target.value)}
+                                                    className={inputCls + ' uppercase'} placeholder="ABCDE1234F" maxLength={10} disabled={!canViewFullBank} />
                                             </div>
                                             <div className="space-y-1">
                                                 <label className="text-xs text-dark-muted uppercase">Upload PAN Photo</label>
@@ -534,8 +546,8 @@ export const EmployeeForm = () => {
                                         <div className="space-y-4">
                                             <div className="space-y-1">
                                                 <label className="text-xs text-dark-muted uppercase">Aadhar Number</label>
-                                                <input type="text" value={formData.bankDetails?.aadharNumber} onChange={e => handleBankChange('aadharNumber', e.target.value)}
-                                                    className={inputCls} placeholder="1234 5678 9012" maxLength={12} />
+                                                <input type="text" value={canViewFullBank ? (formData.bankDetails?.aadharNumber || '') : maskAadhaar(formData.bankDetails?.aadharNumber)} onChange={e => handleBankChange('aadharNumber', e.target.value)}
+                                                    className={inputCls} placeholder="1234 5678 9012" maxLength={12} disabled={!canViewFullBank} />
                                             </div>
                                             <div className="space-y-1">
                                                 <label className="text-xs text-dark-muted uppercase">Upload Aadhar Photo</label>

@@ -1,11 +1,19 @@
 import { useState } from 'react';
 import { Upload, Download, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { BulkImporter } from '@/utils/bulkImporter';
+import { useEmployeeStore } from '@/store/employeeStore';
+import { useDialog } from '@/components/DialogProvider';
+import { useDeviceType } from '@/hooks/useDeviceType';
+import { Employee, EmployeeStatus, ShiftType, SalaryType } from '@/types';
 
 export const BulkImport = () => {
     const [file, setFile] = useState<File | null>(null);
     const [result, setResult] = useState<any>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const { addEmployee } = useEmployeeStore();
+    const { toast } = useDialog();
+    const { isDesktop } = useDeviceType();
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -39,6 +47,56 @@ export const BulkImport = () => {
         a.download = 'employee_import_template.csv';
         a.click();
     };
+
+    const handleApproveAndImport = async () => {
+        if (!result || !result.preview.length) return;
+        setIsSaving(true);
+        try {
+            let successCount = 0;
+            for (const row of result.preview) {
+                const newEmp: Omit<Employee, 'id'> = {
+                    code: row.code,
+                    name: row.name,
+                    email: row.email || '',
+                    phone: row.phone || '',
+                    department: row.department || '',
+                    designation: row.designation || '',
+                    basicSalary: row.basicSalary || 0,
+                    joiningDate: row.joiningDate || new Date().toISOString().split('T')[0],
+                    status: 'ACTIVE' as EmployeeStatus,
+                    role: 'EMPLOYEE',
+                    shift: 'GENERAL' as ShiftType,
+                    salaryType: SalaryType.MONTHLY,
+                    isLeaveBlocked: false,
+                    avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${row.name}`,
+                };
+                await addEmployee(newEmp);
+                successCount++;
+            }
+            toast(`Successfully imported ${successCount} employees!`, 'success');
+            setResult(null);
+            setFile(null);
+        } catch (error) {
+            toast('Failed to import employees', 'error');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    if (!isDesktop) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[500px] text-center px-4">
+                <div className="w-20 h-20 bg-orange-500/10 flex items-center justify-center rounded-full mb-6 relative">
+                    <Upload className="w-10 h-10 text-orange-500 opacity-50" />
+                    <AlertTriangle className="w-6 h-6 text-orange-400 absolute bottom-4 right-4 bg-dark-bg rounded-full border border-dark-bg" />
+                </div>
+                <h2 className="text-2xl font-bold text-dark-text mb-3">Desktop Environment Required</h2>
+                <p className="text-dark-muted max-w-sm leading-relaxed">
+                    Bulk Data Import requires a <strong className="text-white">Desktop environment</strong> for processing complex CSV structures and mapping high-volume records reliably.
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="p-6 space-y-6">
@@ -182,6 +240,14 @@ export const BulkImport = () => {
                                             </tbody>
                                         </table>
                                     </div>
+                                    <button
+                                        onClick={handleApproveAndImport}
+                                        disabled={isSaving}
+                                        className="w-full mt-4 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        <CheckCircle className="w-5 h-5" />
+                                        {isSaving ? 'Importing...' : `Approve & Import ${result.preview.length} Employees`}
+                                    </button>
                                 </div>
                             )}
                         </div>

@@ -245,6 +245,16 @@ export interface ProductionEntry {
     totalAmount: number; // qty * rate
     status: ProductionStatus;
     remarks?: string;
+    // Workflow tracking
+    workflowApprovals?: {
+        stepId: string;
+        roleId: string;
+        roleName: string;
+        status: 'PENDING' | 'APPROVED' | 'REJECTED';
+        actorName?: string;
+        actedAt?: string;
+    }[];
+    currentWorkflowStep?: number;
 }
 
 export enum LeaveType {
@@ -352,27 +362,55 @@ export interface LoanRecord {
     currentWorkflowStep?: number; // 0-based index of the current awaiting step
 }
 
-// Notification System Types
-export interface LoanNotification {
+// ── Notification System ────────────────────────────────────────────────────────
+export enum NotificationType {
+    LOAN_APPROVAL = 'LOAN_APPROVAL',
+    PAYROLL_GENERATED = 'PAYROLL_GENERATED',
+    LEAVE_REQUEST = 'LEAVE_REQUEST',
+    LEAVE_DECISION = 'LEAVE_DECISION',
+    ATTENDANCE_REGULARIZATION = 'ATTENDANCE_REGULARIZATION',
+    SYSTEM = 'SYSTEM',
+}
+
+/**
+ * Generalized notification. Routing is determined by at least one of:
+ *   - targetUserIds  → specific user IDs
+ *   - targetRoles    → any user matching these roles sees it
+ *   - targetPermissions → any user who has one of these permissions sees it
+ */
+export interface AppNotification {
     id: string;
-    loanId: string;
-    employeeId: string;
-    employeeName: string;
-    employeeCode: string;
-    amount: number;
-    balance: number;
-    emiAmount: number;
-    tenureMonths: number;
-    loanType: LoanType;
-    reason: string;
-    approverId: string;
+    type: NotificationType;
+    title: string;
+    message: string;
     timestamp: string;
     isRead: boolean;
-    currentSalary?: number; // Employee's current monthly salary (Net Salary)
-    workedDays?: number; // Current month worked days
-    perDayRate?: number; // Per day rate for salary calculation
-    workInMonth?: number; // Basic Salary + Overtime only
+
+    // ── Routing Criteria (at least one must be set) ───────────────────────────
+    targetUserIds?: string[];        // Direct → specific users
+    targetRoles?: Role[];            // Role-based broadcast
+    targetPermissions?: string[];    // Permission-based broadcast
+
+    // ── Legacy Loan Fields (optional – kept for LoanApprovalModal compat) ─────
+    loanId?: string;
+    employeeId?: string;
+    employeeName?: string;
+    employeeCode?: string;
+    amount?: number;
+    balance?: number;
+    emiAmount?: number;
+    tenureMonths?: number;
+    loanType?: LoanType;
+    reason?: string;
+    approverId?: string;
+    currentSalary?: number;
+    workedDays?: number;
+    perDayRate?: number;
+    workInMonth?: number;
 }
+
+/** @deprecated Use AppNotification instead */
+export type LoanNotification = AppNotification;
 
 // Advanced Loan Features
 export interface SkippedMonth {

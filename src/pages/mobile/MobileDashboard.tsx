@@ -19,6 +19,8 @@ import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { useProductionStore } from '@/store/productionStore';
 import { useAnalyticsStore } from '@/store/analyticsStore';
 import { getBSSID } from '@/hooks/useBSSID';
+import { PERMISSIONS } from '@/config/permissions';
+import { usePermissions } from '@/hooks/usePermission';
 
 // ── Live Clock ────────────────────────────────────────────────────────────────
 const LiveClock = () => {
@@ -76,6 +78,15 @@ const QuickTile = ({
 export const MobileDashboard = () => {
     const navigate = useNavigate();
     const { user } = useAuthStore();
+    const perms = usePermissions([
+        PERMISSIONS.VIEW_TEAM_ATTENDANCE,
+        PERMISSIONS.VIEW_EMPLOYEES,
+        PERMISSIONS.VIEW_PAYROLL,
+        PERMISSIONS.VIEW_ATTENDANCE,
+        PERMISSIONS.VIEW_PRODUCTION,
+        PERMISSIONS.VIEW_SALESMAN,
+        PERMISSIONS.VIEW_APPROVALS
+    ]);
     const { employees } = useEmployeeStore();
     const { records } = useAttendanceStore();
     const { slips } = usePayrollStore();
@@ -120,18 +131,19 @@ export const MobileDashboard = () => {
         sessionStorage.removeItem('prefer-full-dashboard');
     }, []);
 
+    const isEmployee = !perms[PERMISSIONS.VIEW_TEAM_ATTENDANCE] && !perms[PERMISSIONS.VIEW_EMPLOYEES];
+
     useEffect(() => {
-        if (user?.role !== 'EMPLOYEE' && currentCompanyId) {
+        if (!isEmployee && currentCompanyId) {
             fetchDashboardStats(currentCompanyId, currentMonth);
         }
-    }, [user, currentCompanyId, currentMonth]);
+    }, [isEmployee, currentCompanyId, currentMonth]);
 
     const companyEmployees = currentCompanyId
         ? employees.filter(e => e.companyId === currentCompanyId)
         : employees;
 
     // ── My personal data (if employee) ─────────────────────────────────────
-    const isEmployee = user?.role === 'EMPLOYEE';
     const me = isEmployee
         ? companyEmployees.find(e => e.email === user?.email || e.id === user?.id)
         : null;
@@ -284,11 +296,11 @@ export const MobileDashboard = () => {
             {!isEmployee && (
                 <div className="grid grid-cols-2 gap-3">
                     {[
-                        { label: "Today's Attendance", value: `${attPct}%`, sub: `${todayPresent}/${activeEmps} present`, icon: Clock, color: 'text-primary-400', bg: 'bg-primary-500/15' },
-                        { label: 'Active Staff', value: activeEmps, sub: `${totalEmps} total`, icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-500/15' },
-                        { label: 'Net Payroll', value: `₹${(netPayroll / 1000).toFixed(0)}k`, sub: currentMonth, icon: Banknote, color: 'text-yellow-400', bg: 'bg-yellow-500/15' },
-                        { label: 'Pending Items', value: pendingLeaves + pendingLoans, sub: `${pendingLeaves} leaves, ${pendingLoans} loans`, icon: Bell, color: 'text-red-400', bg: 'bg-red-500/15' },
-                    ].map((stat, i) => (
+                        { label: "Today's Attendance", value: `${attPct}%`, sub: `${todayPresent}/${activeEmps} present`, icon: Clock, color: 'text-primary-400', bg: 'bg-primary-500/15', show: true },
+                        { label: 'Active Staff', value: activeEmps, sub: `${totalEmps} total`, icon: Users, color: 'text-emerald-400', bg: 'bg-emerald-500/15', show: true },
+                        { label: 'Net Payroll', value: `₹${(netPayroll / 1000).toFixed(0)}k`, sub: currentMonth, icon: Banknote, color: 'text-yellow-400', bg: 'bg-yellow-500/15', show: perms[PERMISSIONS.VIEW_PAYROLL] },
+                        { label: 'Pending Items', value: pendingLeaves + pendingLoans, sub: `${pendingLeaves} leaves, ${pendingLoans} loans`, icon: Bell, color: 'text-red-400', bg: 'bg-red-500/15', show: true },
+                    ].filter(s => s.show).map((stat, i) => (
                         <motion.div
                             key={stat.label}
                             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
@@ -311,12 +323,12 @@ export const MobileDashboard = () => {
                 <div className="grid grid-cols-2 gap-3">
                     {(!isEmployee) && (
                         <>
-                            <QuickTile icon={Users} label="Employees" sublabel="Manage staff" path="/employees" color="bg-blue-600/80 border-blue-500/30" />
-                            <QuickTile icon={CalendarClock} label="Attendance" sublabel="Today's status" path="/attendance" color="bg-violet-600/80 border-violet-500/30" badge={activeEmps - todayPresent} />
-                            <QuickTile icon={Banknote} label="Payroll" sublabel={currentMonth} path="/payroll" color="bg-emerald-600/80 border-emerald-500/30" />
-                            <QuickTile icon={Factory} label="Production" sublabel="View output" path="/production" color="bg-orange-600/80 border-orange-500/30" />
-                            <QuickTile icon={ShoppingBag} label="Salesman" sublabel="Sales data" path="/salesman" color="bg-pink-600/80 border-pink-500/30" />
-                            <QuickTile icon={AlertCircle} label="Approvals" sublabel="Pending items" path="/approvals" color="bg-red-600/80 border-red-500/30" badge={pendingLeaves + pendingLoans} />
+                            {perms[PERMISSIONS.VIEW_EMPLOYEES] && <QuickTile icon={Users} label="Employees" sublabel="Manage staff" path="/employees" color="bg-blue-600/80 border-blue-500/30" />}
+                            {perms[PERMISSIONS.VIEW_ATTENDANCE] && <QuickTile icon={CalendarClock} label="Attendance" sublabel="Today's status" path="/attendance" color="bg-violet-600/80 border-violet-500/30" badge={activeEmps - todayPresent} />}
+                            {perms[PERMISSIONS.VIEW_PAYROLL] && <QuickTile icon={Banknote} label="Payroll" sublabel={currentMonth} path="/payroll" color="bg-emerald-600/80 border-emerald-500/30" />}
+                            {perms[PERMISSIONS.VIEW_PRODUCTION] && <QuickTile icon={Factory} label="Production" sublabel="View output" path="/production" color="bg-orange-600/80 border-orange-500/30" />}
+                            {perms[PERMISSIONS.VIEW_SALESMAN] && <QuickTile icon={ShoppingBag} label="Salesman" sublabel="Sales data" path="/salesman" color="bg-pink-600/80 border-pink-500/30" />}
+                            {perms[PERMISSIONS.VIEW_APPROVALS] && <QuickTile icon={AlertCircle} label="Approvals" sublabel="Pending items" path="/approvals" color="bg-red-600/80 border-red-500/30" badge={pendingLeaves + pendingLoans} />}
                         </>
                     )}
                     {isEmployee && (

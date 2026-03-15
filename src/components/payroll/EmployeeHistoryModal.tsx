@@ -9,6 +9,7 @@ import { useSystemConfigStore } from '@/store/systemConfigStore';
 import { Employee, SalaryType, AttendanceStatus, LoanType } from '@/types';
 import { clsx } from 'clsx';
 import { exportEmployeePayoutToExcel } from '@/utils/exportUtils';
+import { useAuthStore } from '@/store/authStore';
 
 interface EmployeeHistoryModalProps {
     employee: Employee;
@@ -20,6 +21,7 @@ export const EmployeeHistoryModal = ({ employee, month, onClose }: EmployeeHisto
     const { records } = useAttendanceStore();
     const { entries } = useProductionStore();
     const { loans } = useLoanStore();
+    const user = useAuthStore(s => s.user);
 
     const [year, monthNum] = month.split('-').map(Number);
     const daysInMonth = new Date(year, monthNum, 0).getDate();
@@ -281,7 +283,8 @@ export const EmployeeHistoryModal = ({ employee, month, onClose }: EmployeeHisto
                 netSalary
             },
             attendanceData,
-            activeLoans
+            activeLoans,
+            user
         );
     };
 

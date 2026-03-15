@@ -12,13 +12,14 @@ import { LogIn, LogOut, CheckCircle, Loader2, Clock } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useAttendanceStore } from '@/store/attendanceStore';
 import { useEmployeeStore } from '@/store/employeeStore';
+import { PERMISSIONS } from '@/config/permissions';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Pages where FAB should NOT appear
 const HIDDEN_ON = ['/login', '/company-setup', '/quick-action', '/mobile', '/attendance/kiosk'];
 
 export const GlobalPunchFAB = () => {
-    const { user, isAuthenticated } = useAuthStore();
+    const { user, isAuthenticated, hasPermission } = useAuthStore();
     const { records, markCheckIn, markCheckOut } = useAttendanceStore();
     const { employees } = useEmployeeStore();
     const navigate = useNavigate();
@@ -46,8 +47,8 @@ export const GlobalPunchFAB = () => {
     const punchedInOnly = !!myRecord?.checkIn && !myRecord?.checkOut;
     const shiftDone = !!myRecord?.checkIn && !!myRecord?.checkOut;
 
-    // If no employee record at all, don't show FAB (admin-only accounts)
-    if (!myEmployee && user?.role === 'SUPER_ADMIN') return null;
+    // If no employee record at all or no permission, don't show FAB
+    if (!hasPermission(PERMISSIONS.MARK_OWN_ATTENDANCE) || !myEmployee) return null;
 
     const handlePunch = async () => {
         if (status === 'loading') return;

@@ -9,6 +9,8 @@ import { useEmployeeStore } from '@/store/employeeStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/config/permissions';
+import { useAuditStore } from '@/store/auditStore';
+import { useSecurityStore } from '@/store/securityStore';
 
 // ── Report type definitions with field mappings ───────────────────────────────
 const REPORT_TYPES = [
@@ -51,8 +53,10 @@ export const ReportBuilder = () => {
     const [generatedReport, setGeneratedReport] = useState<any[] | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
 
-    const { hasPermission } = useAuthStore();
+    const { hasPermission, user } = useAuthStore();
     const canExport = hasPermission(PERMISSIONS.EXPORT_REPORTS);
+    const addLog = useAuditStore(s => s.addLog);
+    const { currentIp } = useSecurityStore();
 
     // Store data
     const { records: attendanceRecords } = useAttendanceStore();
@@ -221,6 +225,25 @@ export const ReportBuilder = () => {
     // ── CSV Export with proper escaping ──────────────────────────────────────
     const exportCSV = () => {
         if (!generatedReport || generatedReport.length === 0) return;
+
+        if (user) {
+            addLog({
+                userId: user.id,
+                userName: user.name,
+                userRole: user.role,
+                action: 'DATA_EXPORT',
+                entityType: 'SETTINGS',
+                details: {
+                    reportType: currentType?.label || 'Custom',
+                    rows: generatedReport.length,
+                    dateRange
+                },
+                ipAddress: currentIp || '127.0.0.1',
+                userAgent: navigator.userAgent,
+                status: 'SUCCESS'
+            });
+        }
+
         const cols = selectedColumns.length > 0 ? selectedColumns : (currentType?.columns || []);
         const escape = (v: any) => {
             const s = String(v ?? '');
@@ -230,7 +253,12 @@ export const ReportBuilder = () => {
         };
         const headers = cols.join(',');
         const rows = generatedReport.map(row => cols.map(col => escape(row[col])).join(','));
-        const csv = [headers, ...rows].join('\n');
+        const footerInfo = [
+            '',
+            `"CONFIDENTIAL \— ${user?.role || 'System'} DATA"`,
+            `"Downloaded by ${user?.name || 'Automated'} (${user?.id || 'System'}) on ${new Date().toLocaleString()}"`
+        ];
+        const csv = [headers, ...rows, ...footerInfo].join('\n');
         const bom = '\uFEFF'; // UTF-8 BOM for Excel compatibility
         const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);

@@ -236,7 +236,7 @@ export const ProductionDashboard = () => {
                 'Total (₹)': e.totalAmount, Status: e.status,
             };
         });
-        exportToExcel(data, `Production_${startDate}_to_${endDate}`);
+        exportToExcel(data, `Production_${startDate}_to_${endDate}`, user);
         setShowExportMenu(false);
     };
 
@@ -247,7 +247,7 @@ export const ProductionDashboard = () => {
             'Approved (₹)': s.approved, 'Pending (₹)': s.pending,
             'Rejected (₹)': s.rejected, 'Total Earned (₹)': s.approved + s.pending,
         }));
-        exportToExcel(data, `Production_Summary_${startDate}_to_${endDate}`);
+        exportToExcel(data, `Production_Summary_${startDate}_to_${endDate}`, user);
         setShowExportMenu(false);
     };
 
@@ -270,6 +270,13 @@ export const ProductionDashboard = () => {
         doc.setFontSize(11);
         doc.text(`Total Approved: ₹${totalApproved.toLocaleString('en-IN')}`, 14, finalY);
         doc.text(`Total Pending: ₹${totalPending.toLocaleString('en-IN')}`, 80, finalY);
+        if (user) {
+            doc.setFontSize(7);
+            doc.setTextColor(160, 160, 160);
+            const ph = doc.internal.pageSize.height || doc.internal.pageSize.getHeight();
+            doc.text(`CONFIDENTIAL — ${user.role} DATA | Downloaded by ${user.name} on ${new Date().toLocaleString()}`, 14, ph - 8);
+            doc.setTextColor(0, 0, 0);
+        }
         doc.save(`Production_Report_${startDate}_${endDate}.pdf`);
         setShowExportMenu(false);
     };
@@ -289,6 +296,12 @@ export const ProductionDashboard = () => {
             styles: { fontSize: 9, cellPadding: 2 },
             headStyles: { fillColor: [5, 150, 105] },
         });
+        if (user) {
+            doc.setFontSize(7);
+            doc.setTextColor(160, 160, 160);
+            const ph = doc.internal.pageSize.height || doc.internal.pageSize.getHeight();
+            doc.text(`CONFIDENTIAL — ${user.role} DATA | Downloaded by ${user.name} on ${new Date().toLocaleString()}`, 14, ph - 8);
+        }
         doc.save(`Production_Summary_${startDate}_${endDate}.pdf`);
         setShowExportMenu(false);
     };

@@ -15,6 +15,9 @@ import { useAttendanceStore } from '@/store/attendanceStore';
 import { useAuthStore } from '@/store/authStore';
 import { useFaceRecognition } from '@/hooks/useFaceRecognition';
 import { biometricStore } from '@/store/biometricStore';
+import { PERMISSIONS } from '@/config/permissions';
+import { useDeviceType } from '@/hooks/useDeviceType';
+import { useSecurityStore } from '@/store/securityStore';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const ENROLL_FRAMES = 5;
@@ -68,13 +71,27 @@ const LiveClock = () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 export const FaceKioskPage = () => {
     const navigate = useNavigate();
-    const { user } = useAuthStore();
+    const { user, hasPermission } = useAuthStore();
     const { employees } = useEmployeeStore();
     const { records, markCheckIn, markCheckOut } = useAttendanceStore();
     const { loadModels, modelsLoaded, loadProgress, error: modelError,
-        retryLoadModels, getDescriptor } = useFaceRecognition();
+        retryLoadModels, getDescriptor
+    } = useFaceRecognition();
 
-    const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+    const isAdmin = hasPermission(PERMISSIONS.USE_FACE_KIOSK);
+    const { isDesktop } = useDeviceType();
+
+    const { kioskDevices, registerKioskDevice } = useSecurityStore();
+    const [deviceId, setDeviceId] = useState(() => localStorage.getItem('kiosk_device_id'));
+    const isDeviceRegistered = deviceId && kioskDevices.some(d => d.id === deviceId);
+    const [deviceNameInput, setDeviceNameInput] = useState('');
+
+    const handleRegisterDevice = () => {
+        if (!deviceNameInput.trim()) return alert('Device name likhiye');
+        const newId = registerKioskDevice(deviceNameInput, user?.name || 'Admin');
+        localStorage.setItem('kiosk_device_id', newId);
+        setDeviceId(newId);
+    };
 
     // ── Mode ──────────────────────────────────────────────────────────────────
     const [mode, setMode] = useState<KioskMode>('live');
@@ -385,6 +402,77 @@ export const FaceKioskPage = () => {
     // ══════════════════════════════════════════════════════════════════════════
     // RENDER
     // ══════════════════════════════════════════════════════════════════════════
+    if (isDesktop) {
+        return (
+            <div className="fixed inset-0 bg-[#060a0f] flex flex-col items-center justify-center text-center p-6 z-[100]">
+                <div className="max-w-md w-full flex flex-col items-center">
+                    <div className="w-24 h-24 rounded-full bg-violet-600/10 border-2 border-violet-500/30 flex items-center justify-center mb-6 relative">
+                        <ScanFace className="w-12 h-12 text-violet-400 opacity-60" />
+                        <span className="absolute -bottom-2 -right-2 bg-dark-bg rounded-full p-1 border border-dark-bg">
+                            <Maximize2 className="w-6 h-6 text-red-400" />
+                        </span>
+                    </div>
+                    <h1 className="text-3xl font-extrabold text-white mb-3">Mobile & Tablet Only</h1>
+                    <p className="text-slate-400 leading-relaxed mb-8">
+                        The Face Recognition Kiosk is designed exclusively for front-facing devices mounted at terminal entrances. It is natively blocked on Desktop environments.
+                    </p>
+                    <button
+                        onClick={() => navigate('/attendance')}
+                        className="flex items-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all border border-slate-700"
+                    >
+                        <ArrowLeft className="w-5 h-5" /> Go Back to Attendance
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (!isDeviceRegistered) {
+        return (
+            <div className="fixed inset-0 bg-[#060a0f] flex flex-col items-center justify-center text-center p-6 z-[100]">
+                <div className="max-w-md w-full flex flex-col items-center gap-4 bg-slate-900/80 p-8 rounded-3xl border border-slate-800 shadow-2xl">
+                    <div className="w-20 h-20 rounded-full bg-blue-600/10 border-2 border-blue-500/30 flex items-center justify-center mb-2">
+                        <ScanFace className="w-10 h-10 text-blue-400 opacity-80" />
+                    </div>
+                    <h1 className="text-2xl font-extrabold text-white">Unregistered Device</h1>
+                    <p className="text-slate-400 text-sm leading-relaxed mb-4">
+                        Yeh device Kiosk ke liye registered nahi hai. Face recognition chalu karne ke liye pehle is tablet/phone ko register karein.
+                    </p>
+
+                    {isAdmin ? (
+                        <div className="w-full space-y-3 mt-2">
+                            <input
+                                type="text"
+                                placeholder="Device Name (e.g. Front Gate Tablet)"
+                                value={deviceNameInput}
+                                onChange={e => setDeviceNameInput(e.target.value)}
+                                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
+                            />
+                            <button
+                                onClick={handleRegisterDevice}
+                                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg text-sm"
+                            >
+                                Register Device
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 w-full">
+                            <p className="text-red-400 text-sm font-bold">Admin Login Required</p>
+                            <p className="text-slate-400 text-xs mt-1">Sirf admin is device ko register kar sakte hain.</p>
+                        </div>
+                    )}
+
+                    <button
+                        onClick={() => navigate('/attendance')}
+                        className="mt-4 flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all border border-slate-700 w-full text-sm"
+                    >
+                        <ArrowLeft className="w-4 h-4" /> Go Back
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="fixed inset-0 bg-[#060a0f] flex flex-col overflow-hidden z-[100]">
 

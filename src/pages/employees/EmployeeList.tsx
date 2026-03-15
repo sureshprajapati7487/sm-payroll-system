@@ -4,6 +4,7 @@ import { useEmployeeStore } from '@/store/employeeStore';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/config/permissions';
 import { useScopedEmployees } from '@/hooks/useScopedEmployees';
+import { useDataMask } from '@/hooks/useDataMask';
 import {
     Search, Plus, Eye, Edit, Trash2, XCircle, Key,
     Filter, ChevronDown, X, ArrowUpDown, SlidersHorizontal,
@@ -11,9 +12,10 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { CredentialsModal } from '@/components/payroll/CredentialsModal';
+import { ReasonConfirmModal } from '@/components/ReasonConfirmModal';
 import { SkeletonCardGrid } from '@/components/SkeletonLoaders';
+import { MaskedField } from '@/components/MaskedField';
 import { Employee, EmployeeStatus, ShiftType, SalaryType } from '@/types';
-import { useDialog } from '@/components/DialogProvider';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type SortKey = 'name' | 'department' | 'basicSalary' | 'joiningDate';
@@ -55,12 +57,13 @@ export const EmployeeList = () => {
     const navigate = useNavigate();
     const { employees, isLoading, deleteEmployee } = useEmployeeStore();
     const { hasPermission } = useAuthStore();
-    const { confirm } = useDialog();
     const [credentialEmployee, setCredentialEmployee] = useState<Employee | null>(null);
+    const [deleteConfirmEmp, setDeleteConfirmEmp] = useState<Employee | null>(null);
     const [showFilters, setShowFilters] = useState(false);
 
     // ── Row-Level Security ───────────────────────────────────────────────
     const { scopedEmployees } = useScopedEmployees();
+    const { maskSalary, canViewSalary } = useDataMask();
 
     // ── Pagination State ─────────────────────────────────────────────────────
     const { totalCount, currentPage, totalPages, fetchEmployees } = useEmployeeStore();
@@ -529,9 +532,11 @@ export const EmployeeList = () => {
                                         <div>
                                             <p className="text-dark-muted text-[10px] uppercase tracking-wider">Salary</p>
                                             <p className="text-dark-text text-xs font-medium">
-                                                {hasPermission(PERMISSIONS.VIEW_EMPLOYEE_SALARY)
-                                                    ? `₹${(employee.basicSalary || 0).toLocaleString()}`
-                                                    : '****'}
+                                                <MaskedField
+                                                    value={maskSalary(employee.basicSalary)}
+                                                    isMasked={!canViewSalary}
+                                                    tooltip="Requires VIEW_EMPLOYEE_SALARY permission"
+                                                />
                                             </p>
                                         </div>
                                         <div className="text-right">
@@ -570,17 +575,7 @@ export const EmployeeList = () => {
                                         )}
                                         {hasPermission(PERMISSIONS.DELETE_EMPLOYEE) && (
                                             <button
-                                                onClick={async () => {
-                                                    const ok = await confirm({
-                                                        title: 'Employee Delete Karein?',
-                                                        message: `"${employee.name}" ko permanently delete karna chahte hain?`,
-                                                        detail: 'Iska sara payroll aur attendance data bhi delete ho jayega.',
-                                                        confirmLabel: 'Haan, Delete Karo',
-                                                        cancelLabel: 'Cancel',
-                                                        variant: 'danger',
-                                                    });
-                                                    if (ok) deleteEmployee(employee.id);
-                                                }}
+                                                onClick={() => setDeleteConfirmEmp(employee)}
                                                 className="p-1.5 rounded-lg bg-danger/10 text-danger hover:bg-danger hover:text-white transition-colors"
                                                 title="Delete"
                                             >
@@ -608,6 +603,30 @@ export const EmployeeList = () => {
                     })}
                 </div>
             )}
+
+            {credentialEmployee && (
+                <CredentialsModal
+                    employee={credentialEmployee}
+                    onClose={() => setCredentialEmployee(null)}
+                />
+            )}
+
+            <ReasonConfirmModal
+                isOpen={!!deleteConfirmEmp}
+                onClose={() => setDeleteConfirmEmp(null)}
+                title="Confirm Employee Deletion"
+                description={`You are about to permanently delete "${deleteConfirmEmp?.name}". ALL payroll, loan, and attendance data associated with this employee will be lost forever.`}
+                actionLabel="Delete Permanently"
+                actionVariant="danger"
+                matchText={deleteConfirmEmp ? `DELETE ${deleteConfirmEmp.name}` : undefined}
+                onConfirm={(reason) => {
+                    if (deleteConfirmEmp) {
+                        console.log(`Deleting employee ${deleteConfirmEmp.id} for reason: ${reason}`);
+                        deleteEmployee(deleteConfirmEmp.id);
+                        setDeleteConfirmEmp(null);
+                    }
+                }}
+            />
         </div>
     );
 };

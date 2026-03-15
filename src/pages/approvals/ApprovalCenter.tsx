@@ -37,6 +37,13 @@ export const ApprovalCenter = () => {
         if (filter === 'ALL') return canProcess;
         if (filter === 'HISTORY') return true;
 
+        if (l.workflowApprovals && l.workflowApprovals.length > 0) {
+            const stepIdx = l.currentWorkflowStep ?? 0;
+            const currentStep = l.workflowApprovals[stepIdx];
+            if (currentStep && user?.role === currentStep.roleId) return true;
+            return false;
+        }
+
         if (l.checkingApproverId === user?.id && l.status === LoanStatus.REQUESTED) return true;
         if (l.approverId === user?.id && (l.status === LoanStatus.REQUESTED || l.status === LoanStatus.CHECKED)) return true;
         if (canProcess) return true;
@@ -49,7 +56,17 @@ export const ApprovalCenter = () => {
         ? productionEntries.filter(e => e.status !== ProductionStatus.PENDING)
         : productionEntries.filter(e => e.status === ProductionStatus.PENDING);
 
-    const filteredProduction = relevantProduction.filter(_ => {
+    const filteredProduction = relevantProduction.filter(e => {
+        if (filter === 'ALL') return canProcess;
+        if (filter === 'HISTORY') return true;
+
+        if (e.workflowApprovals && e.workflowApprovals.length > 0) {
+            const stepIdx = e.currentWorkflowStep ?? 0;
+            const currentStep = e.workflowApprovals[stepIdx];
+            if (currentStep && user?.role === currentStep.roleId) return true;
+            return false;
+        }
+
         return canProcess;
     });
 
@@ -160,11 +177,21 @@ export const ApprovalCenter = () => {
                             </thead>
                             <tbody className="divide-y divide-dark-border/50">
                                 {filteredLoans.map(loan => {
-                                    const isMyCheck = loan.checkingApproverId === user?.id;
-                                    const isMyApprove = loan.approverId === user?.id;
-                                    const canAct = (isMyCheck && loan.status === LoanStatus.REQUESTED) ||
-                                        (isMyApprove && (loan.status === LoanStatus.REQUESTED || loan.status === LoanStatus.CHECKED)) ||
-                                        canProcess;
+                                    let canAct = false;
+                                    let requiredAction = 'Approve';
+                                    if (loan.workflowApprovals && loan.workflowApprovals.length > 0) {
+                                        const stepIdx = loan.currentWorkflowStep ?? 0;
+                                        const currentStep = loan.workflowApprovals[stepIdx];
+                                        canAct = currentStep && user?.role === currentStep.roleId;
+                                        requiredAction = currentStep?.roleName || 'Approve';
+                                    } else {
+                                        const isMyCheck = loan.checkingApproverId === user?.id;
+                                        const isMyApprove = loan.approverId === user?.id;
+                                        canAct = (isMyCheck && loan.status === LoanStatus.REQUESTED) ||
+                                            (isMyApprove && (loan.status === LoanStatus.REQUESTED || loan.status === LoanStatus.CHECKED)) ||
+                                            canProcess;
+                                        requiredAction = (isMyCheck && loan.status === LoanStatus.REQUESTED) ? 'Verify' : 'Approve';
+                                    }
 
                                     const isHistory = filter === 'HISTORY';
                                     const lastAudit = loan.auditTrail?.slice(-1)[0];
@@ -201,18 +228,31 @@ export const ApprovalCenter = () => {
                                             </td>
                                             <td className="p-4 text-xs">
                                                 <div className="flex flex-col gap-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-dark-muted w-16">Approver:</span>
-                                                        <span className={clsx(loan.approverId ? "text-white" : "text-dark-muted italic")}>
-                                                            {loan.approverId ? getEmployeeName(loan.approverId) : 'Auto'}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-dark-muted w-16">Checker:</span>
-                                                        <span className={clsx(loan.checkingApproverId ? "text-primary-300" : "text-dark-muted italic")}>
-                                                            {loan.checkingApproverId ? getEmployeeName(loan.checkingApproverId) : 'None'}
-                                                        </span>
-                                                    </div>
+                                                    {loan.workflowApprovals && loan.workflowApprovals.length > 0 ? (
+                                                        loan.workflowApprovals.map((step, idx) => (
+                                                            <div key={idx} className="flex items-center gap-2">
+                                                                <span className="text-dark-muted w-24 truncate">{step.roleName}:</span>
+                                                                <span className={clsx(step.status === 'APPROVED' ? "text-success" : step.status === 'REJECTED' ? "text-red-400" : "text-warning")}>
+                                                                    {step.status === 'PENDING' ? (idx === loan.currentWorkflowStep ? 'Awaiting' : 'Pending') : step.actorName}
+                                                                </span>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-dark-muted w-16">Approver:</span>
+                                                                <span className={clsx(loan.approverId ? "text-white" : "text-dark-muted italic")}>
+                                                                    {loan.approverId ? getEmployeeName(loan.approverId) : 'Auto'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-dark-muted w-16">Checker:</span>
+                                                                <span className={clsx(loan.checkingApproverId ? "text-primary-300" : "text-dark-muted italic")}>
+                                                                    {loan.checkingApproverId ? getEmployeeName(loan.checkingApproverId) : 'None'}
+                                                                </span>
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="p-4">
@@ -257,14 +297,13 @@ export const ApprovalCenter = () => {
                                                     <div className="flex items-center justify-end gap-2">
                                                         <button
                                                             onClick={async () => {
-                                                                const action = (isMyCheck && loan.status === LoanStatus.REQUESTED) ? 'Verify' : 'Approve';
-                                                                const ok = await confirm({ title: `Loan ${action}?`, message: `Kya aap is loan request ko ${action.toLowerCase()} karna chahte hain?`, confirmLabel: `Haan, ${action}`, cancelLabel: 'Cancel', variant: 'info' });
+                                                                const ok = await confirm({ title: `Loan ${requiredAction}?`, message: `Kya aap is loan request ko ${requiredAction.toLowerCase()} karna chahte hain?`, confirmLabel: `Haan, ${requiredAction}`, cancelLabel: 'Cancel', variant: 'info' });
                                                                 if (ok) approveLoan(loan.id);
                                                             }}
                                                             className="flex items-center gap-1.5 px-3 py-1.5 bg-success/20 text-success hover:bg-success hover:text-white rounded-lg transition-colors text-xs font-bold"
                                                         >
                                                             <CheckCircle className="w-4 h-4" />
-                                                            {(isMyCheck && loan.status === LoanStatus.REQUESTED) ? 'Verify' : 'Approve'}
+                                                            {requiredAction}
                                                         </button>
                                                         <button
                                                             onClick={async () => {
@@ -334,38 +373,57 @@ export const ApprovalCenter = () => {
                                             <td className="p-4 text-right font-mono text-white">₹{entry.rate}</td>
                                             <td className="p-4 text-right font-mono text-primary-400 font-bold">₹{entry.totalAmount.toLocaleString()}</td>
                                             <td className="p-4 text-right">
-                                                <span className={clsx(
-                                                    "px-2 py-1 rounded text-[10px] font-bold uppercase",
-                                                    entry.status === ProductionStatus.APPROVED ? "bg-success/20 text-success" :
-                                                        entry.status === ProductionStatus.REJECTED ? "bg-red-500/20 text-red-400" :
-                                                            "bg-warning/20 text-warning"
-                                                )}>
-                                                    {entry.status}
-                                                </span>
+                                                <div className="flex flex-col gap-1 items-end">
+                                                    <span className={clsx(
+                                                        "px-2 py-1 rounded text-[10px] font-bold uppercase",
+                                                        entry.status === ProductionStatus.APPROVED ? "bg-success/20 text-success" :
+                                                            entry.status === ProductionStatus.REJECTED ? "bg-red-500/20 text-red-400" :
+                                                                "bg-warning/20 text-warning"
+                                                    )}>
+                                                        {entry.status}
+                                                    </span>
+                                                    {entry.workflowApprovals && entry.workflowApprovals.length > 0 && (
+                                                        <div className="text-[10px] text-dark-muted mt-1 text-right max-w-[120px]">
+                                                            {entry.workflowApprovals.map((step, idx) => (
+                                                                <div key={idx} className="flex items-center justify-end gap-1">
+                                                                    <span className={clsx(step.status === 'APPROVED' ? "text-success" : step.status === 'REJECTED' ? "text-red-400" : "text-warning")}>
+                                                                        {step.status === 'PENDING' ? (idx === entry.currentWorkflowStep ? '▶' : '•') : '✓'}
+                                                                    </span>
+                                                                    <span className="truncate">{step.roleName}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="p-4 text-right">
                                                 {entry.status === ProductionStatus.PENDING && (
                                                     <div className="flex items-center justify-end gap-2">
-                                                        <button
-                                                            onClick={async () => {
-                                                                const ok = await confirm({ title: 'Work Entry Approve?', message: 'Is production entry ko approve karna chahte hain?', confirmLabel: 'Approve', cancelLabel: 'Cancel', variant: 'info' });
-                                                                if (ok) approveEntry(entry.id);
-                                                            }}
-                                                            className="p-1.5 bg-success/20 text-success hover:bg-success hover:text-white rounded-lg transition-colors"
-                                                            title="Approve"
-                                                        >
-                                                            <CheckCircle className="w-4 h-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={async () => {
-                                                                const ok = await confirm({ title: 'Work Entry Reject?', message: 'Is production entry ko reject karna chahte hain?', confirmLabel: 'Reject', cancelLabel: 'Cancel', variant: 'danger' });
-                                                                if (ok) rejectEntry(entry.id);
-                                                            }}
-                                                            className="p-1.5 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors"
-                                                            title="Reject"
-                                                        >
-                                                            <XCircle className="w-4 h-4" />
-                                                        </button>
+                                                        {(!entry.workflowApprovals || entry.workflowApprovals[entry.currentWorkflowStep ?? 0]?.roleId === user?.role || canProcess) && (
+                                                            <>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        const requiredAction = entry.workflowApprovals ? entry.workflowApprovals[entry.currentWorkflowStep ?? 0]?.roleName || 'Approve' : 'Approve';
+                                                                        const ok = await confirm({ title: `Work Entry ${requiredAction}?`, message: 'Is production entry ko approve karna chahte hain?', confirmLabel: 'Approve', cancelLabel: 'Cancel', variant: 'info' });
+                                                                        if (ok) approveEntry(entry.id);
+                                                                    }}
+                                                                    className="p-1.5 bg-success/20 text-success hover:bg-success hover:text-white rounded-lg transition-colors"
+                                                                    title="Approve"
+                                                                >
+                                                                    <CheckCircle className="w-4 h-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        const ok = await confirm({ title: 'Work Entry Reject?', message: 'Is production entry ko reject karna chahte hain?', confirmLabel: 'Reject', cancelLabel: 'Cancel', variant: 'danger' });
+                                                                        if (ok) rejectEntry(entry.id);
+                                                                    }}
+                                                                    className="p-1.5 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors"
+                                                                    title="Reject"
+                                                                >
+                                                                    <XCircle className="w-4 h-4" />
+                                                                </button>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 )}
                                             </td>

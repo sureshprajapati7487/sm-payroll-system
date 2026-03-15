@@ -3,6 +3,7 @@ import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { LoginPage } from '@/pages/LoginPage';
 import { UnauthorizedPage } from '@/pages/UnauthorizedPage';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PermissionRefreshSync } from '@/components/auth/PermissionRefreshSync';
 import { EmployeeList } from '@/pages/employees/EmployeeList';
 import { EmployeeProfile } from '@/pages/employees/EmployeeProfile';
 import { EmployeeForm } from '@/pages/employees/EmployeeForm';
@@ -67,6 +68,7 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary, PageErrorBoundary } from '@/components/ErrorBoundary';
 import { CameraPunchWidget } from '@/components/CameraPunchWidget';
 import { InstallPWA } from '@/components/InstallPWA';
+import { SecurityAlertToast } from '@/components/security/SecurityAlertToast';
 
 import { DialogProvider } from '@/components/DialogProvider';
 
@@ -120,6 +122,7 @@ import { useInternalDepartmentStore } from '@/store/departmentStore';
 import { useInternalShiftStore } from '@/store/shiftStore';
 import { useInternalWorkGroupStore } from '@/store/workGroupStore';
 import { useRolePermissionsStore } from '@/store/rolePermissionsStore';
+import { PERMISSIONS } from '@/config/permissions';
 
 // ── Auth Guard: agar token hai toh login page nahi dikhega, seedha dashboard ──
 const AuthGuard = ({ children }: { children: JSX.Element }) => {
@@ -183,11 +186,13 @@ function App() {
         <ErrorBoundary>
             <DialogProvider>
                 <BrowserRouter>
+                    <PermissionRefreshSync />
                     <ForceIpRedirect />
                     <LoanApprovalModal />
                     <CommandPalette />
                     <CameraPunchWidget />
                     <InstallPWA />
+                    <SecurityAlertToast />
 
                     {showWarning && (
                         <SessionTimeoutModal
@@ -216,36 +221,66 @@ function App() {
                                 <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
                                 {/* Employee Module */}
-                                <Route path="/employees" element={<EmployeeList />} />
-                                <Route path="/employees/new" element={<EmployeeForm />} />
-                                <Route path="/employees/:id" element={<EmployeeProfile />} />
-                                <Route path="/employees/:id/edit" element={<EmployeeForm />} />
+                                <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_EMPLOYEES} />}>
+                                    <Route path="/employees" element={<EmployeeList />} />
+                                    <Route path="/employees/new" element={<EmployeeForm />} />
+                                    <Route path="/employees/:id" element={<EmployeeProfile />} />
+                                    <Route path="/employees/:id/edit" element={<EmployeeForm />} />
+                                </Route>
 
-                                {/* Existing Modules */}
-                                <Route path="/attendance" element={<PageErrorBoundary pageName="Attendance"><AttendanceDashboard /></PageErrorBoundary>} />
-                                <Route path="/attendance/holidays" element={<PageErrorBoundary pageName="Holiday Manager"><HolidayManager /></PageErrorBoundary>} />
-                                <Route path="/attendance/kiosk" element={<PageErrorBoundary pageName="Face Kiosk"><FaceKioskPage /></PageErrorBoundary>} />
-                                <Route path="/salesman" element={<PageErrorBoundary pageName="Salesman Dashboard"><SalesmanDashboard /></PageErrorBoundary>} />
-                                <Route path="/salesman/clients" element={<PageErrorBoundary pageName="Client / Party List"><ClientListPage /></PageErrorBoundary>} />
-                                <Route path="/production" element={<PageErrorBoundary pageName="Production Dashboard"><ProductionDashboard /></PageErrorBoundary>} />
-                                <Route path="/production/rates" element={<PageErrorBoundary pageName="Rate Manager"><RateManager /></PageErrorBoundary>} />
-                                <Route path="/production/workgroups" element={<PageErrorBoundary pageName="Work Groups"><WorkGroupManager /></PageErrorBoundary>} />
-                                <Route path="/production/bulk" element={<PageErrorBoundary pageName="Bulk Production Entry"><BulkEntryForm /></PageErrorBoundary>} />
-                                <Route path="/leaves" element={<PageErrorBoundary pageName="Leave Dashboard"><LeaveDashboard /></PageErrorBoundary>} />
-                                <Route path="/loans" element={<PageErrorBoundary pageName="Loan Manager"><LoanDashboard /></PageErrorBoundary>} />
-                                <Route path="/approvals" element={<PageErrorBoundary pageName="Approval Center"><ApprovalCenter /></PageErrorBoundary>} />
-                                <Route path="/payroll" element={<PageErrorBoundary pageName="Payroll Dashboard"><PayrollDashboard /></PageErrorBoundary>} />
-                                <Route path="/payroll/history" element={<PageErrorBoundary pageName="Payroll History"><PayrollHistory /></PageErrorBoundary>} />
-                                <Route path="/payroll/simulation" element={<PageErrorBoundary pageName="Payroll Simulation"><PayrollSimulation /></PageErrorBoundary>} />
-                                <Route path="/payroll/slip/:id" element={<PageErrorBoundary pageName="Payslip"><PayslipView /></PageErrorBoundary>} />
+                                {/* Attendance Module */}
+                                <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_ATTENDANCE} />}>
+                                    <Route path="/attendance" element={<PageErrorBoundary pageName="Attendance"><AttendanceDashboard /></PageErrorBoundary>} />
+                                    <Route path="/attendance/holidays" element={<PageErrorBoundary pageName="Holiday Manager"><HolidayManager /></PageErrorBoundary>} />
+                                    <Route path="/attendance/kiosk" element={<PageErrorBoundary pageName="Face Kiosk"><FaceKioskPage /></PageErrorBoundary>} />
+                                </Route>
 
-                                {/* Expenses */}
-                                <Route path="/expenses" element={<PageErrorBoundary pageName="Expenses"><ExpensesDashboard /></PageErrorBoundary>} />
+                                {/* Salesman Dashboard (Optional depending on usage context, but View Salesman applies) */}
+                                <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_SALESMAN} />}>
+                                    <Route path="/salesman" element={<PageErrorBoundary pageName="Salesman Dashboard"><SalesmanDashboard /></PageErrorBoundary>} />
+                                    <Route path="/salesman/clients" element={<PageErrorBoundary pageName="Client / Party List"><ClientListPage /></PageErrorBoundary>} />
+                                </Route>
+
+                                {/* Production Module */}
+                                <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_PRODUCTION} />}>
+                                    <Route path="/production" element={<PageErrorBoundary pageName="Production Dashboard"><ProductionDashboard /></PageErrorBoundary>} />
+                                    <Route path="/production/rates" element={<PageErrorBoundary pageName="Rate Manager"><RateManager /></PageErrorBoundary>} />
+                                    <Route path="/production/workgroups" element={<PageErrorBoundary pageName="Work Groups"><WorkGroupManager /></PageErrorBoundary>} />
+                                    <Route path="/production/bulk" element={<PageErrorBoundary pageName="Bulk Production Entry"><BulkEntryForm /></PageErrorBoundary>} />
+                                </Route>
+
+                                {/* Leaves & Loans Module */}
+                                <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_LEAVES} />}>
+                                    <Route path="/leaves" element={<PageErrorBoundary pageName="Leave Dashboard"><LeaveDashboard /></PageErrorBoundary>} />
+                                </Route>
+                                <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_OWN_LOANS} />}>
+                                    <Route path="/loans" element={<PageErrorBoundary pageName="Loan Manager"><LoanDashboard /></PageErrorBoundary>} />
+                                </Route>
+
+                                {/* Approvals Module */}
+                                <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_APPROVALS} />}>
+                                    <Route path="/approvals" element={<PageErrorBoundary pageName="Approval Center"><ApprovalCenter /></PageErrorBoundary>} />
+                                </Route>
+
+                                {/* Payroll Module */}
+                                <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_PAYROLL} />}>
+                                    <Route path="/payroll" element={<PageErrorBoundary pageName="Payroll Dashboard"><PayrollDashboard /></PageErrorBoundary>} />
+                                    <Route path="/payroll/history" element={<PageErrorBoundary pageName="Payroll History"><PayrollHistory /></PageErrorBoundary>} />
+                                    <Route path="/payroll/simulation" element={<PageErrorBoundary pageName="Payroll Simulation"><PayrollSimulation /></PageErrorBoundary>} />
+                                    <Route path="/payroll/slip/:id" element={<PageErrorBoundary pageName="Payslip"><PayslipView /></PageErrorBoundary>} />
+                                </Route>
+
+                                {/* Expenses module */}
+                                <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_OWN_EXPENSES} />}>
+                                    <Route path="/expenses" element={<PageErrorBoundary pageName="Expenses"><ExpensesDashboard /></PageErrorBoundary>} />
+                                </Route>
 
                                 {/* Calculator Pages */}
-                                <Route path="/calculators/ctc" element={<CTCCalculator />} />
-                                <Route path="/calculators/tds" element={<TDSCalculator />} />
-                                <Route path="/calculators/pfesi" element={<PFESICalculator />} />
+                                <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.USE_CALCULATORS} />}>
+                                    <Route path="/calculators/ctc" element={<CTCCalculator />} />
+                                    <Route path="/calculators/tds" element={<TDSCalculator />} />
+                                    <Route path="/calculators/pfesi" element={<PFESICalculator />} />
+                                </Route>
 
                                 {/* Admin Tools */}
                                 <Route path="/admin/bulk-import" element={<PageErrorBoundary pageName="Bulk Import"><BulkImport /></PageErrorBoundary>} />

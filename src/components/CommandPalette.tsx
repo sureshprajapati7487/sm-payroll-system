@@ -8,7 +8,7 @@ import {
     CreditCard, Banknote, Calendar, CheckSquare, Shield,
     Building2, UserPlus, Download, RefreshCw,
     ChevronRight, BookOpen, Trash2, FileSpreadsheet,
-    AlertCircle, Activity, PiggyBank, Moon
+    AlertCircle, Activity, PiggyBank, Moon, Database, ScanFace, FileDown
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useEmployeeStore } from '@/store/employeeStore';
@@ -87,6 +87,9 @@ export const CommandPalette = () => {
             { id: 'act-payslip', title: 'View Payslip History', description: 'Past payroll records', icon: <FileSpreadsheet className="w-4 h-4" />, action: () => navigate('/payroll/history'), keywords: ['payslip', 'history', 'past', 'payroll'], category: 'Action', perm: PERMISSIONS.VIEW_PAYROLL },
             { id: 'act-loan-req', title: 'New Loan Request', description: 'Raise an advance/loan', icon: <PiggyBank className="w-4 h-4" />, action: () => navigate('/loans'), keywords: ['loan', 'advance', 'udhar', 'request'], category: 'Action', perm: PERMISSIONS.VIEW_ALL_LOANS },
             { id: 'act-bulk-import', title: 'Bulk Import', description: 'Import employees from file', icon: <Download className="w-4 h-4" />, action: () => navigate('/admin/bulk-import'), keywords: ['import', 'bulk', 'upload', 'excel'], category: 'Action', perm: PERMISSIONS.BULK_IMPORT },
+            { id: 'act-db-backup', title: 'Database Backup', description: 'Download full system backup', icon: <Database className="w-4 h-4" />, action: () => navigate('/admin/database-backup'), keywords: ['backup', 'database', 'download', 'export', 'db'], category: 'Action', perm: PERMISSIONS.DATABASE_BACKUP },
+            { id: 'act-export-csv', title: 'Export Reports CSV', description: 'Download reports as spreadsheet', icon: <FileDown className="w-4 h-4" />, action: () => navigate('/reports/builder'), keywords: ['export', 'csv', 'download', 'excel', 'spreadsheet', 'report'], category: 'Action', perm: PERMISSIONS.EXPORT_REPORTS },
+            { id: 'act-face-kiosk', title: 'Face Recognition Kiosk', description: 'Mark attendance via face scan', icon: <ScanFace className="w-4 h-4" />, action: () => navigate('/attendance/face-kiosk'), keywords: ['face', 'kiosk', 'recognition', 'scan', 'biometric', 'punch'], category: 'Action', perm: PERMISSIONS.USE_FACE_KIOSK },
             { id: 'act-audit', title: 'Audit Logs', description: 'View system activity logs', icon: <Activity className="w-4 h-4" />, action: () => navigate('/admin/audit-logs'), keywords: ['audit', 'logs', 'activity', 'history'], category: 'Action', perm: PERMISSIONS.VIEW_AUDIT_LOGS },
             { id: 'act-trash', title: 'Trash / Deleted Items', description: 'Restore deleted records', icon: <Trash2 className="w-4 h-4" />, action: () => navigate('/admin/trash'), keywords: ['trash', 'deleted', 'restore', 'recycle'], category: 'Action', perm: PERMISSIONS.MANAGE_TRASH },
 
@@ -98,7 +101,7 @@ export const CommandPalette = () => {
             { id: 'rep-scheduled', title: 'Scheduled Reports', description: 'Auto-send report schedule', icon: <RefreshCw className="w-4 h-4" />, action: () => navigate('/reports/scheduled'), keywords: ['scheduled', 'auto', 'report', 'email'], category: 'Report', perm: PERMISSIONS.SCHEDULE_REPORTS },
 
             // â”€â”€ Settings (always visible) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            { id: 'set-settings', title: 'Settings', description: 'App configuration', icon: <Settings className="w-4 h-4" />, action: () => navigate('/settings'), keywords: ['settings', 'config', 'preferences'], category: 'Settings' },
+            { id: 'set-settings', title: 'Settings', description: 'App configuration', icon: <Settings className="w-4 h-4" />, action: () => navigate('/settings'), keywords: ['settings', 'config', 'preferences'], category: 'Settings', perm: PERMISSIONS.MANAGE_SETTINGS },
             { id: 'set-theme', title: 'Change Theme', description: 'Switch app theme & dark mode', icon: <Moon className="w-4 h-4" />, action: () => navigate('/settings'), keywords: ['theme', 'dark', 'light', 'color', 'mode', 'theem'], category: 'Settings' },
             { id: 'set-logout', title: 'Log Out', description: 'Sign out of your account', icon: <LogOut className="w-4 h-4" />, action: () => { logout(); navigate('/login'); }, keywords: ['logout', 'sign out', 'exit', 'quit'], category: 'Settings' as CategoryType, danger: true },
         ];

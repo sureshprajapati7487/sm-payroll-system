@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import { LeaveRequest, LeaveStatus } from '@/types';
+import { LeaveRequest, LeaveStatus, NotificationType } from '@/types';
 import { useMultiCompanyStore } from './multiCompanyStore';
 import { apiFetch } from '@/lib/apiClient';
 import { useAuthStore } from './authStore';
 import { useRolePermissionsStore } from './rolePermissionsStore';
 import { useEmployeeStore } from './employeeStore';
 import { useWorkflowStore } from './workflowStore';
+import { useNotificationStore } from './notificationStore';
 
 interface LeaveState {
     requests: LeaveRequest[];
@@ -46,14 +47,23 @@ const useInternalLeaveStore = create<LeaveState>((set, get) => ({
     requestLeave: async (req) => {
         const companyId = useMultiCompanyStore.getState().currentCompanyId;
 
-        // Check if there's an active workflow for 'leave'
-        const activeWorkflow = useWorkflowStore.getState().getWorkflowByModule('leave');
-        const workflowApprovals = activeWorkflow?.steps.map(step => ({
-            stepId: step.id,
-            roleId: step.roleId,
-            roleName: step.roleName,
-            status: 'PENDING' as const,
-        }));
+        // 🛡️ Leave > 15 days Rule: Mandatory 2-step approval
+        let workflowApprovals = [];
+        if (req.daysCount && req.daysCount > 15) {
+            workflowApprovals = [
+                { stepId: 's1', roleId: 'MANAGER', roleName: 'Manager', status: 'PENDING' as const },
+                { stepId: 's2', roleId: 'ADMIN', roleName: 'Admin', status: 'PENDING' as const },
+            ];
+        } else {
+            // Check if there's an active workflow for 'leave'
+            const activeWorkflow = useWorkflowStore.getState().getWorkflowByModule('leave');
+            workflowApprovals = activeWorkflow?.steps.map(step => ({
+                stepId: step.id,
+                roleId: step.roleId,
+                roleName: step.roleName,
+                status: 'PENDING' as const,
+            })) || [];
+        }
 
         const newRequest: LeaveRequest = {
             ...req,
@@ -61,8 +71,8 @@ const useInternalLeaveStore = create<LeaveState>((set, get) => ({
             companyId: companyId || undefined,
             status: LeaveStatus.PENDING,
             appliedOn: new Date().toISOString().split('T')[0],
-            workflowApprovals: workflowApprovals || [],
-            currentWorkflowStep: workflowApprovals && workflowApprovals.length > 0 ? 0 : undefined,
+            workflowApprovals: workflowApprovals,
+            currentWorkflowStep: workflowApprovals.length > 0 ? 0 : undefined,
         };
 
         // Optimistic update
@@ -86,6 +96,16 @@ const useInternalLeaveStore = create<LeaveState>((set, get) => ({
             // Rollback on failure
             set(state => ({ requests: state.requests.filter(r => r.id !== newRequest.id) }));
         }
+
+        // ── Notify Managers/Admins about new leave request ────────────────────
+        const applicant = useEmployeeStore.getState()._rawEmployees.find(e => e.id === newRequest.employeeId);
+        useNotificationStore.getState().addNotification({
+            type: NotificationType.LEAVE_REQUEST,
+            targetRoles: ['MANAGER', 'ADMIN', 'SUPER_ADMIN'],
+            title: `Leave Request — ${applicant?.name ?? newRequest.employeeId}`,
+            message: `${newRequest.type} leave requested from ${newRequest.startDate} to ${newRequest.endDate}${newRequest.reason ? ': ' + newRequest.reason : ''}.`,
+            employeeId: newRequest.employeeId,
+        });
     },
 
     // ── Approve → PATCH /api/leaves/:id/approve ──────────────────────────────
@@ -152,6 +172,18 @@ const useInternalLeaveStore = create<LeaveState>((set, get) => ({
                 )
             }));
         }
+
+        // ── Notify employee of the decision ─────────────────────────────────────
+        const approvedLeave = get().requests.find(r => r.id === id);
+        if (approvedLeave) {
+            useNotificationStore.getState().addNotification({
+                type: NotificationType.LEAVE_DECISION,
+                targetUserIds: [approvedLeave.employeeId],
+                title: 'Leave Approved ✅',
+                message: `Your ${approvedLeave.type} leave from ${approvedLeave.startDate} to ${approvedLeave.endDate} has been approved.`,
+                employeeId: approvedLeave.employeeId,
+            });
+        }
     },
 
     // ── Reject → PATCH /api/leaves/:id/reject ───────────────────────────────
@@ -175,6 +207,18 @@ const useInternalLeaveStore = create<LeaveState>((set, get) => ({
                     r.id === id ? { ...r, status: LeaveStatus.PENDING } : r
                 )
             }));
+        }
+
+        // ── Notify employee of the decision ─────────────────────────────────────
+        const rejectedLeave = get().requests.find(r => r.id === id);
+        if (rejectedLeave) {
+            useNotificationStore.getState().addNotification({
+                type: NotificationType.LEAVE_DECISION,
+                targetUserIds: [rejectedLeave.employeeId],
+                title: 'Leave Rejected ❌',
+                message: `Your ${rejectedLeave.type} leave request from ${rejectedLeave.startDate} to ${rejectedLeave.endDate} was not approved.`,
+                employeeId: rejectedLeave.employeeId,
+            });
         }
     },
 

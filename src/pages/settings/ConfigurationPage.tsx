@@ -10,10 +10,9 @@ import { useInternalSystemSettingStore, useSystemSettingStore } from '@/store/sy
 import { useInternalShiftStore, useShiftStore } from '@/store/shiftStore';
 import { useSystemConfigStore } from '@/store/systemConfigStore';
 import { useSystemKeyStore, useInternalSystemKeyStore } from '@/store/systemKeyStore';
-import { useAuthStore } from '@/store/authStore';
 import { useHolidayStore } from '@/store/holidayStore';
 import { PERMISSIONS } from '@/config/permissions';
-import { Roles } from '@/types';
+import { usePermissions } from '@/hooks/usePermission';
 import { Building2, Clock, Plus, Trash2, Edit2, Save, X, Briefcase, Gavel, FileCheck, AlertOctagon, IndianRupee, CalendarCheck, Key, Lock, Eye, EyeOff, Calendar, Camera, MapPin, Fingerprint, ScanFace, Navigation, ToggleLeft, ToggleRight, Crosshair, Shield, Network, Settings2 } from 'lucide-react';
 import { WarningModal } from '@/components/ui/WarningModal';
 import { StatutorySettings } from './StatutorySettings';
@@ -658,10 +657,23 @@ export const ConfigurationPage = () => {
     const { shifts, addShift, updateShift, removeShift } = useShiftStore();
     const { groups: workGroups, assignments, addGroup, removeGroup, getGroupEmployees } = useWorkGroupStore();
     const config = useSystemConfigStore();
-    const { user, hasPermission } = useAuthStore();
+
+    // Lazy Evaluation Hook for all required UI checks in this component
+    const perms = usePermissions([
+        PERMISSIONS.MANAGE_ROLES,
+        PERMISSIONS.MANAGE_SETTINGS,
+        PERMISSIONS.MANAGE_HOLIDAYS,
+        PERMISSIONS.MANAGE_DEPARTMENTS,
+        PERMISSIONS.MANAGE_WORK_GROUPS,
+        PERMISSIONS.MANAGE_SHIFTS,
+        PERMISSIONS.MANAGE_STATUTORY,
+    ]);
+
+    const isSuperAdmin = perms[PERMISSIONS.MANAGE_ROLES];
+    const isAdmin = perms[PERMISSIONS.MANAGE_SETTINGS];
+    const canManageHolidays = perms[PERMISSIONS.MANAGE_HOLIDAYS];
+
     const { holidays, addHoliday, removeHoliday, fetchHolidays } = useHolidayStore();
-    const isSuperAdmin = user?.role === Roles.SUPER_ADMIN;
-    const isAdmin = user?.role === Roles.ADMIN || user?.role === Roles.SUPER_ADMIN;
 
     const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
     const fetchDepartments = useInternalDepartmentStore(s => s.fetchDepartments);
@@ -772,7 +784,6 @@ export const ConfigurationPage = () => {
 
     // Holiday Form State (must be at top level — Rules of Hooks)
     const [hForm, setHForm] = useState({ name: '', date: '', type: 'FESTIVAL' as 'FESTIVAL' | 'NATIONAL' | 'OPTIONAL' });
-    const canManageHolidays = hasPermission(PERMISSIONS.MANAGE_HOLIDAYS);
 
     const handleHSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -858,7 +869,7 @@ export const ConfigurationPage = () => {
                         { id: 'salesman', label: 'Salesman', icon: <span className="text-xs">🛒</span>, color: 'orange', req: PERMISSIONS.MANAGE_SETTINGS },
                         { id: 'punch', label: 'Punch System', icon: <Camera className="w-3.5 h-3.5" />, color: 'emerald', req: PERMISSIONS.MANAGE_SETTINGS },
                         { id: 'statutory', label: 'Statutory', icon: <Shield className="w-3.5 h-3.5" />, color: 'primary', req: PERMISSIONS.MANAGE_STATUTORY },
-                    ].filter(tab => !tab.req || hasPermission(tab.req)).map(tab => {
+                    ].filter(tab => !tab.req || perms[tab.req]).map(tab => {
                         const isActive = activeTab === tab.id;
                         const colorMap: Record<string, string> = {
                             primary: 'bg-primary-600 text-white shadow-primary-600/30',
