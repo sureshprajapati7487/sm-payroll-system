@@ -29,7 +29,14 @@ setInterval(() => {
     }
 }, 30 * 60 * 1000);
 
-function getAttemptKey(idOrEmail) { return (idOrEmail || '').trim().toLowerCase(); }
+// getAttemptKey — returns a consistent, unified key for brute-force tracking
+// Employee code is stored as UPPERCASE (e.g. "ACLLP-01"), email as lowercase
+// We normalize BOTH so lockout works regardless of what the user typed
+function getAttemptKey(idOrEmail) {
+    const clean = (idOrEmail || '').trim();
+    // If it looks like an email (has @), use lowercase; otherwise uppercase for emp code
+    return clean.includes('@') ? clean.toLowerCase() : clean.toUpperCase();
+}
 function isLocked(key) {
     const entry = failedAttempts.get(key);
     if (!entry || !entry.lockedUntil) return false;
@@ -156,6 +163,9 @@ const ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'https://localhost:5173',
     'http://localhost:4173',
+    'capacitor://localhost',                 // iOS Capacitor requests
+    'http://localhost',                      // Android Capacitor requests
+    'https://localhost',
     'https://sm-payroll-system.vercel.app',  // production frontend
     'https://192.168.1.3:5173',              // local network dev
     process.env.FRONTEND_URL,
@@ -163,7 +173,6 @@ const ALLOWED_ORIGINS = [
 
 // ── Auth Middleware ───────────────────────────────────────────────────────────
 const PUBLIC_PATHS = [
-    { method: 'GET', path: '/api/dev/reset-admin' }, // TEMPORARY DEBUG ROUTE
     { method: 'POST', path: '/api/auth/login' },
     { method: 'POST', path: '/api/auth/dev-login' },
     { method: 'POST', path: '/api/auth/refresh' },
@@ -180,7 +189,14 @@ const PUBLIC_PATHS = [
     { method: 'GET', path: '/api/clients/demo-export' },
 ];
 
+// ── DEV ONLY: Reset Admin Password (localhost only, blocked in production) ────
 app.get('/api/dev/reset-admin', async (req, res) => {
+    // 🔒 SECURITY: Only allow from localhost — never accessible from network or production
+    const ip = req.socket.remoteAddress || req.ip || '';
+    const isLocalhost = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+    if (IS_PRODUCTION || !isLocalhost) {
+        return res.status(403).json({ error: 'Access denied. This route is only available on localhost in development mode.' });
+    }
     try {
         const emp = await Employee.findOne({ where: { code: 'ACLLP-01' } });
         if (!emp) {
