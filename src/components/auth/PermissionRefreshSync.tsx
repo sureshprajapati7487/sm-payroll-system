@@ -2,77 +2,73 @@ import { useEffect, useRef } from 'react';
 import { useDialog } from '@/components/DialogProvider';
 import { useRolePermissionsStore } from '@/store/rolePermissionsStore';
 import { useAuthStore } from '@/store/authStore';
+import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 
 export const PermissionRefreshSync = () => {
     const { toast } = useDialog();
     const { user } = useAuthStore();
-    const { permissions, scopes } = useRolePermissionsStore();
+    const { currentCompanyId } = useMultiCompanyStore();
+    const { permissions, scopes, fetchPermissions, _hydrated } = useRolePermissionsStore();
 
-    // Store the initial signature of the store to detect diffs
-    const initialSignature = useRef(JSON.stringify({ permissions, scopes }));
+    const userRole = user?.role;
+
+    // Extract only the current user's permissions to avoid reloading everyone when ANY role changes.
+    const getSignature = () => {
+        if (!userRole) return '';
+        return JSON.stringify({
+            perms: permissions[userRole] || [],
+            scope: scopes[userRole] || 'OWN'
+        });
+    };
+
+    const initialSignature = useRef<string | null>(null);
     const isReloading = useRef(false);
 
+    // 1. Snapshot the initial signature ONCE per session after hydration
     useEffect(() => {
-        if (!user) return; // Don't trigger if user is not logged in
+        if (!initialSignature.current && _hydrated && userRole) {
+            initialSignature.current = getSignature();
+        }
+    }, [_hydrated, userRole]);
 
-        const triggerReload = () => {
-            if (isReloading.current) return;
+    // 2. Diff and Trigger Reload
+    useEffect(() => {
+        if (!userRole || !initialSignature.current || isReloading.current) return;
+
+        const currentSignature = getSignature();
+
+        if (currentSignature !== initialSignature.current) {
             isReloading.current = true;
-
             toast('Your permissions were updated by an Admin. Reloading session...', 'warning');
 
             setTimeout(() => {
                 window.location.reload();
             }, 3000);
-        };
+        }
+    }, [permissions, scopes, userRole, toast]);
 
-        // 1. Storage Event Listener (Instantly fires across tabs)
-        const handleStorage = (e: StorageEvent) => {
-            if (e.key === 'role-permissions-v2') {
-                if (!e.newValue) return;
-                try {
-                    const nextState = JSON.parse(e.newValue).state;
-                    const nextSignature = JSON.stringify({
-                        permissions: nextState.permissions,
-                        scopes: nextState.scopes
-                    });
+    // 3. Network Sync Polling (cross-device mobile syncing)
+    useEffect(() => {
+        if (!user || !currentCompanyId) return;
 
-                    if (nextSignature !== initialSignature.current) {
-                        triggerReload();
-                    }
-                } catch (err) {
-                    console.error('Failed to parse storage event for permission sync', err);
-                }
-            }
-        };
-
-        window.addEventListener('storage', handleStorage);
-
-        // 2. Fallback Polling (Every 60s)
+        // Fetch from backend every 60 seconds
         const intervalId = setInterval(() => {
-            const raw = localStorage.getItem('role-permissions-v2');
-            if (raw) {
-                try {
-                    const parsed = JSON.parse(raw).state;
-                    const currentSignature = JSON.stringify({
-                        permissions: parsed.permissions,
-                        scopes: parsed.scopes
-                    });
-
-                    if (currentSignature !== initialSignature.current) {
-                        triggerReload();
-                    }
-                } catch {
-                    // Ignore JSON parse errors here
-                }
-            }
+            fetchPermissions(currentCompanyId);
         }, 60000);
 
-        return () => {
-            window.removeEventListener('storage', handleStorage);
-            clearInterval(intervalId);
+        // Also add visibility listener to fetch immediately when app comes to foreground
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchPermissions(currentCompanyId);
+            }
         };
-    }, [user, toast]);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    return null; // Headless component, renders no UI
+        return () => {
+            clearInterval(intervalId);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [user, currentCompanyId, fetchPermissions]);
+
+    return null; // Headless component
 };

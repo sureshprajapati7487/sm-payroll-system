@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Role, Roles } from '@/types';
 import { ROLE_PERMISSIONS, PERMISSIONS, PermissionValue } from '@/config/permissions';
+import { useMultiCompanyStore } from './multiCompanyStore';
+import { apiFetch } from '@/lib/apiClient';
 
 export type DataScope = 'ALL' | 'TEAM' | 'OWN';
 
@@ -66,6 +68,25 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
 
             _setHydrated: (v) => set({ _hydrated: v }),
 
+            // Helper to sync to backend
+            _syncToServer: async (permissions: RolePermMap, scopes: RoleScopeMap) => {
+                const companyId = useMultiCompanyStore.getState().currentCompanyId;
+                if (!companyId) return;
+                try {
+                    await apiFetch(`/system-settings`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            companyId,
+                            key: 'ROLE_PERMISSIONS_V2',
+                            value: JSON.stringify({ permissions, scopes })
+                        })
+                    });
+                } catch (error) {
+                    console.error('Failed to sync permissions to server:', error);
+                }
+            },
+
             // ── Atomic save: replaces everything at once → persisted immediately ──
             setPermissions: (permissions, scopes) => {
                 clearCache(); // Invalidate performance cache
@@ -79,6 +100,7 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
                     [Roles.SUPER_ADMIN]: 'ALL' as DataScope,
                 };
                 set({ permissions: safePerms, scopes: safeScopes });
+                (get() as any)._syncToServer(safePerms, safeScopes);
             },
 
             togglePermission: (role, permission) => {
@@ -87,15 +109,18 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
                 set((state) => {
                     const current = state.permissions[role] ?? [];
                     const has = current.includes(permission);
+                    const newPermissions = {
+                        ...state.permissions,
+                        [role]: has
+                            ? current.filter((p) => p !== permission)
+                            : [...current, permission],
+                    };
                     return {
-                        permissions: {
-                            ...state.permissions,
-                            [role]: has
-                                ? current.filter((p) => p !== permission)
-                                : [...current, permission],
-                        },
+                        permissions: newPermissions
                     };
                 });
+                const state = get();
+                (state as any)._syncToServer(state.permissions, state.scopes);
             },
 
             hasPermission: (role, permission) => {
@@ -117,7 +142,11 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
 
             setScope: (role, scope) => {
                 if (role === Roles.SUPER_ADMIN) return;
-                set((state) => ({ scopes: { ...state.scopes, [role]: scope } }));
+                set((state) => {
+                    const newScopes = { ...state.scopes, [role]: scope };
+                    (get() as any)._syncToServer(state.permissions, newScopes);
+                    return { scopes: newScopes };
+                });
             },
 
             getScope: (role) => {
@@ -128,22 +157,48 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
             resetRole: (role) => {
                 if (role === Roles.SUPER_ADMIN) return;
                 clearCache(); // Invalidate performance cache
-                set((state) => ({
-                    permissions: {
+                set((state) => {
+                    const newPermissions = {
                         ...state.permissions,
                         [role]: [...(ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] ?? [])],
-                    },
-                    scopes: { ...state.scopes, [role]: defaultScopes()[role] },
-                }));
+                    };
+                    const newScopes = { ...state.scopes, [role]: defaultScopes()[role] };
+                    (get() as any)._syncToServer(newPermissions, newScopes);
+                    return {
+                        permissions: newPermissions,
+                        scopes: newScopes,
+                    };
+                });
             },
 
             resetAll: () => {
                 clearCache(); // Invalidate performance cache
-                set({ permissions: defaultPermissions(), scopes: defaultScopes() });
+                const perms = defaultPermissions();
+                const scps = defaultScopes();
+                set({ permissions: perms, scopes: scps });
+                (get() as any)._syncToServer(perms, scps);
             },
 
-            // No-op: kept for backwards compatibility in App.tsx
-            fetchPermissions: async (_companyId: string) => { /* localStorage-backed — no fetch needed */ },
+            // Fetches global permissions from backend so mobile devices sync up
+            fetchPermissions: async (companyId: string) => {
+                if (!companyId) return;
+                try {
+                    const res = await apiFetch(`/system-settings?companyId=${companyId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const roleSetting = data.find((s: any) => s.key === 'ROLE_PERMISSIONS_V2');
+                        if (roleSetting) {
+                            const parsed = JSON.parse(roleSetting.value);
+                            if (parsed.permissions && parsed.scopes) {
+                                clearCache();
+                                set({ permissions: parsed.permissions, scopes: parsed.scopes });
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch permissions from server:', error);
+                }
+            },
         }),
         {
             name: 'role-permissions-v2', // New key clears any stale/broken old cache
