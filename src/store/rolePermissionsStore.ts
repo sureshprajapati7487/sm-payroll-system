@@ -180,23 +180,24 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
             },
 
             // Fetches global permissions from backend so mobile devices sync up
+            // Returns true if server had saved permissions, false if not
             fetchPermissions: async (companyId: string) => {
                 if (!companyId) return;
                 try {
                     const res = await apiFetch(`/system-settings?companyId=${companyId}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        const roleSetting = data.find((s: any) => s.key === 'ROLE_PERMISSIONS_V2');
-                        if (roleSetting) {
-                            const parsed = JSON.parse(roleSetting.value);
-                            if (parsed.permissions && parsed.scopes) {
-                                clearCache();
-                                set({ permissions: parsed.permissions, scopes: parsed.scopes });
-                            }
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    const roleSetting = data.find((s: any) => s.key === 'ROLE_PERMISSIONS_V2');
+                    if (roleSetting?.value) {
+                        const parsed = JSON.parse(roleSetting.value);
+                        if (parsed.permissions && parsed.scopes) {
+                            clearCache();
+                            set({ permissions: parsed.permissions, scopes: parsed.scopes });
                         }
                     }
+                    // If no server data — silently keep localStorage version (handled by PermissionRefreshSync)
                 } catch (error) {
-                    console.error('Failed to fetch permissions from server:', error);
+                    console.warn('[PermissionsStore] fetchPermissions failed:', error);
                 }
             },
         }),

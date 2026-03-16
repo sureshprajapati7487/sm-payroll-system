@@ -1,12 +1,24 @@
 /**
  * apiConfig.ts — Central API URL resolver
  *
- * THREE environments:
- *  1. Web Dev  (Vite dev server): '/api'  → Vite proxy → http://localhost:3000
- *  2. Android Dev (Capacitor):    'http://YOUR_PC_IP:3000/api'  (local network)
- *  3. Production (Vercel/Render): 'https://your-backend.com/api'
+ * ═══════════════════════════════════════════════════════════════
+ *  ENVIRONMENT MODES  (controlled via .env.local)
+ * ═══════════════════════════════════════════════════════════════
  *
- * To switch Android to production: set VITE_API_URL in your build env.
+ *  MODE A — Production Server (ALL devices sync to same DB) ✅ ACTIVE
+ *  ─ Set VITE_API_URL=https://sm-payroll-system.onrender.com in .env.local
+ *  ─ Local Web  → Render (production)
+ *  ─ Website    → Render (production)
+ *  ─ Android    → Render (production)
+ *  ─ Result: Permissions, data — sab ek hi DB mein ✅
+ *
+ *  MODE B — Local Server (offline / local dev)
+ *  ─ Comment out VITE_API_URL in .env.local (or delete it)
+ *  ─ Also run: cd server && npm start
+ *  ─ Local Web → localhost:3000 (Vite proxy)
+ *  ─ Android   → still uses Render (native always uses PROD_API)
+ *
+ * ═══════════════════════════════════════════════════════════════
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -14,25 +26,31 @@ import { Capacitor } from '@capacitor/core';
 // ── Detect if running inside native Android/iOS app ──────────────────────────
 const isNative = Capacitor.isNativePlatform();
 
-// ── Android Dev (Local IP) ─────────────────
-// Set this to your PC's local IP address (ipconfig) so your phone can reach your local server
-const LOCAL_WIFI_IP = '192.168.1.83';
-const DEV_API = `http://${LOCAL_WIFI_IP}:3000/api`;
+// ── Production base URL (from .env.local or default Render URL) ──────────────
+const rawEnv = (import.meta.env.VITE_API_URL || 'https://sm-payroll-system.onrender.com')
+    .replace(/\/api\/?$/, '')  // trailing /api remove
+    .replace(/\/$/, '');       // trailing slash remove
 
-// ── Production URLs (Vercel/Render) ─────────────
-const rawEnv = (import.meta.env.VITE_API_URL || 'https://sm-payroll-system.onrender.com').replace(/\/api\/?$/, '').replace(/\/$/, '');
 const PROD_API = `${rawEnv}/api`;
 
-// ── Resolution Logic ─────────────────────────────────────────────────────────
-export const API_URL: string =
-    isNative ? DEV_API : // <--- Android now points to LOCAL PC during testing! Change to PROD_API when releasing.
-        (import.meta.env.VITE_API_URL ? PROD_API : '/api'); // Web uses proxy in dev or PROD in prod
+// ── API URL Resolution ────────────────────────────────────────────────────────
+// Android (native)     → always production (Render)
+// Web with VITE_API_URL → production (Render)  ← .env.local set hai toh
+// Web without VITE_API_URL → '/api' (Vite proxy → localhost:3000)
+export const API_URL: string = isNative
+    ? PROD_API
+    : (import.meta.env.VITE_API_URL ? PROD_API : '/api');
 
 export const getApiUrl = () => API_URL;
 
-// ── Helper: full URL for direct fetch calls ────────
+// ── Current Mode (for debugging in Server Status page) ───────────────────────
+export const getEnvironmentMode = (): 'production' | 'local' => {
+    if (isNative || import.meta.env.VITE_API_URL) return 'production';
+    return 'local';
+};
+
+// ── Helper: base URL (without /api) for direct fetch calls ───────────────────
 export const getServerBaseUrl = (): string => {
-    if (isNative) return DEV_API.replace('/api', '');
-    if (import.meta.env.VITE_API_URL) return PROD_API.replace('/api', '');
+    if (isNative || import.meta.env.VITE_API_URL) return rawEnv;
     return 'http://localhost:3000';
 };

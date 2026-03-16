@@ -96,14 +96,18 @@ export default defineConfig(async () => {
       host: true,
       port: 5173,
       https: !isProd,
-      proxy: {
-        '/api': {
-          target: 'http://localhost:3000',
-          changeOrigin: true,
-          secure: false,
+      // ── Proxy only active in LOCAL mode (when VITE_API_URL is NOT set) ────────
+      // When VITE_API_URL is set → browser calls Render directly (CORS) — no proxy needed
+      // When VITE_API_URL is NOT set → Vite proxies /api → localhost:3000
+      ...(process.env.VITE_API_URL ? {} : {
+        proxy: {
+          '/api': {
+            target: 'http://localhost:3000',
+            changeOrigin: true,
+            secure: false,
+          }
         }
-      }
+      }),
     },
   };
 });
-

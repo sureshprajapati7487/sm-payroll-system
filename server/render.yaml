@@ -16,4 +16,4 @@ services:
       - key: REFRESH_SECRET
         generateValue: true
       - key: FRONTEND_URL
-        sync: false
+        value: https://sm-payroll-system.vercel.app

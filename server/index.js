@@ -159,19 +159,28 @@ const addError = (err, endpoint = 'system') => {
 };
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
-const ALLOWED_ORIGINS = [
-    'http://localhost:5173',
-    'https://localhost:5173',
-    'http://localhost:4173',
-    'capacitor://localhost',                 // iOS Capacitor requests
-    'http://localhost',                      // Android Capacitor requests
+// Static allow list (always allowed)
+const ALLOWED_ORIGINS_STATIC = [
+    'https://sm-payroll-system.vercel.app',  // production frontend (Vercel)
+    'capacitor://localhost',                 // iOS Capacitor
+    'http://localhost',                      // Android WebView
     'https://localhost',
-    'https://sm-payroll-system.vercel.app',  // production frontend
-    'https://192.168.1.3:5173',              // local network dev
-    'http://192.168.1.83:5173',              // User's Local PC IP (Vite)
-    'http://192.168.1.83:3000',              // User's Local PC IP (Backend)
     process.env.FRONTEND_URL,
 ].filter(Boolean);
+
+// Dynamic check: allow ANY localhost origin (any port) — covers dev server on any port
+// Also allow any 192.168.x.x local network origin for mobile testing on LAN
+function isAllowedOrigin(origin) {
+    if (!origin) return true; // server-to-server (no origin header)
+    if (ALLOWED_ORIGINS_STATIC.includes(origin)) return true;
+    // Allow localhost on any port (http or https)
+    if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
+    // Allow HTTPS localhost on any port (Vite dev SSL)
+    if (/^https:\/\/localhost(:\d+)?$/.test(origin)) return true;
+    // Allow local network IPs (192.168.x.x or 10.x.x.x) on any port
+    if (/^https?:\/\/(192\.168\.|10\.)\d+\.\d+(:\d+)?$/.test(origin)) return true;
+    return false;
+}
 
 // ── Auth Middleware ───────────────────────────────────────────────────────────
 const PUBLIC_PATHS = [
@@ -238,10 +247,9 @@ function authMiddleware(req, res, next) {
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-        if (IS_PRODUCTION) { console.warn(`🚫 CORS blocked: ${origin}`); return callback(new Error(`CORS: origin ${origin} not allowed`)); }
-        return callback(null, true);
+        if (isAllowedOrigin(origin)) return callback(null, true);
+        console.warn(`🚫 CORS blocked: ${origin}`);
+        return callback(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true,
 }));
