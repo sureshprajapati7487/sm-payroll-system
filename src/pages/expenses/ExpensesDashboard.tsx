@@ -108,7 +108,7 @@ export const ExpensesDashboard = () => {
                     <p className="text-dark-muted">Track daily office expenses with full audit history.</p>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full md:w-auto">
                     <div className="flex bg-dark-bg p-1 rounded-lg border border-dark-border">
                         <button
                             onClick={() => setFilterStatus('ALL')}
@@ -265,7 +265,7 @@ export const ExpensesDashboard = () => {
                                 <span className="text-xs text-dark-muted">{filteredExpenses.length} entries</span>
                             </div>
 
-                            <div className="max-h-[500px] overflow-y-auto">
+                            <div className="max-h-[500px] overflow-y-auto overflow-x-auto">
                                 {filteredExpenses.length > 0 ? (
                                     <table className="w-full text-left text-sm">
                                         <thead className="bg-dark-surface text-dark-muted sticky top-0 z-10">

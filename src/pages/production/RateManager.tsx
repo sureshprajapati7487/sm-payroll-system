@@ -56,8 +56,8 @@ export const RateManager = ({ onClose }: { onClose?: () => void }) => {
             </div>
             <div className="glass rounded-2xl overflow-hidden">
                 {/* Add New Form */}
-                <form onSubmit={handleAdd} className="bg-dark-bg/50 p-4 rounded-xl border border-dark-border mb-6 flex gap-3 items-end">
-                    <div className="flex-1 space-y-1">
+                <form onSubmit={handleAdd} className="bg-dark-bg/50 p-4 rounded-xl border border-dark-border mb-6 flex flex-wrap gap-3 items-end">
+                    <div className="flex-1 min-w-[150px] space-y-1">
                         <label className="text-xs text-dark-muted">Item Name</label>
                         <input
                             type="text"
@@ -104,7 +104,7 @@ export const RateManager = ({ onClose }: { onClose?: () => void }) => {
                         items.map(item => (
                             <div key={item.id} className="flex items-center justify-between p-3 bg-dark-bg rounded-lg group border border-transparent hover:border-dark-border transition-all">
                                 {editingId === item.id ? (
-                                    <div className="flex items-center gap-3 w-full">
+                                    <div className="flex flex-wrap items-center gap-3 w-full">
                                         <input
                                             className="flex-1 bg-dark-card border border-dark-border rounded px-2 py-1 text-white text-sm"
                                             value={editForm.name}

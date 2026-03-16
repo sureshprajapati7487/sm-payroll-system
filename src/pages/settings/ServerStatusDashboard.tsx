@@ -394,7 +394,7 @@ export const ServerStatusDashboard = () => {
             </div>
 
             {/* ── Status Cards ── */}
-            <div className="grid grid-cols-4 gap-3 mb-3 shrink-0">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 shrink-0">
                 {/* Backend */}
                 <div className={`rounded-xl p-3 border ${backendOnline ? 'bg-emerald-500/10 border-emerald-500/25' : 'bg-red-500/10 border-red-500/25'}`}>
                     <div className="flex items-center justify-between mb-1">
@@ -663,7 +663,7 @@ export const ServerStatusDashboard = () => {
                             {/* ── Diagnostics Summary Bar ── */}
                             {deepHealth.diagnosticSummary && (
                                 <>
-                                    <div className="grid grid-cols-4 gap-3">
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                                         {[
                                             { label: 'Total Checks', value: deepHealth.diagnosticSummary.total, color: 'text-slate-300', bg: 'bg-dark-elem/50 border-dark-border' },
                                             { label: 'Critical Issues', value: deepHealth.diagnosticSummary.critical, color: 'text-red-400', bg: deepHealth.diagnosticSummary.critical > 0 ? 'bg-red-500/15 border-red-500/30' : 'bg-dark-elem/50 border-dark-border' },

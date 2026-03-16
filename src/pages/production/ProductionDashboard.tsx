@@ -412,12 +412,12 @@ export const ProductionDashboard = () => {
             </div>
 
             {/* ── Date Range Filter ── */}
-            <div className="glass p-3 rounded-xl flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="glass p-3 rounded-xl flex flex-col items-start sm:items-center sm:flex-row gap-3">
                 {/* Quick range buttons */}
-                <div className="flex gap-1.5">
+                <div className="flex flex-wrap gap-1.5 w-full sm:w-auto">
                     {([['today', 'Today'], ['week', 'This Week'], ['month', 'This Month'], ['custom', 'Custom']] as [QuickRange, string][]).map(([key, label]) => (
                         <button key={key} onClick={() => applyQuick(key)} className={clsx(
-                            'px-3 py-1.5 rounded-lg text-xs font-bold transition-all',
+                            'px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex-1 sm:flex-none whitespace-nowrap',
                             quickRange === key
                                 ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
                                 : 'bg-dark-bg text-dark-muted hover:text-white hover:bg-dark-border'
@@ -426,69 +426,69 @@ export const ProductionDashboard = () => {
                 </div>
 
                 {/* Date inputs */}
-                <div className="flex items-center gap-2 ml-auto">
-                    <Calendar className="w-3.5 h-3.5 text-dark-muted" />
+                <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                    <Calendar className="w-3.5 h-3.5 text-dark-muted shrink-0" />
                     <input type="date" value={startDate}
                         onChange={e => { setStartDate(e.target.value); setQuickRange('custom'); }}
-                        className="bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-primary-500" />
-                    <span className="text-dark-muted text-xs">→</span>
+                        className="bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-primary-500 w-full sm:w-auto min-w-0" />
+                    <span className="text-dark-muted text-xs shrink-0">→</span>
                     <input type="date" value={endDate} min={startDate}
                         onChange={e => { setEndDate(e.target.value); setQuickRange('custom'); }}
-                        className="bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-primary-500" />
-                    <span className="text-[10px] text-dark-muted border border-dark-border rounded px-2 py-1 bg-dark-bg whitespace-nowrap">
-                        {filteredEntries.length} entries
+                        className="bg-dark-bg border border-dark-border rounded-lg px-2 py-1.5 text-white text-xs focus:outline-none focus:border-primary-500 w-full sm:w-auto min-w-0" />
+                    <span className="text-[10px] text-dark-muted border border-dark-border rounded px-2 py-1 bg-dark-bg whitespace-nowrap shrink-0">
+                        {filteredEntries.length}
                     </span>
                 </div>
             </div>
 
             {/* ── KPI Cards ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="glass p-3 rounded-xl border-l-4 border-emerald-500">
+            <div className="flex overflow-x-auto pb-2 -mb-2 gap-4 snap-x">
+                <div className="glass p-3 rounded-xl border-l-4 border-emerald-500 min-w-[150px] flex-1 snap-start">
                     <p className="text-[10px] text-dark-muted font-bold uppercase tracking-wider">Approved Amount</p>
                     <p className="text-xl font-bold text-white mt-0.5">₹{totalApproved.toLocaleString('en-IN')}</p>
-                    <p className="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">
+                    <p className="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5 whitespace-nowrap">
                         <CheckCircle className="w-3 h-3" /> {filteredEntries.filter(e => e.status === 'APPROVED').length} entries
                     </p>
                 </div>
-                <div className="glass p-3 rounded-xl border-l-4 border-yellow-500">
+                <div className="glass p-3 rounded-xl border-l-4 border-yellow-500 min-w-[150px] flex-1 snap-start">
                     <p className="text-[10px] text-dark-muted font-bold uppercase tracking-wider">Pending Review</p>
                     <p className="text-xl font-bold text-white mt-0.5">₹{totalPending.toLocaleString('en-IN')}</p>
-                    <p className="text-[10px] text-yellow-400 flex items-center gap-1 mt-0.5">
+                    <p className="text-[10px] text-yellow-400 flex items-center gap-1 mt-0.5 whitespace-nowrap">
                         <Clock className="w-3 h-3" /> {pendingCount} entries
                     </p>
                 </div>
-                <div className="glass p-3 rounded-xl border-l-4 border-blue-500">
+                <div className="glass p-3 rounded-xl border-l-4 border-blue-500 min-w-[150px] flex-1 snap-start">
                     <p className="text-[10px] text-dark-muted font-bold uppercase tracking-wider">Total Entries</p>
                     <p className="text-xl font-bold text-white mt-0.5">{filteredEntries.length}</p>
-                    <p className="text-[10px] text-blue-400 flex items-center gap-1 mt-0.5">
+                    <p className="text-[10px] text-blue-400 flex items-center gap-1 mt-0.5 whitespace-nowrap">
                         <Factory className="w-3 h-3" /> {employeeSummary.length} employees
                     </p>
                 </div>
-                <div className="glass p-3 rounded-xl border-l-4 border-purple-500">
+                <div className="glass p-3 rounded-xl border-l-4 border-purple-500 min-w-[150px] flex-1 snap-start">
                     <p className="text-[10px] text-dark-muted font-bold uppercase tracking-wider">Top Performer</p>
                     <p className="text-sm font-bold text-white mt-0.5 truncate">{employeeSummary[0]?.name || '—'}</p>
-                    <p className="text-[10px] text-purple-400 flex items-center gap-1 mt-0.5">
+                    <p className="text-[10px] text-purple-400 flex items-center gap-1 mt-0.5 whitespace-nowrap">
                         <Trophy className="w-3 h-3" /> ₹{(employeeSummary[0]?.approved || 0).toLocaleString('en-IN')}
                     </p>
                 </div>
             </div>
 
             {/* ── View Toggle ── */}
-            <div className="flex items-center gap-2">
+            <div className="flex overflow-x-auto pb-1 -mb-1 gap-2 items-center">
                 <button onClick={() => setViewMode('daily')} className={clsx(
-                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all',
+                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap shrink-0',
                     viewMode === 'daily' ? 'bg-primary-600 text-white shadow-lg' : 'bg-dark-card text-dark-muted hover:text-white hover:bg-dark-border'
                 )}><Factory className="w-3.5 h-3.5" /> Daily Entries</button>
                 <button onClick={() => setViewMode('summary')} className={clsx(
-                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all',
+                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap shrink-0',
                     viewMode === 'summary' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-dark-card text-dark-muted hover:text-white hover:bg-dark-border'
                 )}><BarChart3 className="w-3.5 h-3.5" /> Monthly Summary</button>
                 <button onClick={() => setViewMode('items')} className={clsx(
-                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all',
+                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap shrink-0',
                     viewMode === 'items' ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20' : 'bg-dark-card text-dark-muted hover:text-white hover:bg-dark-border'
                 )}><Tag className="w-3.5 h-3.5" /> Item Summary</button>
                 <button onClick={() => setViewMode('chart')} className={clsx(
-                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all',
+                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap shrink-0',
                     viewMode === 'chart' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'bg-dark-card text-dark-muted hover:text-white hover:bg-dark-border'
                 )}><TrendingUp className="w-3.5 h-3.5" /> Chart</button>
             </div>

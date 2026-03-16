@@ -156,7 +156,7 @@ export const TDSCalculator = () => {
                                 {/* Old Regime */}
                                 <div className={`glass rounded-2xl p-6 ${result.recommendedRegime === 'OLD' ? 'border-2 border-yellow-500' : ''
                                     }`}>
-                                    <div className="flex items-center justify-between mb-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                                         <h4 className="text-lg font-semibold text-white">Old Regime</h4>
                                         {result.recommendedRegime === 'OLD' && (
                                             <span className="text-xs px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full">
@@ -203,7 +203,7 @@ export const TDSCalculator = () => {
                                 {/* New Regime */}
                                 <div className={`glass rounded-2xl p-6 ${result.recommendedRegime === 'NEW' ? 'border-2 border-primary-500' : ''
                                     }`}>
-                                    <div className="flex items-center justify-between mb-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                                         <h4 className="text-lg font-semibold text-white">New Regime</h4>
                                         {result.recommendedRegime === 'NEW' && (
                                             <span className="text-xs px-2 py-1 bg-primary-500/20 text-primary-400 rounded-full">
@@ -243,7 +243,7 @@ export const TDSCalculator = () => {
 
                             {/* Monthly TDS */}
                             <div className="glass rounded-2xl p-6">
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                                     <div>
                                         <div className="text-dark-muted text-sm mb-1">Monthly TDS (Recommended Regime)</div>
                                         <div className="text-3xl font-bold text-white">

@@ -436,12 +436,12 @@ const SalesmanConfigPanel = () => {
     return (
         <div className="space-y-8 max-w-4xl">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">🛒 Salesman Configuration</h2>
                     <p className="text-sm text-slate-400 mt-1">Sales team ke liye rules, targets, aur features configure karo</p>
                 </div>
-                <button onClick={save} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg ${saved ? 'bg-green-600 shadow-green-600/20 text-white' : 'bg-orange-500 hover:bg-orange-400 text-white shadow-orange-500/20'}`}>
+                <button onClick={save} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg w-full md:w-auto justify-center ${saved ? 'bg-green-600 shadow-green-600/20 text-white' : 'bg-orange-500 hover:bg-orange-400 text-white shadow-orange-500/20'}`}>
                     <Save className="w-4 h-4" /> {saved ? '✅ Saved!' : 'Save Changes'}
                 </button>
             </div>
@@ -618,7 +618,7 @@ const SalesmanConfigPanel = () => {
                         ))}
                     </div>
                     {/* Add New Purpose */}
-                    <div className="flex gap-2 items-end">
+                    <div className="flex flex-wrap gap-2 items-end">
                         <div className="w-14">
                             <label className="text-[10px] text-slate-500 uppercase block mb-1">Emoji</label>
                             <input value={newPurpose.emoji} onChange={e => setNewPurpose(p => ({ ...p, emoji: e.target.value }))} className={`${inp} text-center text-lg`} maxLength={2} />

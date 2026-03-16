@@ -49,7 +49,7 @@ export const CTCCalculator = () => {
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                         <Calculator className="w-8 h-8 text-primary-500" />
@@ -162,7 +162,7 @@ export const CTCCalculator = () => {
 
                         {/* Detailed Breakdown */}
                         <div className="lg:col-span-3 glass rounded-2xl p-6">
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                                 <h3 className="text-lg font-semibold text-white">Detailed Breakdown</h3>
                                 <button className="flex items-center gap-2 px-3 py-1.5 bg-primary-500/20 hover:bg-primary-500/30 text-primary-400 rounded-lg text-sm transition-all">
                                     <Download className="w-4 h-4" />

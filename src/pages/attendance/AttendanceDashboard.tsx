@@ -334,23 +334,23 @@ export const AttendanceDashboard = () => {
             />
 
             {/* Stats Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="glass p-4 rounded-xl border-t-4 border-success relative overflow-hidden group">
+            <div className="flex overflow-x-auto pb-4 -mb-4 gap-4 snap-x md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0 md:mb-0">
+                <div className="glass p-4 rounded-xl border-t-4 border-success relative overflow-hidden group min-w-[150px] flex-[0_0_45%] snap-start">
                     <div className="absolute right-2 top-2 opacity-10 group-hover:opacity-20 transition-opacity"><CheckCircle className="w-12 h-12 text-success" /></div>
                     <p className="text-dark-muted text-xs font-medium uppercase">Present</p>
                     <p className="text-2xl font-bold text-dark-text mt-1">{stats.present} <span className="text-sm text-dark-muted font-normal">/ {stats.total}</span></p>
                 </div>
-                <div className="glass p-4 rounded-xl border-t-4 border-warning relative overflow-hidden group">
+                <div className="glass p-4 rounded-xl border-t-4 border-warning relative overflow-hidden group min-w-[150px] flex-[0_0_45%] snap-start">
                     <div className="absolute right-2 top-2 opacity-10 group-hover:opacity-20 transition-opacity"><Clock className="w-12 h-12 text-warning" /></div>
                     <p className="text-dark-muted text-xs font-medium uppercase">Late Arrival</p>
                     <p className="text-2xl font-bold text-dark-text mt-1">{stats.late}</p>
                 </div>
-                <div className="glass p-4 rounded-xl border-t-4 border-danger relative overflow-hidden group">
+                <div className="glass p-4 rounded-xl border-t-4 border-danger relative overflow-hidden group min-w-[150px] flex-[0_0_45%] snap-start">
                     <div className="absolute right-2 top-2 opacity-10 group-hover:opacity-20 transition-opacity"><AlertTriangle className="w-12 h-12 text-danger" /></div>
                     <p className="text-dark-muted text-xs font-medium uppercase">Absent</p>
                     <p className="text-2xl font-bold text-dark-text mt-1">{stats.absent}</p>
                 </div>
-                <div className="glass p-4 rounded-xl border-t-4 border-primary-500 relative overflow-hidden group">
+                <div className="glass p-4 rounded-xl border-t-4 border-primary-500 relative overflow-hidden group min-w-[150px] flex-[0_0_45%] snap-start">
                     <div className="absolute right-2 top-2 opacity-10 group-hover:opacity-20 transition-opacity"><Calendar className="w-12 h-12 text-primary-500" /></div>
                     <p className="text-dark-muted text-xs font-medium uppercase">On Leave</p>
                     <p className="text-2xl font-bold text-dark-text mt-1">{stats.leave}</p>
@@ -375,7 +375,7 @@ export const AttendanceDashboard = () => {
                 };
 
                 return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="flex overflow-x-auto pb-4 -mb-4 gap-4 snap-x sm:grid sm:grid-cols-2 md:grid-cols-4 md:gap-4 sm:overflow-visible sm:pb-0 sm:mb-0">
                         {ALL_SHIFTS.map(sh => {
                             const shiftEmps = activeEmployees.filter(e => (e.shift || 'GENERAL') === sh);
                             if (shiftEmps.length === 0) return null;
@@ -391,7 +391,7 @@ export const AttendanceDashboard = () => {
                             const attendancePct = shiftEmps.length > 0 ? Math.round((shiftPresent / shiftEmps.length) * 100) : 0;
 
                             return (
-                                <div key={sh} className={`glass rounded-xl p-4 border ${SHIFT_COLORS[sh]} cursor-pointer hover:shadow-lg transition-all`}
+                                <div key={sh} className={`glass rounded-xl p-4 border ${SHIFT_COLORS[sh]} cursor-pointer hover:shadow-lg transition-all min-w-[200px] flex-[0_0_80%] sm:flex-1 snap-start`}
                                     onClick={() => setShiftFilter(shiftFilter === sh ? 'ALL' : sh)}>
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="text-xs font-bold text-dark-muted uppercase tracking-wider">{sh}</span>
@@ -438,7 +438,7 @@ export const AttendanceDashboard = () => {
                         </div>
 
                         {/* Filters */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <select
                                 value={shiftFilter}
                                 onChange={(e) => setShiftFilter(e.target.value as any)}

@@ -201,7 +201,7 @@ export const EmployeeList = () => {
             </div>
 
             {/* ── Search + filter toggle row ──────────────────────── */}
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
                 {/* Search */}
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-muted" />
@@ -245,7 +245,7 @@ export const EmployeeList = () => {
                         Sort
                         <ChevronDown className="w-3 h-3" />
                     </button>
-                    <div className="absolute right-0 top-full mt-2 w-44 bg-dark-card border border-dark-border rounded-xl shadow-2xl z-30 overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                    <div className="absolute right-0 top-full mt-2 w-44 bg-dark-card border border-dark-border rounded-xl shadow-2xl z-40 overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                         {SORT_OPTIONS.map(opt => (
                             <button
                                 key={opt.key}
@@ -388,7 +388,7 @@ export const EmployeeList = () => {
 
             {/* ── Active filter chips ─────────────────────────────── */}
             {activeFilterCount > 0 && !showFilters && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 pt-1">
                     {deptFilter !== 'All' && (
                         <span className="flex items-center gap-1.5 px-2.5 py-1 bg-primary-500/10 border border-primary-500/30 rounded-full text-xs text-primary-400">
                             Dept: {deptFilter}
@@ -483,7 +483,7 @@ export const EmployeeList = () => {
                         return (
                             <div
                                 key={employee.id}
-                                className="glass group relative overflow-hidden rounded-2xl border border-dark-border/50 hover:border-primary-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary-500/10 hover:-translate-y-0.5"
+                                className="glass group relative overflow-hidden rounded-2xl border border-dark-border/50 hover:border-primary-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary-500/10 hover:-translate-y-0.5 pb-14 md:pb-0"
                             >
                                 {/* Status indicator strip */}
                                 <div className={clsx(

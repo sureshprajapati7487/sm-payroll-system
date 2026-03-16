@@ -474,66 +474,76 @@ export const FaceKioskPage = () => {
     }
 
     return (
-        <div className="fixed inset-0 bg-[#060a0f] flex flex-col overflow-hidden z-[100]">
+        <div className="fixed inset-0 bg-[#060a0f] flex flex-col overflow-hidden z-[100] w-full h-[100dvh]">
 
             {/* ── Header ───────────────────────────────────────────────────── */}
-            <div className="flex flex-wrap items-center justify-between gap-2 px-3 md:px-6 py-2 md:py-3 border-b border-slate-800/70 bg-slate-900/80 backdrop-blur-md shrink-0">
-                {/* Left */}
-                <div className="flex items-center gap-2 md:gap-4">
-                    <button onClick={() => { stopCamera(); stopAllLoops(); navigate('/attendance'); }}
-                        className="p-2 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition-all">
-                        <ArrowLeft className="w-5 h-5" />
-                    </button>
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center">
-                            <ScanFace className="w-4 h-4 text-violet-400" />
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-3 px-3 md:px-6 py-3 border-b border-slate-800/70 bg-[#0a0f1a] shrink-0 w-full z-20">
+                {/* Mobile Top Row: Back & Title ... and Right Controls */}
+                <div className="flex items-center justify-between w-full lg:w-auto">
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <button onClick={() => { stopCamera(); stopAllLoops(); navigate('/attendance'); }}
+                            className="p-2 rounded-xl text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition-all">
+                            <ArrowLeft className="w-5 h-5" />
+                        </button>
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center">
+                                <ScanFace className="w-4 h-4 text-violet-400" />
+                            </div>
+                            <div>
+                                <p className="text-white font-bold text-sm leading-tight">Face Kiosk</p>
+                                <p className="text-slate-500 text-[10px] hidden sm:block">SM Payroll System</p>
+                            </div>
                         </div>
-                        <div className="hidden sm:block">
-                            <p className="text-white font-bold text-sm leading-tight">Face Kiosk</p>
-                            <p className="text-slate-600 text-[10px]">SM Payroll System</p>
-                        </div>
+                    </div>
+                    {/* Right Controls (Mobile Only) */}
+                    <div className="flex items-center gap-2 lg:hidden">
+                        <LiveClock />
+                        <button onClick={toggleFullscreen}
+                            className="p-2 rounded-xl text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition-all">
+                            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                        </button>
                     </div>
                 </div>
 
-                {/* Center: Mode Tabs — horizontal scroll on small screens */}
-                <div className="flex items-center bg-slate-800/60 rounded-xl p-1 gap-1 overflow-x-auto max-w-full">
+                {/* Center Tabs */}
+                <div className="flex items-center w-full lg:w-auto bg-slate-800/80 rounded-xl p-1 gap-1 shadow-inner overflow-x-auto min-w-0">
                     <button onClick={() => setMode('live')}
-                        className={`flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all whitespace-nowrap ${mode === 'live' ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/50' : 'text-slate-400 hover:text-slate-200'}`}>
-                        <Camera className="w-3.5 h-3.5" /> Live Detect
+                        className={`flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${mode === 'live' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                        <Camera className="w-4 h-4" /> Live Detect
                     </button>
                     {isAdmin && (
                         <button onClick={() => { stopAllLoops(); setMode('enroll'); }}
-                            className={`flex items-center gap-1.5 px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all whitespace-nowrap ${mode === 'enroll' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/50' : 'text-slate-400 hover:text-slate-200'}`}>
-                            <Users className="w-3.5 h-3.5" /> Enroll
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${enrolledCount === activeEmployees.length ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                            className={`flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${mode === 'enroll' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
+                            <Users className="w-4 h-4" /> Enroll
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${enrolledCount === activeEmployees.length ? 'bg-emerald-950 text-emerald-400' : 'bg-amber-950 text-amber-400'}`}>
                                 {enrolledCount}/{activeEmployees.length}
                             </span>
                         </button>
                     )}
                 </div>
 
-                {/* Right: Model status + Clock + Fullscreen */}
-                <div className="flex items-center gap-2 md:gap-3">
-                    <div className="text-xs">
+                {/* Right Controls (Desktop Only) */}
+                <div className="hidden lg:flex items-center gap-4 shrink-0">
+                    <div className="text-xs font-medium">
                         {modelsLoaded
-                            ? <span className="flex items-center gap-1 text-green-400"><Wifi className="w-3 h-3" /> <span className="hidden sm:inline">Face AI Ready</span></span>
-                            : <span className="flex items-center gap-1 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" /> {loadProgress}%</span>}
+                            ? <span className="flex items-center gap-1.5 text-emerald-400"><Wifi className="w-3.5 h-3.5" /> Models Active</span>
+                            : <span className="flex items-center gap-1.5 text-amber-400"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading {loadProgress}%</span>}
                     </div>
                     <LiveClock />
                     <button onClick={toggleFullscreen}
                         title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen (F11)'}
-                        className="p-2 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition-all">
-                        {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                        className="p-2.5 rounded-xl text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition-all">
+                        {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
                     </button>
                 </div>
             </div>
 
             {/* ── Body ─────────────────────────────────────────────────────── */}
-            <div className="flex-1 flex overflow-hidden relative">
+            <div className="flex-1 flex flex-col overflow-hidden relative w-full h-full min-h-0">
 
                 {/* ══ LIVE DETECT MODE ══════════════════════════════════════ */}
                 {mode === 'live' && (
-                    <div className="flex-1 flex overflow-hidden">
+                    <div className="flex-1 flex flex-col md:flex-row overflow-hidden w-full h-full min-h-0">
 
                         {/* Left: Camera col */}
                         <div className="flex-1 flex flex-col items-center justify-center relative p-6 gap-5">
@@ -825,11 +835,11 @@ export const FaceKioskPage = () => {
 
                 {/* ══ ENROLL MODE ════════════════════════════════════════════ */}
                 {mode === 'enroll' && (
-                    <div className="flex-1 flex overflow-hidden">
+                    <div className="flex-1 flex flex-col md:flex-row overflow-hidden w-full h-full min-h-0">
 
-                        {/* Left: Camera */}
-                        <div className="w-[420px] shrink-0 p-6 flex flex-col gap-4 border-r border-slate-800/50">
-                            <div className="relative rounded-2xl overflow-hidden aspect-video border-2 border-slate-700/60 bg-slate-900">
+                        {/* Left/Top: Camera */}
+                        <div className="w-full md:w-[420px] shrink-0 p-3 md:p-6 flex flex-col gap-3 md:gap-4 border-b md:border-b-0 md:border-r border-slate-800/80 bg-[#0a0f1a] overflow-y-auto">
+                            <div className="relative rounded-2xl overflow-hidden aspect-video w-full max-w-sm mx-auto md:max-w-none border-2 border-slate-700/60 bg-slate-900 shrink-0">
                                 <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
                                 {enrollingId ? (
                                     <div className="absolute inset-x-0 bottom-0 bg-black/70 py-3 px-4">
@@ -864,14 +874,14 @@ export const FaceKioskPage = () => {
                             </div>
                             {enrollingId && (
                                 <button onClick={cancelEnroll}
-                                    className="w-full py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-300 text-sm font-bold hover:bg-slate-700 transition-all">
-                                    Cancel
+                                    className="w-full max-w-sm mx-auto md:max-w-none py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-300 text-sm font-bold hover:bg-slate-700 transition-all shrink-0">
+                                    Cancel Search
                                 </button>
                             )}
                         </div>
 
-                        {/* Right: Employee Grid */}
-                        <div className="flex-1 flex flex-col overflow-hidden p-6 gap-4">
+                        {/* Right/Bottom: Employee Grid */}
+                        <div className="flex-1 flex flex-col overflow-hidden bg-[#060a0f] p-3 md:p-6 gap-3 min-h-0 relative">
                             {/* Header + Search */}
                             <div className="flex items-center justify-between gap-3">
                                 <div>
@@ -893,7 +903,7 @@ export const FaceKioskPage = () => {
                             </div>
 
                             {/* Grid */}
-                            <div className="flex-1 overflow-y-auto">
+                            <div className="flex-1 overflow-y-auto min-h-0 pr-1 pb-20 md:pb-0">
                                 {filteredEnrollEmployees.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-16 gap-2 text-center">
                                         <Search className="w-10 h-10 text-slate-700" />
@@ -901,7 +911,7 @@ export const FaceKioskPage = () => {
                                         <button onClick={() => setEnrollSearch('')} className="text-violet-400 text-xs underline mt-1">Clear search</button>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                                         {filteredEnrollEmployees.map(emp => {
                                             const isEnrolled = biometricStore.isFaceRegistered(emp.id);
                                             const isActive = enrollingId === emp.id;

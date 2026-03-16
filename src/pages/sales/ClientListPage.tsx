@@ -425,17 +425,17 @@ const VisitHistoryModal = ({ client, onClose }: { client: SalesClient; onClose: 
                     <button onClick={onClose} className="text-dark-muted hover:text-white"><X className="w-5 h-5" /></button>
                 </div>
                 {/* Stats row */}
-                <div className="grid grid-cols-4 gap-3 px-5 py-3 border-b border-dark-border/50">
+                <div className="flex overflow-x-auto gap-4 pb-4 -mb-4 snap-x px-5 py-3 border-b border-dark-border/50 md:grid md:grid-cols-4 md:gap-3 md:overflow-visible md:pb-3 md:mb-0">
                     {[
                         { label: 'Total Visits', value: clientVisits.length, icon: '🔁' },
                         { label: 'Avg Duration', value: fmtDuration(client.avgVisitMins), icon: '⏱' },
                         { label: 'Last Visit', value: fmtDate(client.lastVisitAt), icon: '📅' },
                         { label: 'Next Visit', value: fmtDate(client.nextVisitDate), icon: '🗓' },
                     ].map(({ label, value, icon }) => (
-                        <div key={label} className="text-center">
+                        <div key={label} className="text-center min-w-[100px] flex-[0_0_35%] snap-start sm:flex-auto">
                             <p className="text-xl">{icon}</p>
-                            <p className="text-white font-bold text-sm">{value}</p>
-                            <p className="text-dark-muted text-[10px]">{label}</p>
+                            <p className="text-white font-bold text-sm mt-1">{value}</p>
+                            <p className="text-dark-muted text-[10px] mt-0.5">{label}</p>
                         </div>
                     ))}
                 </div>
@@ -935,14 +935,14 @@ export const ClientListPage = () => {
             </div>
 
             {/* KPI Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="flex overflow-x-auto pb-4 -mb-4 gap-4 snap-x md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0 md:mb-0">
                 {[
                     { label: 'Total Clients', value: totalClients, icon: Building2, color: 'text-blue-400', bg: 'bg-blue-500/10' },
                     { label: 'Active', value: activeClients, icon: CheckSquare, color: 'text-green-400', bg: 'bg-green-500/10' },
                     { label: 'No GPS Yet', value: noLocation, icon: MapPin, color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
                     { label: 'Overdue Visits', value: overdue, icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-500/10' },
                 ].map(({ label, value, icon: Icon, color, bg }) => (
-                    <div key={label} className="glass rounded-xl border border-dark-border p-4 flex items-center gap-3">
+                    <div key={label} className="glass rounded-xl border border-dark-border p-4 flex items-center gap-3 min-w-[200px] flex-[0_0_80%] sm:flex-1 snap-start">
                         <div className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center shrink-0`}><Icon className={`w-5 h-5 ${color}`} /></div>
                         <div><p className="text-dark-muted text-xs">{label}</p><p className={`text-2xl font-bold ${color}`}>{value}</p></div>
                     </div>

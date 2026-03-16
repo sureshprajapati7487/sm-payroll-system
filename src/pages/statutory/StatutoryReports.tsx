@@ -264,7 +264,7 @@ export const StatutoryReports = () => {
 
             {/* Total payable highlight */}
             {reportType !== 'PT' && (
-                <div className="glass rounded-2xl p-4 flex items-center justify-between">
+                <div className="glass rounded-2xl p-4 flex flex-wrap gap-4 items-center justify-between">
                     <span className="text-white font-semibold">Total {reportType} Payable (Employee + Employer)</span>
                     <span className="text-2xl font-bold text-primary-400">{fmt(stat.total)}</span>
                 </div>
@@ -324,7 +324,7 @@ export const StatutoryReports = () => {
 
                     {reportType === 'PT' && (<>
                         <button onClick={exportPTReturn} disabled={!hasData}
-                            className="flex items-center justify-between p-4 bg-dark-surface hover:bg-white/5 disabled:opacity-40 rounded-xl transition-all border border-slate-800/50">
+                            className="flex flex-wrap gap-2 items-center justify-between p-4 bg-dark-surface hover:bg-white/5 disabled:opacity-40 rounded-xl transition-all border border-slate-800/50">
                             <div className="text-left">
                                 <div className="text-white font-semibold">PT Monthly Return</div>
                                 <div className="text-xs text-dark-muted mt-1">Per-employee PT deduction (CSV)</div>

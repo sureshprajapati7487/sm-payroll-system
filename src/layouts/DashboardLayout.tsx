@@ -400,7 +400,7 @@ export const DashboardLayout = () => {
     );
 
     return (
-        <div className="min-h-screen bg-dark-bg text-dark-text flex font-sans">
+        <div className="min-h-[100dvh] bg-dark-bg text-dark-text flex font-sans">
             <ImpersonationBanner />
 
             {/* ── Desktop Sidebar ──────────────────────────────────────────── */}

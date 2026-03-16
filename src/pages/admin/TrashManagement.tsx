@@ -77,7 +77,7 @@ export const TrashManagement = () => {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 border-b border-dark-border">
+            <div className="flex flex-wrap gap-2 border-b border-dark-border">
                 {(['EMPLOYEE', 'LOAN', 'PAYROLL', 'ATTENDANCE'] as const).map(type => (
                     <button
                         key={type}

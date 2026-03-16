@@ -112,18 +112,18 @@ export const Dashboard = () => {
                     <p className="text-dark-muted">Overview of {managerProfile?.department || 'Your'} Team</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
-                    <div className="glass p-5 rounded-xl border border-dark-border">
+                <div className="flex overflow-x-auto pb-4 -mb-4 gap-4 snap-x sm:grid sm:grid-cols-3 md:gap-6 sm:overflow-visible sm:pb-0 sm:mb-0">
+                    <div className="glass p-5 rounded-xl border border-dark-border min-w-[200px] flex-1 snap-start">
                         <p className="text-dark-muted text-xs uppercase mb-2">Team Size</p>
                         <h3 className="text-3xl font-bold text-white">{teamActive}</h3>
                         <p className="text-xs text-dark-muted mt-1">Active Members</p>
                     </div>
-                    <div className="glass p-5 rounded-xl border border-dark-border">
+                    <div className="glass p-5 rounded-xl border border-dark-border min-w-[200px] flex-1 snap-start">
                         <p className="text-dark-muted text-xs uppercase mb-2">Team Attendance</p>
                         <h3 className="text-3xl font-bold text-warning">{teamPresent} / {teamActive}</h3>
                         <p className="text-xs text-dark-muted mt-1">Present Today</p>
                     </div>
-                    <div className="glass p-5 rounded-xl border border-dark-border">
+                    <div className="glass p-5 rounded-xl border border-dark-border min-w-[200px] flex-1 snap-start">
                         <p className="text-dark-muted text-xs uppercase mb-2">Team Production</p>
                         <h3 className="text-3xl font-bold text-success">₹ {teamProduction.toLocaleString()}</h3>
                         <p className="text-xs text-dark-muted mt-1">This Month</p>
@@ -211,8 +211,8 @@ export const Dashboard = () => {
             </div>
 
             {/* KPI Cards Row 1 */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-6">
-                <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden">
+            <div className="flex overflow-x-auto pb-4 -mb-4 gap-3 snap-x lg:grid lg:grid-cols-5 lg:overflow-visible lg:pb-0 lg:mb-0 md:gap-6">
+                <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden min-w-[180px] flex-[0_0_65%] sm:flex-1 snap-start">
                     <div className="absolute top-0 right-0 p-4 opacity-10"><Users className="w-16 h-16 text-primary-400" /></div>
                     <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">Total Staff</p>
                     <div className="flex items-baseline gap-2">
@@ -225,7 +225,7 @@ export const Dashboard = () => {
                     </div>
                 </div>
 
-                <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden">
+                <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden min-w-[180px] flex-[0_0_65%] sm:flex-1 snap-start">
                     <div className="absolute top-0 right-0 p-4 opacity-10"><Clock className="w-16 h-16 text-warning" /></div>
                     <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">Today's Attendance</p>
                     <div className="flex items-baseline gap-2">
@@ -241,7 +241,7 @@ export const Dashboard = () => {
                 </div>
 
                 {hasPermission(PERMISSIONS.VIEW_PRODUCTION) && (
-                    <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden">
+                    <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden min-w-[180px] flex-[0_0_65%] sm:flex-1 snap-start">
                         <div className="absolute top-0 right-0 p-4 opacity-10"><TrendingUp className="w-16 h-16 text-success" /></div>
                         <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">This Month Production</p>
                         <div className="flex items-baseline gap-1">
@@ -263,7 +263,7 @@ export const Dashboard = () => {
                 )}
 
                 {hasPermission(PERMISSIONS.VIEW_ALL_LOANS) && (
-                    <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden">
+                    <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden min-w-[180px] flex-[0_0_65%] sm:flex-1 snap-start">
                         <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet className="w-16 h-16 text-danger" /></div>
                         <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">Outstanding Loans</p>
                         <div className="flex items-baseline gap-1">
@@ -276,7 +276,7 @@ export const Dashboard = () => {
                 )}
 
                 {hasPermission(PERMISSIONS.VIEW_FINANCE_DASHBOARD) && (
-                    <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden">
+                    <div className="glass p-5 rounded-xl border border-dark-border relative overflow-hidden min-w-[180px] flex-[0_0_65%] sm:flex-1 snap-start">
                         <div className="absolute top-0 right-0 p-4 opacity-10"><DollarSign className="w-16 h-16 text-primary-400" /></div>
                         <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">Est. Profit (P&L)</p>
                         <div className="flex items-baseline gap-1">
@@ -297,8 +297,8 @@ export const Dashboard = () => {
             </div>
 
             {/* KPI Cards Row 2 — Pending Approvals + Net Payroll */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                <div className={`glass p-4 rounded-xl border flex items-center gap-4 ${pendingLeaves > 0 ? 'border-yellow-500/30' : 'border-dark-border'
+            <div className="flex overflow-x-auto pb-4 -mb-4 gap-3 snap-x lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0 lg:mb-0 md:gap-4">
+                <div className={`glass p-4 rounded-xl border flex items-center gap-4 min-w-[200px] flex-[0_0_75%] sm:flex-1 snap-start ${pendingLeaves > 0 ? 'border-yellow-500/30' : 'border-dark-border'
                     }`}>
                     <div className={`p-2.5 rounded-lg ${pendingLeaves > 0 ? 'bg-yellow-500/20' : 'bg-dark-surface'}`}>
                         <CalendarX className={`w-5 h-5 ${pendingLeaves > 0 ? 'text-yellow-400' : 'text-dark-muted'}`} />
@@ -309,7 +309,7 @@ export const Dashboard = () => {
                     </div>
                 </div>
 
-                <div className={`glass p-4 rounded-xl border flex items-center gap-4 ${pendingProduction > 0 ? 'border-blue-500/30' : 'border-dark-border'
+                <div className={`glass p-4 rounded-xl border flex items-center gap-4 min-w-[200px] flex-[0_0_75%] sm:flex-1 snap-start ${pendingProduction > 0 ? 'border-blue-500/30' : 'border-dark-border'
                     }`}>
                     <div className={`p-2.5 rounded-lg ${pendingProduction > 0 ? 'bg-blue-500/20' : 'bg-dark-surface'}`}>
                         <CheckSquare className={`w-5 h-5 ${pendingProduction > 0 ? 'text-blue-400' : 'text-dark-muted'}`} />
@@ -321,7 +321,7 @@ export const Dashboard = () => {
                 </div>
 
                 {hasPermission(PERMISSIONS.VIEW_ALL_LOANS) && (
-                    <div className={`glass p-4 rounded-xl border flex items-center gap-4 ${pendingLoans > 0 ? 'border-orange-500/30' : 'border-dark-border'
+                    <div className={`glass p-4 rounded-xl border flex items-center gap-4 min-w-[200px] flex-[0_0_75%] sm:flex-1 snap-start ${pendingLoans > 0 ? 'border-orange-500/30' : 'border-dark-border'
                         }`}>
                         <div className={`p-2.5 rounded-lg ${pendingLoans > 0 ? 'bg-orange-500/20' : 'bg-dark-surface'}`}>
                             <AlertTriangle className={`w-5 h-5 ${pendingLoans > 0 ? 'text-orange-400' : 'text-dark-muted'}`} />
@@ -334,7 +334,7 @@ export const Dashboard = () => {
                 )}
 
                 {hasPermission(PERMISSIONS.VIEW_PAYROLL) && (
-                    <div className="glass p-4 rounded-xl border border-emerald-500/30 flex items-center gap-4">
+                    <div className="glass p-4 rounded-xl border border-emerald-500/30 flex items-center gap-4 min-w-[200px] flex-[0_0_75%] sm:flex-1 snap-start">
                         <div className="p-2.5 rounded-lg bg-emerald-500/20">
                             <BadgeDollarSign className="w-5 h-5 text-emerald-400" />
                         </div>
@@ -655,18 +655,18 @@ function EmployeeView({ me, records, entries, loans, today, currentMonth }: {
             )}
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="glass p-5 rounded-xl border border-dark-border">
+            <div className="flex overflow-x-auto pb-4 -mb-4 gap-4 snap-x sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 sm:mb-0">
+                <div className="glass p-5 rounded-xl border border-dark-border min-w-[200px] flex-1 snap-start">
                     <p className="text-dark-muted text-xs uppercase mb-2">My Attendance</p>
                     <h3 className="text-3xl font-bold text-white">{myAttPercentage}%</h3>
                     <p className="text-xs text-success mt-1">{myPresentDays} Days Present in {monthLabel}</p>
                 </div>
-                <div className="glass p-5 rounded-xl border border-dark-border">
+                <div className="glass p-5 rounded-xl border border-dark-border min-w-[200px] flex-1 snap-start">
                     <p className="text-dark-muted text-xs uppercase mb-2">My Production</p>
                     <h3 className="text-3xl font-bold text-success">₹ {myProdValue.toLocaleString()}</h3>
                     <p className="text-xs text-dark-muted mt-1">Earnings in {monthLabel}</p>
                 </div>
-                <div className="glass p-5 rounded-xl border border-dark-border">
+                <div className="glass p-5 rounded-xl border border-dark-border min-w-[200px] flex-1 snap-start">
                     <p className="text-dark-muted text-xs uppercase mb-2">Active Loan</p>
                     <h3 className="text-3xl font-bold text-danger">₹ {myLoan?.balance?.toLocaleString() || '0'}</h3>
                     <p className="text-xs text-dark-muted mt-1">Remaining Balance</p>

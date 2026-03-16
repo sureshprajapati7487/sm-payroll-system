@@ -207,7 +207,7 @@ export const AdvanceSalaryManagement = () => {
             )}
 
             {/* Filter tabs */}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
                 {(['all', 'pending', 'approved', 'rejected'] as const).map(s => (
                     <button key={s} onClick={() => setFilterStatus(s)}
                         className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors capitalize ${filterStatus === s ? 'bg-primary-600 text-white' : 'bg-dark-surface text-slate-400 hover:text-white'}`}>

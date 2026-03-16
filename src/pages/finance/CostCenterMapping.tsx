@@ -46,7 +46,7 @@ export const CostCenterMapping = () => {
 
     return (
         <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                         <Building className="w-8 h-8 text-primary-500" />
@@ -173,8 +173,8 @@ export const CostCenterMapping = () => {
                                                 <div className="w-24 h-2 bg-dark-surface rounded-full overflow-hidden">
                                                     <div
                                                         className={`h-full ${utilization > 90 ? 'bg-red-500' :
-                                                                utilization > 75 ? 'bg-yellow-500' :
-                                                                    'bg-green-500'
+                                                            utilization > 75 ? 'bg-yellow-500' :
+                                                                'bg-green-500'
                                                             }`}
                                                         style={{ width: `${Math.min(utilization, 100)}%` }}
                                                     />

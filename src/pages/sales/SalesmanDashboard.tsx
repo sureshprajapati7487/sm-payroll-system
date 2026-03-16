@@ -279,7 +279,7 @@ const PerformanceTab = ({ salesEmployees }: { salesEmployees: { id: string; name
     return (
         <div className="space-y-4">
             {/* Summary Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="flex overflow-x-auto pb-4 -mb-4 gap-4 snap-x md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0 md:mb-0">
                 {[
                     {
                         label: 'Total Visits Today',
@@ -302,7 +302,7 @@ const PerformanceTab = ({ salesEmployees }: { salesEmployees: { id: string; name
                         icon: AlertCircle, color: 'text-red-400', bg: 'bg-red-500/10'
                     },
                 ].map(({ label, value, icon: Icon, color, bg }) => (
-                    <div key={label} className="glass rounded-xl border border-dark-border p-4 flex items-center gap-3">
+                    <div key={label} className="glass rounded-xl border border-dark-border p-4 flex items-center gap-3 min-w-[200px] flex-[0_0_80%] sm:flex-1 snap-start">
                         <div className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center shrink-0`}>
                             <Icon className={`w-5 h-5 ${color}`} />
                         </div>
@@ -435,14 +435,14 @@ const TodayActivityBanner = ({ companyId }: { companyId: string }) => {
                     </span>
                 )}
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="flex overflow-x-auto pb-4 -mb-4 gap-3 snap-x md:grid md:grid-cols-4 md:gap-3 md:overflow-visible md:pb-0 md:mb-0">
                 {[
                     { label: 'Total Visits', value: todayVisits.length, color: 'text-blue-400', icon: '🔁' },
                     { label: 'Completed', value: completed, color: 'text-green-400', icon: '✅' },
                     { label: 'Orders (₹)', value: `₹${totalOrders.toLocaleString('en-IN')}`, color: 'text-emerald-400', icon: '🛒' },
                     { label: 'Collection (₹)', value: `₹${totalCollection.toLocaleString('en-IN')}`, color: 'text-yellow-400', icon: '💰' },
                 ].map(({ label, value, color, icon }) => (
-                    <div key={label} className="bg-dark-surface/40 rounded-xl px-4 py-3 border border-dark-border/50">
+                    <div key={label} className="bg-dark-surface/40 rounded-xl px-4 py-3 border border-dark-border/50 min-w-[140px] flex-[0_0_45%] snap-start">
                         <p className="text-lg mb-0.5">{icon}</p>
                         <p className={`text-xl font-bold ${color}`}>{value}</p>
                         <p className="text-xs text-dark-muted">{label}</p>
@@ -614,14 +614,14 @@ export const SalesmanDashboard = () => {
             {activeTab === 'tasks' && (<>
 
                 {/* KPI Row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="flex overflow-x-auto pb-4 -mb-4 gap-4 snap-x md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0 md:mb-0">
                     {[
                         { label: 'Total Tasks', value: total, icon: ListChecks, color: 'text-orange-400', bg: 'bg-orange-500/10' },
                         { label: 'Pending', value: pending, icon: AlertCircle, color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
                         { label: 'Overdue', value: overdue, icon: Clock, color: 'text-red-400', bg: 'bg-red-500/10' },
                         { label: 'Completed', value: done, icon: Target, color: 'text-green-400', bg: 'bg-green-500/10' },
                     ].map(({ label, value, icon: Icon, color, bg }) => (
-                        <div key={label} className="glass rounded-xl border border-dark-border p-4 flex items-center gap-3">
+                        <div key={label} className="glass rounded-xl border border-dark-border p-4 flex items-center gap-3 min-w-[160px] flex-[0_0_45%] snap-start">
                             <div className={`w-10 h-10 rounded-lg ${bg} flex items-center justify-center shrink-0`}>
                                 <Icon className={`w-5 h-5 ${color}`} />
                             </div>

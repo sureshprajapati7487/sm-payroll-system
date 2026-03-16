@@ -888,7 +888,7 @@ export const RoleAccessConfig = () => {
             </div>
 
             {/* Stats Bar */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3 text-center">
                     <div className="text-2xl font-bold text-green-400">{enabledCount}</div>
                     <div className="text-xs text-slate-400">Draft Enabled</div>

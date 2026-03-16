@@ -184,14 +184,14 @@ export const HolidayManager = () => {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="flex overflow-x-auto pb-2 -mb-2 gap-4 snap-x md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0 md:mb-0">
                 {[
                     { label: 'Total', value: stats.total, color: 'text-white' },
                     { label: 'National', value: stats.national, color: 'text-blue-400' },
                     { label: 'Festival', value: stats.festival, color: 'text-purple-400' },
                     { label: 'Optional', value: stats.optional, color: 'text-slate-400' },
                 ].map(s => (
-                    <div key={s.label} className="glass rounded-2xl p-4 text-center">
+                    <div key={s.label} className="glass rounded-2xl p-4 text-center min-w-[120px] flex-[0_0_40%] snap-start">
                         <p className={`text-3xl font-bold ${s.color}`}>{s.value}</p>
                         <p className="text-dark-muted text-xs mt-1">{s.label}</p>
                     </div>
@@ -250,7 +250,7 @@ export const HolidayManager = () => {
                                 placeholder="Search holidays…"
                                 className="w-full pl-9 pr-3 py-2 bg-dark-surface border border-dark-border rounded-xl text-white text-sm outline-none" />
                         </div>
-                        <div className="flex gap-1.5">
+                        <div className="flex flex-wrap gap-1.5 mt-2 md:mt-0">
                             {(['ALL', 'NATIONAL', 'FESTIVAL', 'OPTIONAL'] as const).map(t => (
                                 <button key={t} onClick={() => setFilterType(t)}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterType === t ? 'bg-primary-600 text-white' : 'text-slate-400 hover:text-white'}`}>
@@ -297,11 +297,11 @@ export const HolidayManager = () => {
                                                                 <div className="space-y-2">
                                                                     <input value={editData.name || ''} onChange={e => setEditData({ ...editData, name: e.target.value })}
                                                                         className="w-full bg-dark-surface border border-primary-500/50 rounded-lg px-3 py-1.5 text-white text-sm outline-none" />
-                                                                    <div className="flex gap-2">
+                                                                    <div className="flex flex-col sm:flex-row gap-2">
                                                                         <input type="date" value={editData.date || ''} onChange={e => setEditData({ ...editData, date: e.target.value })}
-                                                                            className="bg-dark-surface border border-dark-border rounded-lg px-2 py-1.5 text-white text-xs outline-none" />
+                                                                            className="w-full sm:w-auto bg-dark-surface border border-dark-border rounded-lg px-2 py-1.5 text-white text-xs outline-none" />
                                                                         <select value={editData.type || 'FESTIVAL'} onChange={e => setEditData({ ...editData, type: e.target.value as Holiday['type'] })}
-                                                                            className="bg-dark-surface border border-dark-border rounded-lg px-2 py-1.5 text-white text-xs outline-none">
+                                                                            className="w-full sm:w-auto bg-dark-surface border border-dark-border rounded-lg px-2 py-1.5 text-white text-xs outline-none">
                                                                             <option value="NATIONAL">National</option>
                                                                             <option value="FESTIVAL">Festival</option>
                                                                             <option value="OPTIONAL">Optional</option>

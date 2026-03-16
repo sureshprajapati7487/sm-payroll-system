@@ -262,7 +262,7 @@ export const LoanDashboard = () => {
                     />
                 </div>
 
-                <div className="flex bg-dark-bg p-1 rounded-lg border border-dark-border">
+                <div className="flex flex-wrap gap-1 md:gap-2 bg-dark-bg p-1 rounded-lg border border-dark-border">
                     <button
                         onClick={() => setShowHistoryModal(true)}
                         className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 text-purple-400 hover:bg-purple-600 hover:text-white rounded-md transition-colors mr-2"

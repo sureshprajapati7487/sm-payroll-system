@@ -267,7 +267,7 @@ export function DatabaseBackup() {
         <div className="max-w-6xl mx-auto space-y-6">
 
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-xl bg-emerald-500/20">
                         <Database className="w-6 h-6 text-emerald-400" />
@@ -345,7 +345,7 @@ export function DatabaseBackup() {
             {/* Manual Backup + Toggle */}
             <div className="grid md:grid-cols-2 gap-4">
                 {/* Manual Backup */}
-                <div className="glass p-5 rounded-xl border border-dark-border flex items-center justify-between gap-4">
+                <div className="glass p-5 rounded-xl border border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-start gap-3">
                         <div className="p-2.5 rounded-xl bg-primary-500/20"><Zap className="w-5 h-5 text-primary-400" /></div>
                         <div>
@@ -362,7 +362,7 @@ export function DatabaseBackup() {
                 </div>
                 {/* Auto-backup Toggle */}
                 {cfg && (
-                    <div className="glass p-5 rounded-xl border border-dark-border flex items-center justify-between gap-4">
+                    <div className="glass p-5 rounded-xl border border-dark-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-start gap-3">
                             <div className={clsx('p-2.5 rounded-xl', cfg.enabled ? 'bg-emerald-500/20' : 'bg-dark-surface')}>
                                 <Power className={clsx('w-5 h-5', cfg.enabled ? 'text-emerald-400' : 'text-dark-muted')} />
@@ -391,7 +391,7 @@ export function DatabaseBackup() {
             {/* Tabs */}
             <div className="glass rounded-xl border border-dark-border overflow-hidden">
                 {/* Tab Bar */}
-                <div className="flex border-b border-dark-border/50 bg-dark-bg/30">
+                <div className="flex flex-wrap border-b border-dark-border/50 bg-dark-bg/30">
                     {TABS.map(tab => (
                         <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                             className={clsx('flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors',
@@ -406,9 +406,9 @@ export function DatabaseBackup() {
                 {/* ── Tab: History ── */}
                 {activeTab === 'history' && (
                     <>
-                        <div className="px-5 py-3 flex items-center justify-between border-b border-dark-border/50">
+                        <div className="px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between border-b border-dark-border/50 gap-2">
                             <span className="font-semibold text-sm text-white">Backup History <span className="text-dark-muted font-normal">({status?.totalBackups ?? 0})</span></span>
-                            <span className="text-xs text-dark-muted font-mono">server/backups/</span>
+                            <span className="text-[10px] sm:text-xs text-dark-muted font-mono truncate">server/backups/</span>
                         </div>
                         {loading ? (
                             <div className="text-center py-12 text-dark-muted"><RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" /><p className="text-sm">Loading...</p></div>
@@ -510,13 +510,13 @@ export function DatabaseBackup() {
                 {/* ── Tab: Email ── */}
                 {activeTab === 'email' && cfg && cfg.email && (
                     <div className="p-6 space-y-5">
-                        <div className="flex items-start justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                             <div>
                                 <h3 className="text-white font-semibold mb-1">Email Delivery</h3>
-                                <p className="text-dark-muted text-sm">Har backup ke baad, .sqlite file email attachment ke roop mein bheja jayega.</p>
+                                <p className="text-dark-muted text-sm border-b border-dark-border/30 pb-2 sm:border-0 sm:pb-0">Har backup ke baad, .sqlite file email attachment ke roop mein bheja jayega.</p>
                             </div>
                             <button onClick={() => setCfg({ ...cfg, email: { ...cfg.email, enabled: !cfg.email.enabled } })}
-                                className={clsx('flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors',
+                                className={clsx('flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors w-fit',
                                     cfg.email.enabled ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-dark-surface text-dark-muted border-dark-border')}>
                                 {cfg.email.enabled ? '✓ Enabled' : 'Disabled'}
                             </button>
@@ -564,13 +564,13 @@ export function DatabaseBackup() {
                 {/* ── Tab: WhatsApp ── */}
                 {activeTab === 'whatsapp' && cfg && cfg.whatsapp && (
                     <div className="p-6 space-y-5">
-                        <div className="flex items-start justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                             <div>
                                 <h3 className="text-white font-semibold mb-1">WhatsApp Delivery</h3>
-                                <p className="text-dark-muted text-sm">Har backup ke baad, ek notification (aur agar possible ho, document) WhatsApp pe bheja jayega.</p>
+                                <p className="text-dark-muted text-sm border-b border-dark-border/30 pb-2 sm:border-0 sm:pb-0">Har backup ke baad, ek notification (aur agar possible ho, document) WhatsApp pe bheja jayega.</p>
                             </div>
                             <button onClick={() => setCfg({ ...cfg, whatsapp: { ...cfg.whatsapp, enabled: !cfg.whatsapp.enabled } })}
-                                className={clsx('flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors',
+                                className={clsx('flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors w-fit',
                                     cfg.whatsapp.enabled ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-dark-surface text-dark-muted border-dark-border')}>
                                 {cfg.whatsapp.enabled ? '✓ Enabled' : 'Disabled'}
                             </button>

@@ -131,7 +131,7 @@ export const PFESICalculator = () => {
                     <>
                         {/* PF Card */}
                         <div className="glass rounded-2xl p-6">
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                                 <h3 className="text-lg font-semibold text-white">Provident Fund (PF)</h3>
                                 {pfResult.isApplicable ? (
                                     <span className="text-xs px-2 py-1 bg-green-500/20 text-green-400 rounded-full">
@@ -188,7 +188,7 @@ export const PFESICalculator = () => {
 
                         {/* ESI Card */}
                         <div className="glass rounded-2xl p-6">
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                                 <h3 className="text-lg font-semibold text-white">Employee State Insurance (ESI)</h3>
                                 {esiResult.isApplicable ? (
                                     <span className="text-xs px-2 py-1 bg-green-500/20 text-green-400 rounded-full">

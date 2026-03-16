@@ -277,7 +277,7 @@ export const ReportBuilder = () => {
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                         <FileText className="w-8 h-8 text-primary-500" />
@@ -286,7 +286,7 @@ export const ReportBuilder = () => {
                     <p className="text-dark-muted mt-1">Generate real-time reports from live data</p>
                 </div>
                 {generatedReport && (
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                         <span className="text-dark-muted text-sm">{totalRows} records</span>
                         {canExport && (
                             <button
@@ -395,7 +395,7 @@ export const ReportBuilder = () => {
 
                 {/* ── Preview Panel ── */}
                 <div className="lg:col-span-2 glass rounded-2xl p-6 min-h-[500px] min-w-0 max-w-full w-full">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                             <FileText className="w-5 h-5" />
                             {generatedReport ? `${currentType?.label} — ${totalRows} records` : 'Report Preview'}
