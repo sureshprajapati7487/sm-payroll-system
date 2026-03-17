@@ -16,12 +16,12 @@ const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/mode
 
 // Accuracy-tuned constants
 const DETECTOR_OPTIONS = new faceapi.TinyFaceDetectorOptions({
-    inputSize: 320,         // ↑ was 224 — higher = better accuracy, slightly slower
-    scoreThreshold: 0.35,  // ↓ was 0.5 — detect faces in lower light / partial angles
+    inputSize: 224,         // Fast performance, decent accuracy default
+    scoreThreshold: 0.25,  // Relaxed threshold to detect faces quickly even in lower light
 });
-const MATCH_THRESHOLD = 0.52; // Euclidean distance — slightly relaxed from 0.5 to reduce rejection
+const MATCH_THRESHOLD = 0.45; // Euclidean distance
 const MIN_FACE_SIZE_PX = 80;   // Reject faces that are too small (too far from camera)
-const LOOP_INTERVAL_MS = 800;  // ↓ was 1200ms — faster response
+const LOOP_INTERVAL_MS = 600;  // Faster loop
 const CONFIRM_FRAMES = 2;    // Require N consecutive matches to prevent false positives
 
 export type FaceMatchStatus = 'idle' | 'loading_models' | 'detecting' | 'matched' | 'no_face' | 'mismatch' | 'too_far' | 'error';

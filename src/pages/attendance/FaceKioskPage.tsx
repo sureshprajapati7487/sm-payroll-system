@@ -230,34 +230,14 @@ export const FaceKioskPage = () => {
             const box = result.box || result;
             recentBoxes.push({ x: box.x, y: box.y });
             if (recentBoxes.length > LIVENESS_FRAMES) recentBoxes.shift();
-            if (recentBoxes.length === LIVENESS_FRAMES) {
-                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-                recentBoxes.forEach(b => {
-                    if (b.x < minX) minX = b.x;
-                    if (b.x > maxX) maxX = b.x;
-                    if (b.y < minY) minY = b.y;
-                    if (b.y > maxY) maxY = b.y;
-                });
-                const dx = maxX - minX;
-                const dy = maxY - minY;
 
-                // Static photos usually have dx/dy < 1.0 depending on camera noise. Check for micro-movements.
-                if (dx <= 0.8 && dy <= 0.8) {
-                    setScanMsg('Anti-Spoof: Zara hiliye / Blink karein...');
-                    liveLoopRef.current = setTimeout(loop, 300);
-                    return;
-                }
-            } else {
-                setScanMsg('Liveness detect ho raha hai...');
-                liveLoopRef.current = setTimeout(loop, 300);
-                return;
-            }
+            setScanMsg('Checking Face...');
 
             // ── OFFLINE 1:N MATCHING ──
             try {
                 let bestMatchId: string | null = null;
                 let minDistance = Infinity;
-                const MATCH_THRESHOLD = 0.52; // Same as backend threshold
+                const MATCH_THRESHOLD = 0.45; // Stricter threshold to prevent false matches
 
                 // Match against all cached descriptors
                 for (const emp of activeEmployees) {
@@ -737,7 +717,7 @@ export const FaceKioskPage = () => {
 
                 {/* ══ CONFIRM OVERLAY (on top of live mode) ════════════════ */}
                 {mode === 'live' && liveState === 'confirm' && matchResult && matchedEmp && (
-                    <div className="absolute inset-0 z-40 bg-[#060a0f]/96 backdrop-blur-sm flex flex-col items-center justify-center gap-6 p-8">
+                    <div className="absolute inset-0 z-40 bg-[#020408]/80 backdrop-blur-xl flex flex-col items-center justify-center gap-6 p-6 md:p-8">
 
                         {/* Step label */}
                         <div className="text-center">
@@ -746,53 +726,68 @@ export const FaceKioskPage = () => {
                         </div>
 
                         {/* Employee card */}
-                        <div className={`flex flex-col items-center gap-4 p-8 rounded-3xl border-2 shadow-2xl max-w-sm w-full ${matchResult.punchType === 'IN'
-                            ? 'border-emerald-500/40 bg-emerald-950/40 shadow-emerald-900/20'
+                        <div className={`flex flex-col items-center gap-5 p-8 rounded-[2rem] border shadow-2xl max-w-sm w-full relative overflow-hidden ${matchResult.punchType === 'IN'
+                            ? 'border-emerald-500/30 bg-emerald-950/80 shadow-emerald-900/40'
                             : matchResult.punchType === 'OUT'
-                                ? 'border-blue-500/40 bg-blue-950/40 shadow-blue-900/20'
-                                : 'border-slate-600/40 bg-slate-900/40'
+                                ? 'border-blue-500/30 bg-blue-950/80 shadow-blue-900/40'
+                                : 'border-slate-600/30 bg-slate-900/80 shadow-slate-900/50'
                             }`}>
+
+                            {/* Top Accent Gradient */}
+                            <div className={`absolute top-0 inset-x-0 h-1.5 ${matchResult.punchType === 'IN' ? 'bg-gradient-to-r from-emerald-400 to-emerald-600' :
+                                matchResult.punchType === 'OUT' ? 'bg-gradient-to-r from-blue-400 to-blue-600' :
+                                    'bg-gradient-to-r from-slate-400 to-slate-600'
+                                }`} />
                             {/* Avatar + confidence */}
-                            <div className="relative">
-                                <img src={matchedEmp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(matchedEmp.name)}&background=random&size=160`}
-                                    className="w-28 h-28 rounded-full border-4 border-white/20 shadow-2xl object-cover" />
-                                <div className="absolute bottom-0 right-0 bg-slate-900/90 border border-slate-700 rounded-full px-2 py-0.5 text-[10px] text-slate-300 font-mono font-bold">
+                            <div className="relative mt-2">
+                                <img src={matchedEmp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(matchedEmp.name)}&background=random&color=fff&size=200`}
+                                    className={`w-32 h-32 rounded-full border-4 shadow-2xl object-cover ${matchResult.punchType === 'IN' ? 'border-emerald-400/50 shadow-emerald-900/50' :
+                                        matchResult.punchType === 'OUT' ? 'border-blue-400/50 shadow-blue-900/50' :
+                                            'border-slate-400/50'
+                                        }`} />
+                                <div className="absolute -bottom-2 right-0 bg-[#060a0f] border border-slate-700/80 rounded-full px-2.5 py-0.5 text-[11px] text-white font-mono font-bold shadow-lg">
                                     {matchResult.confidence}%
                                 </div>
                             </div>
 
                             {/* Info */}
-                            <div className="text-center">
-                                <h2 className="text-white font-extrabold text-3xl tracking-tight">{matchedEmp.name}</h2>
-                                <p className="text-slate-400 text-sm mt-1">{matchedEmp.code} · {(matchedEmp as any).shift || 'GENERAL'}</p>
+                            <div className="text-center w-full">
+                                <h2 className="text-white font-black text-2xl md:text-3xl tracking-tight leading-tight">{matchedEmp.name}</h2>
+                                <p className="text-slate-300 text-sm mt-1.5 font-medium tracking-wide">
+                                    {matchedEmp.code} <span className="opacity-50">·</span> {(matchedEmp as any).shift || 'GENERAL'}
+                                </p>
                                 {matchResult.punchType === 'OUT' && matchedRec?.checkIn && (
-                                    <p className="text-slate-500 text-xs mt-1">In time: {fmtTime(matchedRec.checkIn)}</p>
+                                    <p className="text-slate-400 text-xs mt-2 font-mono bg-black/20 inline-block px-3 py-1 rounded-full border border-white/5">
+                                        In time: {fmtTime(matchedRec.checkIn)}
+                                    </p>
                                 )}
                             </div>
 
                             {/* Punch type badge */}
-                            {matchResult.punchType === 'IN' && (
-                                <div className="flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-2xl px-6 py-2.5">
-                                    <LogIn className="w-5 h-5" /><span className="font-extrabold text-xl">PUNCH IN</span>
-                                </div>
-                            )}
-                            {matchResult.punchType === 'OUT' && (
-                                <div className="flex items-center gap-2 bg-blue-500/20 border border-blue-500/40 text-blue-300 rounded-2xl px-6 py-2.5">
-                                    <LogOut className="w-5 h-5" /><span className="font-extrabold text-xl">PUNCH OUT</span>
-                                </div>
-                            )}
-                            {matchResult.punchType === 'DONE' && (
-                                <div className="flex items-center gap-2 bg-slate-700/50 border border-slate-600 text-slate-300 rounded-2xl px-6 py-2.5">
-                                    <CheckCircle className="w-5 h-5" /><span className="font-bold text-lg">Shift Complete</span>
-                                </div>
-                            )}
+                            <div className="w-full mt-2">
+                                {matchResult.punchType === 'IN' && (
+                                    <div className="flex items-center justify-center gap-2 bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 rounded-2xl px-6 py-3 shadow-inner">
+                                        <LogIn className="w-5 h-5" /><span className="font-extrabold text-lg tracking-wide">PUNCH IN</span>
+                                    </div>
+                                )}
+                                {matchResult.punchType === 'OUT' && (
+                                    <div className="flex items-center justify-center gap-2 bg-blue-500/20 border border-blue-500/50 text-blue-300 rounded-2xl px-6 py-3 shadow-inner">
+                                        <LogOut className="w-5 h-5" /><span className="font-extrabold text-lg tracking-wide">PUNCH OUT</span>
+                                    </div>
+                                )}
+                                {matchResult.punchType === 'DONE' && (
+                                    <div className="flex items-center justify-center gap-2 bg-slate-700/50 border border-slate-600 text-slate-300 rounded-2xl px-6 py-3 shadow-inner">
+                                        <CheckCircle className="w-5 h-5" /><span className="font-bold text-lg tracking-wide">Shift Complete</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Countdown ring + Confirm button */}
-                        <div className="flex items-center gap-8">
+                        <div className="flex items-center justify-center gap-4 sm:gap-6 mt-2">
                             {/* SVG ring */}
-                            <div className="relative w-20 h-20 flex items-center justify-center">
-                                <svg className="absolute inset-0 -rotate-90" viewBox="0 0 80 80">
+                            <div className="relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shrink-0">
+                                <svg className="absolute inset-0 -rotate-90 w-full h-full" viewBox="0 0 80 80">
                                     <circle cx="40" cy="40" r={RING_R} stroke="#1e293b" strokeWidth="6" fill="none" />
                                     <circle cx="40" cy="40" r={RING_R}
                                         stroke={matchResult.punchType === 'IN' ? '#10b981' : matchResult.punchType === 'OUT' ? '#3b82f6' : '#64748b'}
@@ -802,24 +797,24 @@ export const FaceKioskPage = () => {
                                         className="transition-all duration-1000"
                                     />
                                 </svg>
-                                <span className="text-white font-mono text-2xl font-bold relative">{countdown}</span>
+                                <span className="text-white font-mono text-xl sm:text-2xl font-bold relative">{countdown}</span>
                             </div>
 
                             {/* Confirm button */}
                             {matchResult.punchType !== 'DONE' ? (
                                 <button onClick={confirmPunch}
-                                    className={`flex items-center gap-3 font-extrabold text-xl rounded-2xl px-10 py-4 transition-all shadow-lg active:scale-95 ${matchResult.punchType === 'IN'
-                                        ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-900/50'
-                                        : 'bg-blue-500 hover:bg-blue-400 text-white shadow-blue-900/50'
+                                    className={`flex items-center justify-center gap-2.5 font-extrabold text-lg sm:text-xl rounded-2xl px-6 sm:px-10 py-4 transition-all shadow-xl active:scale-95 whitespace-nowrap ${matchResult.punchType === 'IN'
+                                        ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-900/50 ring-2 ring-emerald-500/50 hover:ring-emerald-400'
+                                        : 'bg-blue-500 hover:bg-blue-400 text-white shadow-blue-900/50 ring-2 ring-blue-500/50 hover:ring-blue-400'
                                         }`}>
                                     {matchResult.punchType === 'IN'
-                                        ? <><LogIn className="w-6 h-6" /> Punch In Confirm</>
-                                        : <><LogOut className="w-6 h-6" /> Punch Out Confirm</>
+                                        ? <><LogIn className="w-5 h-5 sm:w-6 sm:h-6" /> Confirm In</>
+                                        : <><LogOut className="w-5 h-5 sm:w-6 sm:h-6" /> Confirm Out</>
                                     }
                                 </button>
                             ) : (
                                 <button onClick={confirmPunch}
-                                    className="flex items-center gap-3 font-bold text-lg rounded-2xl px-8 py-4 bg-slate-700 hover:bg-slate-600 text-white transition-all active:scale-95">
+                                    className="flex items-center justify-center gap-2.5 font-bold text-lg rounded-2xl px-8 py-4 bg-slate-700 hover:bg-slate-600 text-white transition-all active:scale-95 shadow-xl">
                                     <CheckCircle className="w-5 h-5" /> OK
                                 </button>
                             )}
@@ -838,8 +833,8 @@ export const FaceKioskPage = () => {
                     <div className="flex-1 flex flex-col md:flex-row overflow-hidden w-full h-full min-h-0">
 
                         {/* Left/Top: Camera */}
-                        <div className="w-full md:w-[420px] shrink-0 p-3 md:p-6 flex flex-col gap-3 md:gap-4 border-b md:border-b-0 md:border-r border-slate-800/80 bg-[#0a0f1a] overflow-y-auto">
-                            <div className="relative rounded-2xl overflow-hidden aspect-video w-full max-w-sm mx-auto md:max-w-none border-2 border-slate-700/60 bg-slate-900 shrink-0">
+                        <div className="w-full md:w-[420px] lg:w-[480px] shrink-0 p-3 md:p-6 flex flex-col gap-3 border-b md:border-b-0 md:border-r border-slate-800/80 bg-[#0a0f1a] z-10 shadow-md">
+                            <div className="relative rounded-2xl overflow-hidden aspect-video w-full max-w-[260px] sm:max-w-sm mx-auto md:max-w-none border-2 border-slate-700/60 bg-slate-900 shrink-0 shadow-lg">
                                 <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
                                 {enrollingId ? (
                                     <div className="absolute inset-x-0 bottom-0 bg-black/70 py-3 px-4">
@@ -862,20 +857,20 @@ export const FaceKioskPage = () => {
                                     </div>
                                 )}
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-3 text-center">
-                                    <p className="text-2xl font-bold text-green-400">{enrolledCount}</p>
-                                    <p className="text-slate-500 text-xs">Enrolled</p>
+                            <div className="grid grid-cols-2 gap-2 max-w-[260px] sm:max-w-sm w-full mx-auto md:max-w-none">
+                                <div className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-2 md:p-3 text-center transition-colors">
+                                    <p className="text-xl md:text-2xl font-bold text-emerald-400">{enrolledCount}</p>
+                                    <p className="text-slate-500 text-[10px] md:text-xs">Enrolled</p>
                                 </div>
-                                <div className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-3 text-center">
-                                    <p className="text-2xl font-bold text-amber-400">{activeEmployees.length - enrolledCount}</p>
-                                    <p className="text-slate-500 text-xs">Pending</p>
+                                <div className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-2 md:p-3 text-center transition-colors">
+                                    <p className="text-xl md:text-2xl font-bold text-amber-400">{activeEmployees.length - enrolledCount}</p>
+                                    <p className="text-slate-500 text-[10px] md:text-xs">Pending</p>
                                 </div>
                             </div>
                             {enrollingId && (
                                 <button onClick={cancelEnroll}
-                                    className="w-full max-w-sm mx-auto md:max-w-none py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-300 text-sm font-bold hover:bg-slate-700 transition-all shrink-0">
-                                    Cancel Search
+                                    className="w-full max-w-[260px] sm:max-w-sm mx-auto md:max-w-none py-2.5 bg-red-950/40 border border-red-900/50 rounded-xl text-red-400 text-sm font-bold hover:bg-red-900/60 transition-all shrink-0 mt-1 shadow-sm">
+                                    Cancel Scanning
                                 </button>
                             )}
                         </div>
@@ -883,10 +878,10 @@ export const FaceKioskPage = () => {
                         {/* Right/Bottom: Employee Grid */}
                         <div className="flex-1 flex flex-col overflow-hidden bg-[#060a0f] p-3 md:p-6 gap-3 min-h-0 relative">
                             {/* Header + Search */}
-                            <div className="flex items-center justify-between gap-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                                 <div>
-                                    <h2 className="text-white font-bold text-lg leading-tight">Employees</h2>
-                                    <p className="text-slate-500 text-xs">Click to enroll / re-enroll</p>
+                                    <h2 className="text-white font-bold text-lg leading-tight">Employees Roster</h2>
+                                    <p className="text-slate-500 text-[11px] md:text-xs mt-0.5">Select to start face enrollment</p>
                                 </div>
                                 <div className="relative flex-1 max-w-xs">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
@@ -903,7 +898,7 @@ export const FaceKioskPage = () => {
                             </div>
 
                             {/* Grid */}
-                            <div className="flex-1 overflow-y-auto min-h-0 pr-1 pb-20 md:pb-0">
+                            <div className="flex-1 overflow-y-auto min-h-0 pr-1 pb-4">
                                 {filteredEnrollEmployees.length === 0 ? (
                                     <div className="flex flex-col items-center justify-center py-16 gap-2 text-center">
                                         <Search className="w-10 h-10 text-slate-700" />
