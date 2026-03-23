@@ -20,7 +20,7 @@ import { useDeviceType } from '@/hooks/useDeviceType';
 import { useSecurityStore } from '@/store/securityStore';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const ENROLL_FRAMES = 5;
+const ENROLL_FRAMES = 3;  // Reduced from 5 — faster enrollment (~1s)
 const SUCCESS_RESET_MS = 3500;
 const COOLDOWN_MS = 8000;
 const SCAN_INTERVAL_MS = 700;
@@ -164,7 +164,25 @@ export const FaceKioskPage = () => {
         if (videoRef.current) videoRef.current.srcObject = null;
     }, []);
 
+    // Start camera when models are loaded
     useEffect(() => { if (modelsLoaded) startCamera(); return () => stopCamera(); }, [modelsLoaded]);
+
+    // Restart camera when switching to enroll mode (stream may have been stopped)
+    useEffect(() => {
+        if (mode === 'enroll' && modelsLoaded) {
+            // Short delay so the video element is mounted in DOM
+            const t = setTimeout(() => {
+                if (!streamRef.current || streamRef.current.getTracks().every(t => t.readyState === 'ended')) {
+                    startCamera();
+                } else if (videoRef.current && !videoRef.current.srcObject) {
+                    // Stream exists but video element lost it
+                    videoRef.current.srcObject = streamRef.current;
+                    videoRef.current.play().catch(() => { });
+                }
+            }, 150);
+            return () => clearTimeout(t);
+        }
+    }, [mode, modelsLoaded, startCamera]);
 
     // ── Stop all loops ────────────────────────────────────────────────────────
     const stopAllLoops = useCallback(() => {
@@ -177,19 +195,39 @@ export const FaceKioskPage = () => {
     // ═══════════════════════════════════════════════════════════════════════════
     // ENROLL LOGIC
     // ═══════════════════════════════════════════════════════════════════════════
-    const startEnroll = useCallback((empId: string) => {
+    const startEnroll = useCallback(async (empId: string) => {
+        stopAllLoops();
         setEnrollingId(empId); setEnrollProgress(0); setEnrollStatus('scanning');
-        setEnrollMsg('Camera ke samne aao...'); enrollDescriptors.current = [];
+        setEnrollMsg('Camera chalu ho raha hai...'); enrollDescriptors.current = [];
+
+        // Always restart camera so the enroll video gets a fresh stream
+        await startCamera();
+        setEnrollMsg('Camera ke samne aao...');
 
         const capture = async () => {
-            if (!videoRef.current || !modelsLoaded) { enrollLoopRef.current = setTimeout(capture, 600); return; }
+            // Wait for camera stream to be ready
+            if (!videoRef.current || !modelsLoaded) {
+                enrollLoopRef.current = setTimeout(capture, 300);
+                return;
+            }
+            // If video not yet playing, restart camera and wait
+            if (videoRef.current.readyState < 2 || !videoRef.current.srcObject) {
+                if (!streamRef.current || streamRef.current.getTracks().every(t => t.readyState === 'ended')) {
+                    await startCamera();
+                } else {
+                    videoRef.current.srcObject = streamRef.current;
+                    videoRef.current.play().catch(() => { });
+                }
+                enrollLoopRef.current = setTimeout(capture, 400);
+                return;
+            }
             const result = await getDescriptor(videoRef.current);
-            if (!result) { setEnrollMsg('Face nahi mila — thoda paas aao'); enrollLoopRef.current = setTimeout(capture, 700); return; }
-            if (result.faceSize < 80) { setEnrollMsg('Aur paas aao camera ke...'); enrollLoopRef.current = setTimeout(capture, 700); return; }
+            if (!result) { setEnrollMsg('Seedha dekho camera mein...'); enrollLoopRef.current = setTimeout(capture, 400); return; }
+            if (result.faceSize < 80) { setEnrollMsg('Thoda paas aao camera ke...'); enrollLoopRef.current = setTimeout(capture, 400); return; }
             enrollDescriptors.current.push(result.descriptor);
             const prog = enrollDescriptors.current.length;
-            setEnrollProgress(prog); setEnrollMsg(`Frame ${prog}/${ENROLL_FRAMES} capture ho gaya ✓`);
-            if (prog < ENROLL_FRAMES) { enrollLoopRef.current = setTimeout(capture, 500); return; }
+            setEnrollProgress(prog); setEnrollMsg(`Scanning... ${prog}/${ENROLL_FRAMES} ✓`);
+            if (prog < ENROLL_FRAMES) { enrollLoopRef.current = setTimeout(capture, 300); return; }
             const len = enrollDescriptors.current[0].length;
             const avg = new Float32Array(len);
             for (const d of enrollDescriptors.current) for (let i = 0; i < len; i++) avg[i] += d[i];
@@ -198,11 +236,11 @@ export const FaceKioskPage = () => {
             setEnrollStatus('done'); setEnrollMsg('Face enrolled! ✅');
             const empName = activeEmployees.find(e => e.id === empId)?.name || 'Employee';
             speak(`${empName} ka face successfully enrolled ho gaya.`);
-            setTimeout(() => { setEnrollingId(null); setEnrollStatus('idle'); setEnrollMsg(''); setMode('live'); }, 2000);
-
+            setTimeout(() => { setEnrollingId(null); setEnrollStatus('idle'); setEnrollMsg(''); setMode('live'); }, 1500);
         };
-        capture();
-    }, [modelsLoaded, getDescriptor, activeEmployees]);
+        // Small delay to allow camera stream to initialize before first capture
+        enrollLoopRef.current = setTimeout(capture, 200);
+    }, [modelsLoaded, getDescriptor, activeEmployees, startCamera, stopAllLoops]);
 
     const cancelEnroll = useCallback(() => {
         stopAllLoops(); setEnrollingId(null); setEnrollStatus('idle'); setEnrollMsg('');
@@ -532,6 +570,7 @@ export const FaceKioskPage = () => {
                             <div className="relative w-full max-w-xl aspect-video rounded-3xl overflow-hidden border-2 border-slate-700/60 shadow-2xl shadow-black">
                                 <video ref={videoRef} autoPlay playsInline muted
                                     className="w-full h-full object-cover scale-x-[-1]" />
+                                {/* HIDDEN enroll-mode mirror: always mounted, reuses same stream */}
 
                                 {/* Scanning frame */}
                                 {liveState === 'scanning' && (
@@ -835,7 +874,29 @@ export const FaceKioskPage = () => {
                         {/* Left/Top: Camera */}
                         <div className="w-full md:w-[420px] lg:w-[480px] shrink-0 p-3 md:p-6 flex flex-col gap-3 border-b md:border-b-0 md:border-r border-slate-800/80 bg-[#0a0f1a] z-10 shadow-md">
                             <div className="relative rounded-2xl overflow-hidden aspect-video w-full max-w-[260px] sm:max-w-sm mx-auto md:max-w-none border-2 border-slate-700/60 bg-slate-900 shrink-0 shadow-lg">
-                                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
+                                <video
+                                    id="enroll-video"
+                                    autoPlay playsInline muted
+                                    ref={(el) => {
+                                        if (!el) return;
+                                        (videoRef as any).current = el;
+                                        const attachStream = () => {
+                                            if (streamRef.current && streamRef.current.active) {
+                                                el.srcObject = streamRef.current;
+                                                el.play().catch(() => { });
+                                            } else {
+                                                // Stream not active — restart camera
+                                                startCamera().then(() => {
+                                                    if (streamRef.current) {
+                                                        el.srcObject = streamRef.current;
+                                                        el.play().catch(() => { });
+                                                    }
+                                                });
+                                            }
+                                        };
+                                        attachStream();
+                                    }}
+                                    className="w-full h-full object-cover scale-x-[-1]" />
                                 {enrollingId ? (
                                     <div className="absolute inset-x-0 bottom-0 bg-black/70 py-3 px-4">
                                         <div className="flex items-center justify-between text-xs mb-1.5">
