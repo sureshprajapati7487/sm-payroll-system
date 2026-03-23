@@ -570,7 +570,6 @@ export const FaceKioskPage = () => {
                             <div className="relative w-full max-w-xl aspect-video rounded-3xl overflow-hidden border-2 border-slate-700/60 shadow-2xl shadow-black">
                                 <video ref={videoRef} autoPlay playsInline muted
                                     className="w-full h-full object-cover scale-x-[-1]" />
-                                {/* HIDDEN enroll-mode mirror: always mounted, reuses same stream */}
 
                                 {/* Scanning frame */}
                                 {liveState === 'scanning' && (
@@ -875,28 +874,14 @@ export const FaceKioskPage = () => {
                         <div className="w-full md:w-[420px] lg:w-[480px] shrink-0 p-3 md:p-6 flex flex-col gap-3 border-b md:border-b-0 md:border-r border-slate-800/80 bg-[#0a0f1a] z-10 shadow-md">
                             <div className="relative rounded-2xl overflow-hidden aspect-video w-full max-w-[260px] sm:max-w-sm mx-auto md:max-w-none border-2 border-slate-700/60 bg-slate-900 shrink-0 shadow-lg">
                                 <video
-                                    id="enroll-video"
-                                    autoPlay playsInline muted
                                     ref={(el) => {
-                                        if (!el) return;
                                         (videoRef as any).current = el;
-                                        const attachStream = () => {
-                                            if (streamRef.current && streamRef.current.active) {
-                                                el.srcObject = streamRef.current;
-                                                el.play().catch(() => { });
-                                            } else {
-                                                // Stream not active — restart camera
-                                                startCamera().then(() => {
-                                                    if (streamRef.current) {
-                                                        el.srcObject = streamRef.current;
-                                                        el.play().catch(() => { });
-                                                    }
-                                                });
-                                            }
-                                        };
-                                        attachStream();
+                                        if (el && streamRef.current) {
+                                            el.srcObject = streamRef.current;
+                                            el.play().catch(() => { });
+                                        }
                                     }}
-                                    className="w-full h-full object-cover scale-x-[-1]" />
+                                    autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
                                 {enrollingId ? (
                                     <div className="absolute inset-x-0 bottom-0 bg-black/70 py-3 px-4">
                                         <div className="flex items-center justify-between text-xs mb-1.5">
