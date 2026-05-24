@@ -15,7 +15,7 @@ import {
     ShieldCheck, LogIn, LogOut, UserPlus, Trash2, Edit3,
     Eye, ArrowRight, Activity, DollarSign,
     UserPlus2, CalendarCheck, Banknote, CreditCard, Database, Zap,
-    ChevronLeft, ChevronRight
+    ChevronLeft, ChevronRight, RefreshCcw
 } from 'lucide-react';
 import { PERMISSIONS } from '@/config/permissions';
 import {
@@ -42,7 +42,7 @@ export const Dashboard = () => {
     const { user, hasPermission } = useAuthStore();
     const { currentCompanyId } = useMultiCompanyStore();
     const { logs: auditLogs } = useAuditStore();
-    const { stats, fetchDashboardStats } = useAnalyticsStore();
+    const { stats, isLoading, error, fetchDashboardStats } = useAnalyticsStore();
     const { getStats: getExpenseStats, fetchExpenses } = useExpenseStore();
     const navigate = useNavigate();
 
@@ -134,11 +134,51 @@ export const Dashboard = () => {
     }
 
     // 3. Admin View (Company Wide)
+    if (isLoading && !stats) {
+        return (
+            <div className="space-y-6 p-6">
+                <div className="h-8 w-64 animate-pulse bg-dark-border rounded-lg" />
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[...Array(4)].map((_, i) => (
+                        <div key={i} className="animate-pulse bg-dark-border rounded-xl h-24" />
+                    ))}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="animate-pulse bg-dark-border rounded-2xl h-[250px]" />
+                    <div className="animate-pulse bg-dark-border rounded-2xl h-[250px]" />
+                </div>
+            </div>
+        );
+    }
+
+    if (error && !stats) {
+        return (
+            <div className="flex flex-col items-center justify-center p-20 text-white gap-4">
+                <div className="glass p-8 rounded-2xl border border-red-500/30 flex flex-col items-center gap-4 max-w-md">
+                    <AlertCircle className="w-12 h-12 text-red-400" />
+                    <h3 className="text-lg font-bold text-white">Failed to Load Dashboard</h3>
+                    <p className="text-dark-muted text-sm text-center">{error}</p>
+                    <button
+                        onClick={() => currentCompanyId && fetchDashboardStats(currentCompanyId, currentMonth)}
+                        className="px-6 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-colors flex items-center gap-2"
+                    >
+                        <RefreshCcw className="w-4 h-4" />
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     if (!stats) {
         return (
-            <div className="flex flex-col items-center justify-center p-20 text-white gap-3">
-                <Activity className="w-8 h-8 text-primary-400 animate-spin" />
-                <p className="text-dark-muted font-medium tracking-wide">Crunching dashboard analytics...</p>
+            <div className="space-y-6 p-6">
+                <div className="h-8 w-64 animate-pulse bg-dark-border rounded-lg" />
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[...Array(4)].map((_, i) => (
+                        <div key={i} className="animate-pulse bg-dark-border rounded-xl h-24" />
+                    ))}
+                </div>
             </div>
         );
     }
@@ -166,6 +206,59 @@ export const Dashboard = () => {
     const hasPayrollData = payrollDistribution.length > 0;
     const activeLoans = { length: activeLoansCount }; // shim for JSX rendering below
 
+    // STEP 3: Late arrivals today (calculated from records)
+    const lateArrivalsToday = records.filter(
+        r => r.date === today && r.companyId === currentCompanyId && r.status === 'LATE'
+    ).length;
+
+    // STEP 4: Marked absent today (separately from "no record")
+    const markedAbsentToday = records.filter(
+        r => r.date === today && r.companyId === currentCompanyId && r.status === 'ABSENT'
+    ).length;
+
+    // STEP 5: Department-wise attendance
+    const departmentAttendance = (() => {
+        const deptMap = new Map<string, { total: number; present: number }>();
+        companyEmployees.filter(e => e.status === 'ACTIVE').forEach(emp => {
+            const dept = emp.department || 'Unassigned';
+            if (!deptMap.has(dept)) deptMap.set(dept, { total: 0, present: 0 });
+            deptMap.get(dept)!.total++;
+        });
+        records.filter(r => r.date === today && r.companyId === currentCompanyId).forEach(rec => {
+            const emp = companyEmployees.find(e => e.id === rec.employeeId);
+            if (emp && ['PRESENT', 'LATE', 'HALF_DAY'].includes(rec.status)) {
+                const dept = emp.department || 'Unassigned';
+                if (deptMap.has(dept)) deptMap.get(dept)!.present++;
+            }
+        });
+        return Array.from(deptMap.entries())
+            .map(([dept, data]) => ({
+                department: dept,
+                total: data.total,
+                present: data.present,
+                absent: data.total - data.present,
+                percentage: data.total > 0 ? Math.round((data.present / data.total) * 100) : 0,
+            }))
+            .sort((a, b) => a.percentage - b.percentage);
+    })();
+
+    // STEP 6: Today's punch records (last 10)
+    const todayPunches = records
+        .filter(r => r.date === today && r.companyId === currentCompanyId)
+        .sort((a, b) => {
+            const aTime = a.checkIn ? new Date(a.checkIn).getTime() : 0;
+            const bTime = b.checkIn ? new Date(b.checkIn).getTime() : 0;
+            return bTime - aTime;
+        })
+        .slice(0, 10);
+
+    const formatPunchTime = (iso?: string) => {
+        if (!iso) return '—';
+        return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    };
+
+    const totalPending = pendingLeaves + pendingProduction + pendingLoans;
+
     // Calculate Estimated P&L (Production - Payroll - Expenses)
     const expenseStats = getExpenseStats(currentMonth);
     const estimatedProfit = monthProduction - netPayrollThisMonth - expenseStats.total;
@@ -188,9 +281,18 @@ export const Dashboard = () => {
                     <h1 className="text-2xl font-bold text-white mb-1">Executive Dashboard</h1>
                     <p className="text-dark-muted">Real-time overview of your workforce and operations.</p>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-dark-muted bg-dark-card border border-dark-border px-3 py-1.5 rounded-lg">
-                    <Zap className="w-3 h-3 text-primary-400" />
-                    <span>Live — {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => currentCompanyId && fetchDashboardStats(currentCompanyId, currentMonth)}
+                        className="p-2 rounded-lg bg-dark-card border border-dark-border hover:bg-dark-border/40 transition-colors group"
+                        title="Refresh dashboard"
+                    >
+                        <RefreshCcw className={`w-4 h-4 text-dark-muted group-hover:text-white transition-colors ${isLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <div className="flex items-center gap-1.5 text-xs text-dark-muted bg-dark-card border border-dark-border px-3 py-1.5 rounded-lg">
+                        <Zap className="w-3 h-3 text-primary-400" />
+                        <span>Live — {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                    </div>
                 </div>
             </div>
 
@@ -235,9 +337,25 @@ export const Dashboard = () => {
                     <div className="w-full bg-dark-bg h-1.5 rounded-full mt-2 overflow-hidden">
                         <div className="bg-warning h-full transition-all" style={{ width: `${attendancePercentage}%` }} />
                     </div>
-                    {absentToday > 0 && (
-                        <p className="text-xs text-red-400 mt-1">{absentToday} not recorded yet</p>
+                    {(absentToday > 0 || markedAbsentToday > 0) && (
+                        <p className="text-xs text-red-400 mt-1">
+                            {markedAbsentToday > 0 ? `${markedAbsentToday} marked absent` : ''}
+                            {markedAbsentToday > 0 && absentToday > 0 ? ' · ' : ''}
+                            {absentToday > 0 ? `${absentToday} not recorded` : ''}
+                        </p>
                     )}
+                </div>
+
+                {/* STEP 3: Late Arrivals Today KPI Card */}
+                <div className={`glass p-5 rounded-xl border relative overflow-hidden min-w-[180px] flex-[0_0_65%] sm:flex-1 snap-start ${lateArrivalsToday > 0 ? 'border-amber-500/30' : 'border-dark-border'}`}>
+                    <div className="absolute top-0 right-0 p-4 opacity-10"><Clock className="w-16 h-16 text-amber-400" /></div>
+                    <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">Late Today</p>
+                    <div className="flex items-baseline gap-2">
+                        <h3 className={`text-3xl font-bold ${lateArrivalsToday > 0 ? 'text-amber-400' : 'text-white'}`}>{lateArrivalsToday}</h3>
+                    </div>
+                    <div className="mt-2 text-xs text-dark-muted flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> Employees late today
+                    </div>
                 </div>
 
                 {hasPermission(PERMISSIONS.VIEW_PRODUCTION) && (
@@ -429,6 +547,158 @@ export const Dashboard = () => {
                 </div>
             )}
 
+            {/* STEP 5: Department-wise Attendance Table */}
+            <section className="glass rounded-2xl border border-dark-border overflow-hidden">
+                <div className="flex items-center gap-3 px-6 py-4 border-b border-dark-border">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                        <Users className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-white text-sm">Department Attendance — Today</h3>
+                        <p className="text-[11px] text-dark-muted">{departmentAttendance.length} departments</p>
+                    </div>
+                </div>
+                {departmentAttendance.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-14 text-dark-muted gap-2">
+                        <Users className="w-10 h-10 opacity-30" />
+                        <p className="text-sm">No department data available</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-dark-border/50">
+                                    <th className="text-left text-dark-muted text-xs uppercase tracking-wider px-6 py-3">Department</th>
+                                    <th className="text-center text-dark-muted text-xs uppercase tracking-wider px-4 py-3">Total</th>
+                                    <th className="text-center text-dark-muted text-xs uppercase tracking-wider px-4 py-3">Present</th>
+                                    <th className="text-center text-dark-muted text-xs uppercase tracking-wider px-4 py-3">Absent</th>
+                                    <th className="text-center text-dark-muted text-xs uppercase tracking-wider px-4 py-3">%</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-dark-border/30">
+                                {departmentAttendance.map(dept => (
+                                    <tr key={dept.department} className="hover:bg-dark-border/10 transition-colors">
+                                        <td className="px-6 py-3 text-white font-medium">{dept.department}</td>
+                                        <td className="px-4 py-3 text-center text-dark-text">{dept.total}</td>
+                                        <td className="px-4 py-3 text-center text-emerald-400 font-medium">{dept.present}</td>
+                                        <td className="px-4 py-3 text-center text-red-400 font-medium">{dept.absent}</td>
+                                        <td className="px-4 py-3 text-center">
+                                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${dept.percentage >= 90 ? 'bg-emerald-500/20 text-emerald-400' :
+                                                dept.percentage >= 70 ? 'bg-yellow-500/20 text-yellow-400' :
+                                                    'bg-red-500/20 text-red-400'
+                                                }`}>{dept.percentage}%</span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </section>
+
+            {/* STEP 6: Today's Punch Timeline */}
+            {hasPermission(PERMISSIONS.VIEW_ATTENDANCE) && (
+                <section className="glass rounded-2xl border border-dark-border overflow-hidden">
+                    <div className="flex items-center gap-3 px-6 py-4 border-b border-dark-border">
+                        <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
+                            <Clock className="w-4 h-4 text-violet-400" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-white text-sm">Today's Punch Activity</h3>
+                            <p className="text-[11px] text-dark-muted">Last 10 punch events</p>
+                        </div>
+                    </div>
+                    {todayPunches.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-14 text-dark-muted gap-2">
+                            <Clock className="w-10 h-10 opacity-30" />
+                            <p className="text-sm">No punches recorded today</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-dark-border/30">
+                            {todayPunches.map((rec, i) => {
+                                const emp = companyEmployees.find(e => e.id === rec.employeeId);
+                                return (
+                                    <div key={rec.id || i} className="flex items-center gap-4 px-6 py-3 hover:bg-dark-border/10 transition-colors">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-white text-sm font-medium truncate">{emp?.name || rec.employeeId}</p>
+                                        </div>
+                                        <div className="flex items-center gap-4 text-xs">
+                                            <div className="text-center min-w-[70px]">
+                                                <p className="text-dark-muted text-[10px] uppercase">In</p>
+                                                <p className="text-emerald-400 font-medium">{formatPunchTime(rec.checkIn)}</p>
+                                            </div>
+                                            <div className="text-center min-w-[70px]">
+                                                <p className="text-dark-muted text-[10px] uppercase">Out</p>
+                                                <p className="text-red-400 font-medium">{formatPunchTime(rec.checkOut)}</p>
+                                            </div>
+                                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold min-w-[70px] text-center ${rec.status === 'PRESENT' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                rec.status === 'LATE' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                    rec.status === 'HALF_DAY' ? 'bg-orange-500/20 text-orange-400' :
+                                                        rec.status === 'ABSENT' ? 'bg-red-500/20 text-red-400' :
+                                                            'bg-slate-500/20 text-slate-400'
+                                                }`}>{rec.status?.replace(/_/g, ' ')}</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </section>
+            )}
+
+            {/* STEP 7: Pending Approvals Panel */}
+            {totalPending > 0 ? (
+                <section className="glass rounded-2xl border border-dark-border overflow-hidden">
+                    <div className="flex items-center gap-3 px-6 py-4 border-b border-dark-border">
+                        <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                            <AlertTriangle className="w-4 h-4 text-orange-400" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-white text-sm">Pending Actions</h3>
+                            <p className="text-[11px] text-dark-muted">{totalPending} items require your attention</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-dark-border/50">
+                        <button onClick={() => navigate('/leaves')} className="flex items-center gap-4 p-5 hover:bg-dark-border/10 transition-colors text-left">
+                            <div className={`p-2.5 rounded-lg ${pendingLeaves > 0 ? 'bg-yellow-500/20' : 'bg-dark-surface'}`}>
+                                <CalendarX className={`w-5 h-5 ${pendingLeaves > 0 ? 'text-yellow-400' : 'text-dark-muted'}`} />
+                            </div>
+                            <div className="flex-1">
+                                <p className={`text-2xl font-bold ${pendingLeaves > 0 ? 'text-yellow-400' : 'text-white'}`}>{pendingLeaves}</p>
+                                <p className="text-xs text-dark-muted">Pending Leaves</p>
+                            </div>
+                            <span className="text-xs text-primary-400 font-medium">Review →</span>
+                        </button>
+                        <button onClick={() => navigate('/loans')} className="flex items-center gap-4 p-5 hover:bg-dark-border/10 transition-colors text-left">
+                            <div className={`p-2.5 rounded-lg ${pendingLoans > 0 ? 'bg-orange-500/20' : 'bg-dark-surface'}`}>
+                                <CreditCard className={`w-5 h-5 ${pendingLoans > 0 ? 'text-orange-400' : 'text-dark-muted'}`} />
+                            </div>
+                            <div className="flex-1">
+                                <p className={`text-2xl font-bold ${pendingLoans > 0 ? 'text-orange-400' : 'text-white'}`}>{pendingLoans}</p>
+                                <p className="text-xs text-dark-muted">Pending Loans</p>
+                            </div>
+                            <span className="text-xs text-primary-400 font-medium">Review →</span>
+                        </button>
+                        {hasPermission(PERMISSIONS.VIEW_PRODUCTION) && (
+                            <button onClick={() => navigate('/production')} className="flex items-center gap-4 p-5 hover:bg-dark-border/10 transition-colors text-left">
+                                <div className={`p-2.5 rounded-lg ${pendingProduction > 0 ? 'bg-blue-500/20' : 'bg-dark-surface'}`}>
+                                    <CheckSquare className={`w-5 h-5 ${pendingProduction > 0 ? 'text-blue-400' : 'text-dark-muted'}`} />
+                                </div>
+                                <div className="flex-1">
+                                    <p className={`text-2xl font-bold ${pendingProduction > 0 ? 'text-blue-400' : 'text-white'}`}>{pendingProduction}</p>
+                                    <p className="text-xs text-dark-muted">Pending Production</p>
+                                </div>
+                                <span className="text-xs text-primary-400 font-medium">Review →</span>
+                            </button>
+                        )}
+                    </div>
+                </section>
+            ) : (
+                <div className="glass p-5 rounded-xl border border-dark-border text-center">
+                    <p className="text-emerald-400 font-medium">✅ No pending approvals</p>
+                </div>
+            )}
+
             {/* ── Recent Activity Log ────────────────────────────────── */}
             {hasPermission(PERMISSIONS.VIEW_AUDIT_LOGS) && (
                 <ActivityLogCard logs={auditLogs} onViewAll={() => navigate('/admin/audit-logs')} />
@@ -555,6 +825,7 @@ function EmployeeView({ me, records, entries, loans, today, currentMonth }: {
     me: any; records: any[]; entries: any[]; loans: any[];
     today: string; currentMonth: string;
 }) {
+    const navigate = useNavigate();
     const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
     const changeMonth = (direction: -1 | 1) => {
@@ -650,6 +921,26 @@ function EmployeeView({ me, records, entries, loans, today, currentMonth }: {
                                 <span className="text-sm font-bold px-3 py-1 rounded-full bg-slate-500/20 text-slate-400">No Record</span>
                             )}
                         </div>
+                    </div>
+                    {/* STEP 8: Quick Punch Button */}
+                    <div className="px-5 py-3 border-t border-dark-border/50 flex justify-center">
+                        {!isPunchedIn ? (
+                            <button
+                                onClick={() => navigate('/attendance')}
+                                className="w-full sm:w-auto px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+                            >
+                                <LogIn className="w-4 h-4" />
+                                → Punch In Now
+                            </button>
+                        ) : !isPunchedOut ? (
+                            <button
+                                onClick={() => navigate('/attendance')}
+                                className="w-full sm:w-auto px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+                            >
+                                <LogOut className="w-4 h-4" />
+                                → Punch Out Now
+                            </button>
+                        ) : null}
                     </div>
                 </div>
             )}

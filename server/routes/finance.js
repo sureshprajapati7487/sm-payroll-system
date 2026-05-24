@@ -14,7 +14,8 @@ const getErrorHint = (err) => {
 // GET /api/finance/advances?companyId=XYZ
 router.get('/advances', async (req, res) => {
     try {
-        const companyId = req.query.companyId;
+        // Use req.companyId from JWT (tamper-proof) — fallback to query param for super-admin
+        const companyId = req.companyId || req.query.companyId;
         const where = companyId ? { companyId } : {};
         const advances = await AdvanceSalary.findAll({ where, order: [['createdAt', 'DESC']] });
         res.json(advances);
@@ -28,10 +29,13 @@ router.get('/advances', async (req, res) => {
 router.post('/advances', async (req, res) => {
     try {
         // Validate
-        const { id, companyId, employeeId, employeeName, amount, reason, requestDate, installments } = req.body;
+        const { id, employeeId, employeeName, amount, reason, requestDate, installments } = req.body;
         if (!employeeId || !amount) {
             return res.status(400).json({ error: 'employeeId and amount are required' });
         }
+
+        // Use req.companyId from JWT (tamper-proof)
+        const companyId = req.companyId || req.body.companyId;
 
         const advance = await AdvanceSalary.create({
             id: id || Math.random().toString(36).substr(2, 9),

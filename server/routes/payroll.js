@@ -32,6 +32,8 @@ router.get('/leaves', async (req, res) => {
 router.post('/leaves', async (req, res) => {
     try {
         const payload = { ...req.body };
+        // Inject companyId from JWT (prevents cross-tenant records)
+        if (req.companyId) payload.companyId = req.companyId;
         if (!payload.daysCount && payload.startDate && payload.endDate) {
             if (payload.isHalfDay) {
                 payload.daysCount = 0.5;
@@ -139,7 +141,12 @@ router.get('/loans', async (req, res) => {
     } catch (e) { addError(e, 'GET /api/loans'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.post('/loans', async (req, res) => {
-    try { res.json(await Loan.create(req.body)); }
+    try {
+        const data = { ...req.body };
+        // Inject companyId from JWT (prevents cross-tenant records)
+        if (req.companyId) data.companyId = req.companyId;
+        res.json(await Loan.create(data));
+    }
     catch (e) { addError(e, 'POST /api/loans'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.put('/loans/:id', async (req, res) => {
@@ -241,7 +248,14 @@ router.get('/payroll', async (req, res) => {
     } catch (e) { addError(e, 'GET /api/payroll'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.post('/payroll', async (req, res) => {
-    try { const slip = await SalarySlip.upsert(req.body); res.json(slip); }
+    try {
+        const body = { ...req.body };
+        // Inject companyId from JWT (prevents cross-tenant records)
+        if (req.companyId) body.companyId = req.companyId;
+        // upsert() returns [instance, created] — extract just the record
+        const [instance] = await SalarySlip.upsert(body);
+        res.json(instance.toJSON());
+    }
     catch (e) { addError(e, 'POST /api/payroll'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.get('/payroll/:id', async (req, res) => {

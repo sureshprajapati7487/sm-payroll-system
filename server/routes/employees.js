@@ -91,6 +91,9 @@ router.post('/', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'
     try {
         const data = { ...req.body };
 
+        // Always enforce companyId from JWT (prevents cross-tenant employee creation)
+        if (req.companyId) data.companyId = req.companyId;
+
         // RBAC: Strip financial info if user lacks VIEW_SALARY permission equivalent
         const canManageFinancials = req.user && ['SUPER_ADMIN', 'ACCOUNT_ADMIN'].includes(req.user.role);
         if (!canManageFinancials) {

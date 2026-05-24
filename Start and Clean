@@ -7,3 +7,52 @@ taskkill /F /PID 17716; Start-Sleep 1; node index.js
 
 .\deploy.ps1 "message" run karein (Jaise aapne bataya)
 npm run android:open chalayein (Android Studio khulega)
+
+
+
+
+
+
+
+🎓 Ralph Loop Workflow (Baar Baar Follow Karo)
+Step 1: Pehle Decide Karo — Kya Banana Hai?
+Har baar ek hi feature rakho. Abhi humara target hai:
+
+"Dashboard ko improve karna"
+
+Step 2: 
+
+PRD.md
+ Update Karo (Main File)
+Yahi sabse zaroori file hai jo Ralph padh kar kaam karta hai. Isme crystal clear likho ki Dashboard mein kya-kya dikhna chahiye, jaise:
+
+Kaun se cards ho (Total Employees, Present Today, Absent, On Leave)
+Koi chart ho (Attendance Graph)
+Koi quick action buttons ho
+Step 3: 
+
+prompt.md
+ Update Karo (Instructions)
+Isme Ralph ko batao ki woh kaise kaam kare — kaunsi files chhedni hain, kaunsi nahi.
+
+Step 4: Ralph Loop Start Karo
+VS Code mein Ralph Loop panel mein jaao aur Play (▶️) button dabao. Woh naya git branch banayega aur designer + coder ki tarah kaam shuru kar dega.
+
+Step 5: CodeRabbit Review
+Jab Ralph ruk jaaye, CodeRabbit bata dega ki kya theek karna baaki hai. Jo issues aayein, aap mujhe bhejna — main fix kar dunga.
+
+Step 6: Merge
+Sab theek hone par Git mein branch ko main mein merge karo. Feature live!
+
+Aab seedha kaam shuru karte hain!
+
+Aap mujhe bataiye — Dashboard mein aapko exactly kya kya dikhna chahiye? Kuch examples:
+
+📊 Aaj kitne employee present hain?
+💰 Is mahine ki total salary kitni hogi?
+🏖️ Kaun leave par hai?
+📈 Attendance ka weekly graph?
+Jitna batayenge, main utna accha 
+
+PRD.md
+ likh dunga aur Ralph ko seedha kaam pe laga denge! 🚀

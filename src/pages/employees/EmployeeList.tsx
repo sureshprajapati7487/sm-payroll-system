@@ -8,7 +8,7 @@ import { useDataMask } from '@/hooks/useDataMask';
 import {
     Search, Plus, Eye, Edit, Trash2, XCircle, Key,
     Filter, ChevronDown, X, ArrowUpDown, SlidersHorizontal,
-    Users, UserCheck, UserX, Clock
+    Users, UserCheck, UserX, Clock, CalendarCheck, Receipt
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { CredentialsModal } from '@/components/payroll/CredentialsModal';
@@ -495,7 +495,10 @@ export const EmployeeList = () => {
 
                                 <div className="p-5 flex flex-col items-center text-center">
                                     {/* Avatar */}
-                                    <div className="w-18 h-18 rounded-full p-0.5 bg-gradient-to-br from-primary-500/50 to-purple-600/50 mb-3">
+                                    <div
+                                        onClick={() => navigate(`/employees/${employee.id}`)}
+                                        className="w-18 h-18 rounded-full p-0.5 bg-gradient-to-br from-primary-500/50 to-purple-600/50 mb-3 cursor-pointer hover:scale-105 transition-transform"
+                                    >
                                         <img
                                             src={employee.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${employee.name}`}
                                             alt={employee.name}
@@ -504,7 +507,7 @@ export const EmployeeList = () => {
                                         />
                                     </div>
 
-                                    <h3 className="text-base font-bold text-dark-text mb-0.5 leading-tight">{employee.name}</h3>
+                                    <h3 onClick={() => navigate(`/employees/${employee.id}`)} className="text-base font-bold text-dark-text mb-0.5 leading-tight cursor-pointer hover:text-primary-400 transition-colors">{employee.name}</h3>
                                     <p className="text-primary-400 text-xs font-medium mb-1">{employee.designation}</p>
                                     <span className="px-2 py-0.5 rounded-md bg-dark-bg border border-dark-border text-xs text-dark-muted font-mono">
                                         {employee.code}
@@ -555,6 +558,24 @@ export const EmployeeList = () => {
                                                 title="Credentials"
                                             >
                                                 <Key className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {hasPermission(PERMISSIONS.VIEW_ATTENDANCE) && (
+                                            <button
+                                                onClick={() => navigate(`/attendance`)}
+                                                className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors"
+                                                title="View Attendance"
+                                            >
+                                                <CalendarCheck className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {hasPermission(PERMISSIONS.VIEW_PAYROLL) && (
+                                            <button
+                                                onClick={() => navigate(`/payroll`)}
+                                                className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white transition-colors"
+                                                title="View Payroll"
+                                            >
+                                                <Receipt className="w-4 h-4" />
                                             </button>
                                         )}
                                         <button

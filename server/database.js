@@ -368,6 +368,7 @@ const SalarySlip = sequelize.define('SalarySlip', {
     allowances: { type: DataTypes.FLOAT, defaultValue: 0 },
     grossSalary: { type: DataTypes.FLOAT, defaultValue: 0 },
     loanDeduction: { type: DataTypes.FLOAT, defaultValue: 0 },
+    advanceDeduction: { type: DataTypes.FLOAT, defaultValue: 0 },  // ← Advance salary recovery this month
     pfDeduction: { type: DataTypes.FLOAT, defaultValue: 0 },
     taxDeduction: { type: DataTypes.FLOAT, defaultValue: 0 },
     otherDeduction: { type: DataTypes.FLOAT, defaultValue: 0 },

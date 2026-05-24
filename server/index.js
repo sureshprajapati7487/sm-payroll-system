@@ -9,6 +9,14 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+
+// ── IF-01: Security & Performance Middleware ──────────────────────────────────
+// helmet sets HTTP security headers (X-Frame-Options, X-Content-Type-Options, etc.)
+// compression enables gzip/brotli response compression for all API responses
+const helmet = require('helmet');
+const compression = require('compression');
+// ─────────────────────────────────────────────────────────────────────────────
+
 const { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, Expense, SalarySlip, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB } = require('./database');
 const { Op } = require('sequelize');
 const { startBackupScheduler, doBackup, getBackupStatus, getConfig, updateConfig } = require('./backup');
@@ -60,7 +68,7 @@ function recordFailedAttempt(key) {
 }
 function clearFailedAttempts(key) { failedAttempts.delete(key); }
 
-// IP-level rate limiter
+// ── IP-level rate limiter for login endpoint ─────────────────────────────────
 const loginRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 20,
@@ -69,6 +77,25 @@ const loginRateLimiter = rateLimit({
     skipSuccessfulRequests: true,
     message: { error: 'Too many login attempts from this device.', fix: 'Please wait 15 minutes before trying again.', retryAfter: 15 * 60 },
 });
+
+// ── IF-01: Global Write-API Rate Limiter ──────────────────────────────────────
+// Protects ALL mutation endpoints (POST, PUT, PATCH, DELETE) from abuse/DoS.
+// GET requests are skipped — reads are always unrestricted.
+// 100 write-mutations per 15 minutes per IP is very generous for legitimate use
+// (normal payroll admin makes ~10-20 mutations per hour).
+const writeRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minute window
+    max: 100,                  // max 100 write requests per IP per window
+    standardHeaders: true,     // Return rate limit info in RateLimit-* headers
+    legacyHeaders: false,      // Disable X-RateLimit-* headers (deprecated)
+    skip: (req) => req.method === 'GET', // GET requests bypass this limiter entirely
+    message: {
+        error: 'Too many requests from this IP. Please slow down.',
+        fix: 'Wait 15 minutes before sending more write requests.',
+        retryAfter: 15 * 60,
+    },
+});
+// ─────────────────────────────────────────────────────────────────────────────
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -245,6 +272,41 @@ function authMiddleware(req, res, next) {
     catch (e) { return res.status(401).json({ error: 'Invalid or expired token', fix: 'Login again to get a new token' }); }
 }
 
+// ── IF-01: Helmet — HTTP Security Headers ────────────────────────────────────
+// CSP is set to report-only mode initially so no frontend assets break.
+// Report-only means violations are logged (console) but NOT blocked.
+// This lets us observe what would break before we switch to enforce mode (IF-09).
+// Other headers (X-Frame-Options, X-Content-Type-Options, HSTS, etc.) are active.
+app.use(helmet({
+    // CSP in report-only mode — safe for existing React + camera features
+    contentSecurityPolicy: {
+        useDefaults: true,
+        reportOnly: true, // ← violations are reported, NOT blocked (safe mode)
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // needed for React dev
+            styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+            fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+            imgSrc: ["'self'", 'data:', 'blob:'], // blob: needed for camera/face scan
+            connectSrc: ["'self'", 'http://localhost:*', 'http://192.168.*', 'ws://localhost:*'],
+            mediaSrc: ["'self'", 'blob:'],        // blob: needed for camera streams
+            workerSrc: ["'self'", 'blob:'],       // blob: needed for web workers
+            objectSrc: ["'none'"],
+            frameAncestors: ["'self'"],
+        },
+    },
+    // Disable COEP — required for camera/face-scan iframe-embedded resources
+    crossOriginEmbedderPolicy: false,
+    // Allow cross-origin resource loading (needed for fonts, CDN assets)
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+// ── IF-01: Compression — gzip/brotli all API responses ───────────────────────
+// Compresses responses > 1KB automatically. Clients that don't support
+// compression receive plain responses — fully backward compatible.
+app.use(compression());
+
+// ── CORS ──────────────────────────────────────────────────────────────────────
 app.use(cors({
     origin: (origin, callback) => {
         if (isAllowedOrigin(origin)) return callback(null, true);
@@ -256,6 +318,11 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(authMiddleware);
+
+// ── IF-01: Apply Global Write-API Rate Limiter ────────────────────────────────
+// Applied AFTER authMiddleware so authenticated context is available if needed.
+// Skips GET requests automatically (defined in writeRateLimiter config above).
+app.use(writeRateLimiter);
 
 // ── Company Scope Enforcement — prevents cross-tenant data bleed ──────────────
 const { requireCompanyScope } = require('./rbac');

@@ -130,22 +130,17 @@ export const AdminPunchModal = ({
                 // ── NEW MANUAL PUNCH ────────────────────────────────────────
                 if (!employeeId) { setErrorMsg('Employee select karein.'); setStatus('error'); return; }
                 const punchMeta = {
-                    punchMode: 'face' as const,
+                    punchMode: 'admin' as const,
                     isManualPunch: true,
                     manualPunchBy: adminName,
                     manualPunchReason: reason.trim(),
+                    overrideTime: punchDateTime,
                 };
                 if (punchType === 'IN') {
                     const emp = activeEmployees.find(e => e.id === employeeId);
-                    await markCheckIn(employeeId, emp?.shift || 'GENERAL', undefined, {
-                        ...punchMeta,
-                        overrideTime: punchDateTime,
-                    } as any);
+                    await markCheckIn(employeeId, emp?.shift || 'GENERAL', undefined, punchMeta);
                 } else {
-                    await markCheckOut(employeeId, {
-                        ...punchMeta,
-                        overrideTime: punchDateTime,
-                    } as any);
+                    await markCheckOut(employeeId, punchMeta);
                 }
             }
 

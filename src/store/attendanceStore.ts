@@ -18,9 +18,17 @@ interface AttendanceState {
         punchMode?: AttendanceRecord['punchMode'];
         punchLocationId?: string;
         usedPinPunch?: boolean;
+        overrideTime?: string;  // ISO string — use this time instead of now
+        isManualPunch?: boolean;
+        manualPunchBy?: string;
+        manualPunchReason?: string;
     }) => Promise<void>;
     markCheckOut: (employeeId: string, meta?: {
         punchMode?: AttendanceRecord['punchMode'];
+        overrideTime?: string;  // ISO string — use this time instead of now
+        isManualPunch?: boolean;
+        manualPunchBy?: string;
+        manualPunchReason?: string;
     }) => Promise<void>;
     updateRecordStatus: (employeeId: string, status: AttendanceStatus, date?: string) => Promise<void>;
     removeRecord: (employeeId: string, date?: string) => Promise<void>;
@@ -130,8 +138,9 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
 
         // ── Mark Check-In ──────────────────────────────────────────────────────────
         markCheckIn: async (employeeId, shiftId, _imageProof, meta) => {
-            const today = new Date().toISOString().split('T')[0];
-            const now = new Date();
+            // Use overrideTime if admin specified a custom punch-in time
+            const now = meta?.overrideTime ? new Date(meta.overrideTime) : new Date();
+            const today = now.toISOString().split('T')[0];
 
             // Prevent duplicate check-in for the same day
             const existing = get().records.find(r => r.employeeId === employeeId && r.date === today);
@@ -159,6 +168,9 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
                 punchMode: meta?.punchMode ?? 'face',
                 punchLocationId: meta?.punchLocationId,
                 usedPinPunch: meta?.usedPinPunch,
+                isManualPunch: meta?.isManualPunch,
+                manualPunchBy: meta?.manualPunchBy,
+                manualPunchReason: meta?.manualPunchReason,
             };
 
             // 1. Optimistic local update
@@ -186,9 +198,10 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
         },
 
         // ── Mark Check-Out ─────────────────────────────────────────────────────────
-        markCheckOut: async (employeeId) => {
-            const today = new Date().toISOString().split('T')[0];
-            const now = new Date();
+        markCheckOut: async (employeeId, meta) => {
+            // Use overrideTime if admin specified a custom punch-out time
+            const now = (meta as any)?.overrideTime ? new Date((meta as any).overrideTime) : new Date();
+            const today = now.toISOString().split('T')[0];
 
             // Find today's record to get checkIn time and id
             const todayRecord = get().records.find(r => r.employeeId === employeeId && r.date === today);
@@ -202,9 +215,14 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
                 (durationHours > standardHours ? durationHours - standardHours : 0).toFixed(2)
             );
 
-            const checkOutPayload = {
+            const checkOutPayload: Record<string, unknown> = {
                 checkOut: now.toISOString(),
                 overtimeHours,
+                ...(meta as any)?.isManualPunch && {
+                    isManualPunch: true,
+                    manualPunchBy: (meta as any).manualPunchBy,
+                    manualPunchReason: (meta as any).manualPunchReason,
+                },
             };
 
             // 1. Optimistic local update

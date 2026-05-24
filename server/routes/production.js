@@ -109,8 +109,9 @@ router.get('/analytics', async (req, res) => {
 // GET all production entries (company scoped)
 router.get('/', async (req, res) => {
     try {
-        const { companyId } = req.query;
         const whereClause = {};
+        // Use req.companyId from JWT (tamper-proof) — fallback to query param for super-admin
+        const companyId = req.companyId || req.query.companyId;
         if (companyId) whereClause.companyId = companyId;
 
         const entries = await Production.findAll({
@@ -127,11 +128,14 @@ router.get('/', async (req, res) => {
 // POST add new production entry
 router.post('/', async (req, res) => {
     try {
-        const { id, companyId, employeeId, date, item, qty, rate, totalAmount, status, remarks } = req.body;
+        const { id, employeeId, date, item, qty, rate, totalAmount, status, remarks } = req.body;
 
         if (!employeeId || !date || !item) {
             return res.status(400).json({ error: 'employeeId, date, and item are required' });
         }
+
+        // Use req.companyId from JWT (tamper-proof)
+        const companyId = req.companyId || req.body.companyId;
 
         const newEntry = await Production.create({
             id: id || `prod-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -161,6 +165,9 @@ router.post('/bulk', async (req, res) => {
             return res.status(400).json({ error: 'Expected an array of entries' });
         }
 
+        // Use req.companyId from JWT (tamper-proof)
+        const companyId = req.companyId || null;
+
         const successful = [];
         const errors = [];
 
@@ -172,7 +179,7 @@ router.post('/bulk', async (req, res) => {
 
                 const newEntry = await Production.create({
                     id: entry.id || `prod-${Date.now()}-${Math.random().toString(36).substr(2, 5)}-${index}`,
-                    companyId: entry.companyId,
+                    companyId: companyId || entry.companyId,
                     employeeId: entry.employeeId,
                     date: entry.date,
                     item: entry.item,

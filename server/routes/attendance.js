@@ -40,8 +40,18 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
     try {
-        const record = await Attendance.upsert(req.body);
-        res.json(record);
+        // Always inject companyId from JWT session (prevents cross-tenant records with missing companyId)
+        const body = { ...req.body };
+        if (req.companyId) body.companyId = req.companyId;
+        // Normalize: breaks must be a JSON string (SQLite stores as TEXT)
+        if (body.breaks !== undefined && typeof body.breaks !== 'string') {
+            body.breaks = JSON.stringify(body.breaks);
+        }
+        // Strip Sequelize auto-managed timestamps from upsert body
+        delete body.createdAt;
+        delete body.updatedAt;
+        const [instance] = await Attendance.upsert(body);
+        res.json(instance.toJSON());
     } catch (e) { addError(e, 'POST /api/attendance'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
@@ -54,7 +64,15 @@ router.put('/:id', async (req, res) => {
                 return res.status(403).json({ error: 'Forbidden — cannot modify another company\'s attendance record' });
             }
         }
-        await Attendance.update(req.body, { where: { id: req.params.id } });
+        // Normalize body: stringify arrays/objects for TEXT columns, strip Sequelize timestamps
+        const body = { ...req.body };
+        if (body.breaks !== undefined && typeof body.breaks !== 'string') {
+            body.breaks = JSON.stringify(body.breaks);
+        }
+        // Remove read-only fields that Sequelize manages
+        delete body.createdAt;
+        delete body.updatedAt;
+        await Attendance.update(body, { where: { id: req.params.id } });
         res.json({ success: true });
     }
     catch (e) { addError(e, 'PUT /api/attendance/:id'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
@@ -116,7 +134,8 @@ router.post('/admin-punch', async (req, res) => {
             return res.status(400).json({ error: 'employeeId, type, time, reason, adminName are required' });
         }
         const today = time.split('T')[0];
-        let record = await Attendance.findOne({ where: { employeeId, date: today } });
+        const companyWhere = req.companyId ? { employeeId, date: today, companyId: req.companyId } : { employeeId, date: today };
+        let record = await Attendance.findOne({ where: companyWhere });
 
         if (type === 'checkIn') {
             const payload = { checkIn: time, isManualPunch: true, manualPunchBy: adminName, manualPunchReason: reason, punchMode: 'admin' };
@@ -124,7 +143,7 @@ router.post('/admin-punch', async (req, res) => {
                 await Attendance.update(payload, { where: { id: record.id } });
                 res.json({ success: true, id: record.id, ...payload });
             } else {
-                const newRec = await Attendance.create({ id: `manual-${uuidv4()}`, employeeId, date: today, status: 'PRESENT', shiftId: shiftId || null, lateByMinutes: 0, overtimeHours: 0, breaks: '[]', ...payload });
+                const newRec = await Attendance.create({ id: `manual-${uuidv4()}`, employeeId, date: today, companyId: req.companyId || null, status: 'PRESENT', shiftId: shiftId || null, lateByMinutes: 0, overtimeHours: 0, breaks: '[]', ...payload });
                 res.json({ success: true, ...newRec.toJSON() });
             }
         } else if (type === 'checkOut' && record) {
