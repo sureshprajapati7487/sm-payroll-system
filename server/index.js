@@ -17,6 +17,10 @@ const helmet = require('helmet');
 const compression = require('compression');
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── IF-02: Auth Middleware (extracted) ────────────────────────────────────────
+const { authMiddleware, isPublic, PUBLIC_PATHS } = require('./middlewares/auth');
+// ─────────────────────────────────────────────────────────────────────────────
+
 const { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, Expense, SalarySlip, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB } = require('./database');
 const { Op } = require('sequelize');
 const { startBackupScheduler, doBackup, getBackupStatus, getConfig, updateConfig } = require('./backup');
@@ -210,22 +214,7 @@ function isAllowedOrigin(origin) {
 }
 
 // ── Auth Middleware ───────────────────────────────────────────────────────────
-const PUBLIC_PATHS = [
-    { method: 'POST', path: '/api/auth/login' },
-    { method: 'POST', path: '/api/auth/dev-login' },
-    { method: 'POST', path: '/api/auth/refresh' },
-    { method: 'POST', path: '/api/auth/verify-password' },
-    { method: 'POST', path: '/api/auth/logout' },
-    { method: 'GET', path: '/api/health' },
-    { method: 'GET', path: '/api/status/routes' },
-    { method: 'GET', path: '/api/status/errors' },
-    { method: 'DELETE', path: '/api/health/errors' },
-    { method: 'GET', path: '/api/health/deep' },
-    { method: 'POST', path: '/api/status/errors/report' },
-    { method: 'POST', path: '/api/companies' },
-    { method: 'GET', path: '/api/clients/export' },
-    { method: 'GET', path: '/api/clients/demo-export' },
-];
+// PUBLIC_PATHS, isPublic, authMiddleware → see ./middlewares/auth.js (IF-02)
 
 // ── DEV ONLY: Reset Admin Password (localhost only, blocked in production) ────
 app.get('/api/dev/reset-admin', async (req, res) => {
@@ -259,18 +248,6 @@ app.get('/api/dev/reset-admin', async (req, res) => {
         res.json({ error: e.message });
     }
 });
-
-function isPublic(req) {
-    return PUBLIC_PATHS.some(p => p.method === req.method && req.path.startsWith(p.path));
-}
-function authMiddleware(req, res, next) {
-    if (isPublic(req)) return next();
-    const header = req.headers['authorization'] || '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : (req.query.token || null);
-    if (!token) return res.status(401).json({ error: 'Unauthorized — token required', fix: 'Include Authorization: Bearer <token> header' });
-    try { req.user = jwt.verify(token, JWT_SECRET); next(); }
-    catch (e) { return res.status(401).json({ error: 'Invalid or expired token', fix: 'Login again to get a new token' }); }
-}
 
 // ── IF-01: Helmet — HTTP Security Headers ────────────────────────────────────
 // CSP is set to report-only mode initially so no frontend assets break.
