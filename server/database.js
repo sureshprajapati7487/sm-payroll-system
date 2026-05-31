@@ -242,6 +242,11 @@ const Employee = sequelize.define('Employee', {
     loanLimit: { type: DataTypes.FLOAT },
     loanLimitType: { type: DataTypes.STRING },
     salaryMultiplier: { type: DataTypes.FLOAT }
+}, {
+    indexes: [
+        { fields: ['companyId', 'status'] },
+        { fields: ['companyId', 'department'] },
+    ]
 });
 
 // ── 3. Attendance ─────────────────────────────────────────────────────────────
@@ -274,7 +279,11 @@ const Attendance = sequelize.define('Attendance', {
     punchLocationId: { type: DataTypes.STRING },         // Which GPS zone matched
     usedPinPunch: { type: DataTypes.BOOLEAN, defaultValue: false },
 }, {
-    indexes: [{ fields: ['employeeId', 'date'] }]
+    indexes: [
+        { fields: ['employeeId', 'date'] },
+        { fields: ['companyId', 'date'] },
+        { fields: ['companyId', 'employeeId'] },
+    ]
 });
 
 
@@ -324,7 +333,11 @@ const Leave = sequelize.define('Leave', {
     },
     appliedOn: { type: DataTypes.STRING }
 }, {
-    version: true // Optimistic Locking
+    version: true, // Optimistic Locking
+    indexes: [
+        { fields: ['companyId', 'employeeId'] },
+        { fields: ['companyId', 'status'] },
+    ]
 });
 
 // ── 6. Loan Record ────────────────────────────────────────────────────────────
@@ -350,6 +363,11 @@ const Loan = sequelize.define('Loan', {
     skippedMonths: { type: DataTypes.JSON, defaultValue: [] },
     allowedSkips: { type: DataTypes.INTEGER, defaultValue: 2 },
     settlementRequest: { type: DataTypes.JSON }
+}, {
+    indexes: [
+        { fields: ['companyId', 'employeeId'] },
+        { fields: ['companyId', 'status'] },
+    ]
 });
 
 // ── 7. Salary Slip / Payroll ──────────────────────────────────────────────────
@@ -380,6 +398,12 @@ const SalarySlip = sequelize.define('SalarySlip', {
     },
     generatedOn: { type: DataTypes.STRING },
     generatedBy: { type: DataTypes.STRING }
+}, {
+    indexes: [
+        { fields: ['companyId', 'employeeId'] },
+        { fields: ['companyId', 'month'] },
+        { fields: ['employeeId', 'month'] },
+    ]
 });
 
 // ── 8. Expense ────────────────────────────────────────────────────────────────
