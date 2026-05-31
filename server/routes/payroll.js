@@ -244,7 +244,16 @@ router.get('/payroll', async (req, res) => {
         if (req.companyId) where.companyId = req.companyId;
         if (month) where.month = month;
         if (employeeId) where.employeeId = employeeId;
-        res.json(await SalarySlip.findAll({ where }));
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+        const offset = (page - 1) * limit;
+        const { count, rows } = await SalarySlip.findAndCountAll({
+            where,
+            order: [['month', 'DESC']],
+            limit,
+            offset,
+        });
+        res.json({ data: rows, total: count, page, limit, totalPages: Math.ceil(count / limit) });
     } catch (e) { addError(e, 'GET /api/payroll'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.post('/payroll', async (req, res) => {

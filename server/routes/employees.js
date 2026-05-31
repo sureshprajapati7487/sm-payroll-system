@@ -38,7 +38,7 @@ function validatePasswordStrength(password) {
 const { Op } = require('sequelize');
 
 router.get('/', async (req, res) => {
-    const { page, limit, search, status, department, shift } = req.query;
+    const { search, status, department, shift } = req.query;
     try {
         // req.companyId is set by requireCompanyScope middleware from JWT — tamper-proof
         const where = req.companyId ? { companyId: req.companyId } : {};
@@ -60,30 +60,24 @@ router.get('/', async (req, res) => {
         if (department && department !== 'All') where.department = department;
         if (shift && shift !== 'All') where.shift = shift;
 
-        // Check if pagination is requested
-        if (page && limit) {
-            const pageNum = parseInt(page) || 1;
-            const limitNum = parseInt(limit) || 50;
-            const offset = (pageNum - 1) * limitNum;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+        const offset = (page - 1) * limit;
 
-            const { count, rows } = await Employee.findAndCountAll({
-                where,
-                limit: limitNum,
-                offset,
-                order: [['createdAt', 'DESC']]
-            });
+        const { count, rows } = await Employee.findAndCountAll({
+            where,
+            order: [['createdAt', 'DESC']],
+            limit,
+            offset,
+        });
 
-            return res.json({
-                data: rows,
-                total: count,
-                page: pageNum,
-                limit: limitNum,
-                totalPages: Math.ceil(count / limitNum)
-            });
-        }
-
-        // Fallback to all
-        res.json(await Employee.findAll({ where, order: [['createdAt', 'DESC']] }));
+        res.json({
+            data: rows,
+            total: count,
+            page,
+            limit,
+            totalPages: Math.ceil(count / limit),
+        });
     } catch (e) { addError(e, 'GET /api/employees'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 

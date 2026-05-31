@@ -34,7 +34,16 @@ router.get('/', async (req, res) => {
         if (req.companyId) where.companyId = req.companyId;
         if (employeeId) where.employeeId = employeeId;
         if (date) where.date = date;
-        res.json(await Attendance.findAll({ where }));
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+        const offset = (page - 1) * limit;
+        const { count, rows } = await Attendance.findAndCountAll({
+            where,
+            order: [['date', 'DESC']],
+            limit,
+            offset,
+        });
+        res.json({ data: rows, total: count, page, limit, totalPages: Math.ceil(count / limit) });
     } catch (e) { addError(e, 'GET /api/attendance'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
