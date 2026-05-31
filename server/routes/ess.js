@@ -83,9 +83,6 @@ router.post('/loans', async (req, res) => {
 // GET /api/ess/attendance — last 30 days
 router.get('/attendance', async (req, res) => {
     try {
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - 30);
-        const dateStr = cutoff.toISOString().split('T')[0];
         const records = await Attendance.findAll({
             where: { employeeId: req.user.id },
             order: [['date', 'DESC']],
