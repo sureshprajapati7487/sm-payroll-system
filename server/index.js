@@ -139,10 +139,10 @@ app.use(helmet({
     // CSP in report-only mode — safe for existing React + camera features
     contentSecurityPolicy: {
         useDefaults: true,
-        reportOnly: true, // ← violations are reported, NOT blocked (safe mode)
+        reportOnly: false, // ← CSP enforced (IF-09)
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // needed for React dev
+            scriptSrc: ["'self'", "'unsafe-inline'"], // 'unsafe-eval' removed — not needed in production build
             styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
             fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
             imgSrc: ["'self'", 'data:', 'blob:'], // blob: needed for camera/face scan
