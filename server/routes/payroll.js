@@ -489,8 +489,29 @@ router.post('/run', async (req, res) => {
                 }
             }
 
-            // Simplified TDS
-            tdsD = new Decimal(0); // Will calculate based on rules if needed, zero mock for now
+            // TDS — New Tax Regime FY2024-25 (no deductions, slab on gross)
+            if (sc.tdsApplicable) {
+                const gVal = grossSalary.toNumber();
+                if (sc.tdsPercentage !== undefined) {
+                    tdsD = grossSalary.times(sc.tdsPercentage).dividedBy(100).round();
+                } else if (!sc.tdsPanLinked) {
+                    tdsD = grossSalary.times(20).dividedBy(100).round();
+                } else {
+                    const annualGross = gVal * 12;
+                    let annualTax = 0;
+                    if (annualGross <= 300000) annualTax = 0;
+                    else if (annualGross <= 700000) annualTax = (annualGross - 300000) * 0.05;
+                    else if (annualGross <= 1000000) annualTax = 20000 + (annualGross - 700000) * 0.10;
+                    else if (annualGross <= 1200000) annualTax = 50000 + (annualGross - 1000000) * 0.15;
+                    else if (annualGross <= 1500000) annualTax = 80000 + (annualGross - 1200000) * 0.20;
+                    else annualTax = 140000 + (annualGross - 1500000) * 0.30;
+                    // Rebate u/s 87A
+                    if (annualGross <= 700000) annualTax = 0;
+                    // 4% Health & Education Cess
+                    annualTax = annualTax * 1.04;
+                    tdsD = new Decimal(Math.round(annualTax / 12));
+                }
+            }
             const tdsDeduction = tdsD.toNumber();
             const pfDeduction = pfD.toNumber();
 
