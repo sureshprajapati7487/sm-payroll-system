@@ -6,6 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { requireRole } = require('../rbac');
+const { formatError } = require('../middlewares/errorHandler');
 const BCRYPT_ROUNDS = 10;
 
 // ── Multer — local disk storage under server/uploads/{employeeId}/ ─────────────
@@ -260,7 +261,7 @@ router.post('/:id/documents', uploadDoc.single('file'), async (req, res) => {
         emp.changed('documents', true);
         await emp.save();
         res.status(201).json(newDoc);
-    } catch (e) { addError(e, 'POST /api/employees/:id/documents'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'POST /api/employees/:id/documents'); res.status(500).json(formatError(e)); }
 });
 
 router.get('/:id/documents', async (req, res) => {
@@ -268,7 +269,7 @@ router.get('/:id/documents', async (req, res) => {
         const emp = await Employee.findByPk(req.params.id);
         if (!emp) return res.status(404).json({ error: 'Employee not found' });
         res.json(Array.isArray(emp.documents) ? emp.documents : []);
-    } catch (e) { addError(e, 'GET /api/employees/:id/documents'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'GET /api/employees/:id/documents'); res.status(500).json(formatError(e)); }
 });
 
 router.get('/:id/documents/:filename', (req, res) => {

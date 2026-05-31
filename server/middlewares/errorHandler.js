@@ -70,4 +70,10 @@ function errorHandlerMiddleware(err, req, res, _next) {
     res.status(500).json({ error: err.message, why: h.why, fix: h.fix });
 }
 
-module.exports = { addError, getErrorHint, getErrorLog, ERROR_LOG_PATH, errorHandlerMiddleware };
+// Convenience: build a standardized error response object
+function formatError(err) {
+    const h = getErrorHint(err);
+    return { error: (err && err.message) ? err.message : String(err), why: h.why, fix: h.fix };
+}
+
+module.exports = { addError, getErrorHint, getErrorLog, ERROR_LOG_PATH, errorHandlerMiddleware, formatError };

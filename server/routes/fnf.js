@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { FnFSettlement, Employee } = require('../database');
-const { addError, getErrorHint } = require('../middlewares/errorHandler');
+const { addError, formatError } = require('../middlewares/errorHandler');
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function computeFnF({ employee, separationDate, noticePeriodDays, pendingLeaveDays, otherDeductions = 0 }) {
@@ -40,7 +40,7 @@ router.post('/calculate', async (req, res) => {
         if (!employee) return res.status(404).json({ error: 'Employee not found' });
         const result = computeFnF({ employee, separationDate, noticePeriodDays, pendingLeaveDays, otherDeductions });
         res.json({ ...result, basicSalary: employee.basicSalary, employeeName: employee.name });
-    } catch (e) { addError(e, 'POST /api/fnf/calculate'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'POST /api/fnf/calculate'); res.status(500).json(formatError(e)); }
 });
 
 // POST /api/fnf — save as DRAFT
@@ -66,7 +66,7 @@ router.post('/', async (req, res) => {
             generatedBy: req.user?.name || 'System',
         });
         res.status(201).json(record);
-    } catch (e) { addError(e, 'POST /api/fnf'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'POST /api/fnf'); res.status(500).json(formatError(e)); }
 });
 
 // PATCH /api/fnf/:id/approve
@@ -76,7 +76,7 @@ router.patch('/:id/approve', async (req, res) => {
         if (!record) return res.status(404).json({ error: 'Settlement not found' });
         await record.update({ status: 'APPROVED' });
         res.json(record);
-    } catch (e) { addError(e, 'PATCH /api/fnf/:id/approve'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'PATCH /api/fnf/:id/approve'); res.status(500).json(formatError(e)); }
 });
 
 // GET /api/fnf?employeeId=x
@@ -87,7 +87,7 @@ router.get('/', async (req, res) => {
         if (req.query.employeeId) where.employeeId = req.query.employeeId;
         const records = await FnFSettlement.findAll({ where, order: [['createdAt', 'DESC']] });
         res.json(records);
-    } catch (e) { addError(e, 'GET /api/fnf'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'GET /api/fnf'); res.status(500).json(formatError(e)); }
 });
 
 module.exports = router;

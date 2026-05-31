@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { Employee, SalarySlip, Leave, Loan, Attendance } = require('../database');
-const { addError } = require('../middlewares/errorHandler');
+const { addError, formatError } = require('../middlewares/errorHandler');
 
 // All ESS routes use req.user.id from JWT — employee sees only their own data
 
@@ -14,7 +14,7 @@ router.get('/me', async (req, res) => {
         });
         if (!emp) return res.status(404).json({ error: 'Employee not found' });
         res.json(emp);
-    } catch (e) { addError(e, 'GET /api/ess/me'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'GET /api/ess/me'); res.status(500).json(formatError(e)); }
 });
 
 // GET /api/ess/payslips
@@ -26,7 +26,7 @@ router.get('/payslips', async (req, res) => {
             limit: 24,
         });
         res.json(slips);
-    } catch (e) { addError(e, 'GET /api/ess/payslips'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'GET /api/ess/payslips'); res.status(500).json(formatError(e)); }
 });
 
 // GET /api/ess/leaves
@@ -37,7 +37,7 @@ router.get('/leaves', async (req, res) => {
             order: [['appliedOn', 'DESC']],
         });
         res.json(leaves);
-    } catch (e) { addError(e, 'GET /api/ess/leaves'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'GET /api/ess/leaves'); res.status(500).json(formatError(e)); }
 });
 
 // POST /api/ess/leaves — apply for leave
@@ -52,7 +52,7 @@ router.post('/leaves', async (req, res) => {
         };
         const leave = await Leave.create(data);
         res.status(201).json(leave);
-    } catch (e) { addError(e, 'POST /api/ess/leaves'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'POST /api/ess/leaves'); res.status(500).json(formatError(e)); }
 });
 
 // GET /api/ess/loans
@@ -63,7 +63,7 @@ router.get('/loans', async (req, res) => {
             order: [['createdAt', 'DESC']],
         });
         res.json(loans);
-    } catch (e) { addError(e, 'GET /api/ess/loans'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'GET /api/ess/loans'); res.status(500).json(formatError(e)); }
 });
 
 // POST /api/ess/loans — request a loan
@@ -77,7 +77,7 @@ router.post('/loans', async (req, res) => {
         };
         const loan = await Loan.create(data);
         res.status(201).json(loan);
-    } catch (e) { addError(e, 'POST /api/ess/loans'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'POST /api/ess/loans'); res.status(500).json(formatError(e)); }
 });
 
 // GET /api/ess/attendance — last 30 days
@@ -92,7 +92,7 @@ router.get('/attendance', async (req, res) => {
             limit: 30,
         });
         res.json(records);
-    } catch (e) { addError(e, 'GET /api/ess/attendance'); res.status(500).json({ error: e.message }); }
+    } catch (e) { addError(e, 'GET /api/ess/attendance'); res.status(500).json(formatError(e)); }
 });
 
 module.exports = router;
