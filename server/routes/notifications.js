@@ -46,9 +46,14 @@ router.post('/send-payslip', async (req, res) => {
         const subject = `Your Payslip for ${month} — ${companyName}`;
         const result = await sendEmail(to, subject, html);
 
-        // Dev fallback: emailService returns { simulated: true } when SMTP not configured
+        // emailService returns { simulated: true } when SMTP credentials are not configured
         if (result?.simulated) {
-            return res.json({ success: false, reason: 'Email not configured' });
+            return res.status(503).json({
+                success: false,
+                error: 'Email service not configured',
+                why: 'SMTP credentials (SMTP_HOST, SMTP_USER, SMTP_PASS) are not set in server/.env',
+                fix: 'Configure SMTP settings in server/.env or the Notifications Settings page.',
+            });
         }
 
         res.json({ success: true, sentTo: to });

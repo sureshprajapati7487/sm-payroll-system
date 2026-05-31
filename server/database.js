@@ -45,8 +45,7 @@ const Company = sequelize.define('Company', {
     logo: { type: DataTypes.TEXT },
     employeeCount: { type: DataTypes.INTEGER, defaultValue: 0 },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
-    createdAt: { type: DataTypes.DATE, defaultValue: Sequelize.NOW }
-});
+}, { timestamps: true });
 
 // ── 1.5 Department ────────────────────────────────────────────────────────────
 const Department = sequelize.define('Department', {
@@ -58,7 +57,7 @@ const Department = sequelize.define('Department', {
     defaultSalaryType: { type: DataTypes.STRING },
     headCount: { type: DataTypes.INTEGER },
     costCenter: { type: DataTypes.STRING },
-});
+}, { timestamps: true });
 
 // ── 1.6 Shift ─────────────────────────────────────────────────────────────────
 const Shift = sequelize.define('Shift', {
@@ -68,7 +67,7 @@ const Shift = sequelize.define('Shift', {
     startTime: { type: DataTypes.STRING, allowNull: false }, // "09:00"
     endTime: { type: DataTypes.STRING, allowNull: false },   // "18:00"
     graceTimeMinutes: { type: DataTypes.INTEGER, defaultValue: 15 },
-});
+}, { timestamps: true });
 
 // ── 1.7 Work Group ────────────────────────────────────────────────────────────
 const WorkGroup = sequelize.define('WorkGroup', {
@@ -78,7 +77,7 @@ const WorkGroup = sequelize.define('WorkGroup', {
     department: { type: DataTypes.STRING, allowNull: false },
     color: { type: DataTypes.STRING, defaultValue: 'blue' },
     icon: { type: DataTypes.STRING }
-});
+}, { timestamps: true });
 
 // ── 1.8 Salary Type ───────────────────────────────────────────────────────────
 const SalaryType = sequelize.define('SalaryType', {
@@ -88,7 +87,7 @@ const SalaryType = sequelize.define('SalaryType', {
     label: { type: DataTypes.STRING, allowNull: false },
     description: { type: DataTypes.STRING },
     basis: { type: DataTypes.STRING, defaultValue: 'MONTHLY' } // MONTHLY | DAILY | PER_UNIT | WEEKLY | OTHER
-});
+}, { timestamps: true });
 
 // ── 1.9 Attendance Action ─────────────────────────────────────────────────────
 const AttendanceAction = sequelize.define('AttendanceAction', {
@@ -100,7 +99,7 @@ const AttendanceAction = sequelize.define('AttendanceAction', {
     color: { type: DataTypes.STRING, defaultValue: 'slate' },
     enabled: { type: DataTypes.BOOLEAN, defaultValue: true },
     isDefault: { type: DataTypes.BOOLEAN, defaultValue: false }
-});
+}, { timestamps: true });
 
 // ── 1.10 Punch Location ────────────────────────────────────────────────────────
 const PunchLocation = sequelize.define('PunchLocation', {
@@ -114,7 +113,7 @@ const PunchLocation = sequelize.define('PunchLocation', {
     // Wi-Fi BSSID binding: MAC addresses of allowed routers for this zone.
     // Empty array = no BSSID restriction. Only enforced on Android WebView.
     allowedBSSIDs: { type: DataTypes.JSON, defaultValue: [] }
-});
+}, { timestamps: true });
 
 // ── 1.11 System Setting ────────────────────────────────────────────────────────
 const SystemSetting = sequelize.define('SystemSetting', {
@@ -122,7 +121,7 @@ const SystemSetting = sequelize.define('SystemSetting', {
     companyId: { type: DataTypes.STRING, allowNull: false },
     key: { type: DataTypes.STRING, allowNull: false },
     value: { type: DataTypes.TEXT } // JSON stringified payload
-});
+}, { timestamps: true });
 
 // ── 1.12 System Key (Super Admin) ──────────────────────────────────────────
 const SystemKey = sequelize.define('SystemKey', {
@@ -137,7 +136,7 @@ const SystemKey = sequelize.define('SystemKey', {
     },
     description: { type: DataTypes.STRING },
     isSecret: { type: DataTypes.BOOLEAN, defaultValue: false }
-});
+}, { timestamps: true });
 
 // ── 1.13 Security Models (Phase 9) ──────────────────────────────────────────
 const UserSession = sequelize.define('UserSession', {
@@ -149,23 +148,33 @@ const UserSession = sequelize.define('UserSession', {
     userAgent: { type: DataTypes.STRING },
     expiresAt: { type: DataTypes.DATE },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true }
+}, {
+    indexes: [
+        { fields: ['userId', 'isActive'] },
+    ]
 });
 
 const IPRestriction = sequelize.define('IPRestriction', {
     id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
-    ipAddress: { type: DataTypes.STRING, unique: true },
+    companyId: { type: DataTypes.STRING },   // tenant-scoped; null = applies globally (legacy)
+    ipAddress: { type: DataTypes.STRING },
     description: { type: DataTypes.STRING },
     isWhitelisted: { type: DataTypes.BOOLEAN, defaultValue: true },
     createdBy: { type: DataTypes.STRING }
+}, {
+    indexes: [{ fields: ['companyId'] }]
 });
 
 // ── 1.14 Reporting Models ─────────────────────────────────────────────────────
 const CustomReportTemplate = sequelize.define('CustomReportTemplate', {
     id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false }, // tenant isolation
     name: { type: DataTypes.STRING, allowNull: false },
     description: { type: DataTypes.STRING },
     columns: { type: DataTypes.TEXT }, // Stored as JSON string
     filters: { type: DataTypes.TEXT }  // Stored as JSON string
+}, {
+    indexes: [{ fields: ['companyId'] }]
 });
 
 const StatutoryRule = sequelize.define('StatutoryRule', {
@@ -181,6 +190,7 @@ const StatutoryRule = sequelize.define('StatutoryRule', {
 
 const ScheduledReport = sequelize.define('ScheduledReport', {
     id: { type: DataTypes.STRING, primaryKey: true },
+    companyId: { type: DataTypes.STRING, allowNull: false }, // tenant isolation
     name: { type: DataTypes.STRING, allowNull: false },
     reportType: { type: DataTypes.STRING }, // payslip, attendance, statutory, custom
     frequency: { type: DataTypes.STRING }, // daily, weekly, monthly
@@ -191,6 +201,8 @@ const ScheduledReport = sequelize.define('ScheduledReport', {
     lastRun: { type: DataTypes.DATE },
     nextRun: { type: DataTypes.DATE },
     createdBy: { type: DataTypes.STRING }
+}, {
+    indexes: [{ fields: ['companyId'] }]
 });
 
 const ReportJob = sequelize.define('ReportJob', {
@@ -243,7 +255,13 @@ const Employee = sequelize.define('Employee', {
     loanLimit: { type: DataTypes.FLOAT },
     loanLimitType: { type: DataTypes.STRING },
     salaryMultiplier: { type: DataTypes.FLOAT },
-    documents: { type: DataTypes.JSON, defaultValue: [] }
+    documents: { type: DataTypes.JSON, defaultValue: [] },
+    taxRegime: {
+        type: DataTypes.ENUM('OLD', 'NEW'),
+        defaultValue: 'NEW',
+        allowNull: false,
+        comment: 'Income tax regime elected by employee — OLD (with deductions) or NEW (without deductions)'
+    },
 }, {
     indexes: [
         { fields: ['companyId', 'status'] },
@@ -305,6 +323,11 @@ const Production = sequelize.define('Production', {
         defaultValue: 'PENDING'
     },
     remarks: { type: DataTypes.STRING }
+}, {
+    indexes: [
+        { fields: ['companyId', 'date'] },
+        { fields: ['employeeId', 'date'] },
+    ]
 });
 
 const ProductionItem = sequelize.define('ProductionItem', {
@@ -433,21 +456,30 @@ const Expense = sequelize.define('Expense', {
     description: { type: DataTypes.STRING },
     paidTo: { type: DataTypes.STRING },
     addedBy: { type: DataTypes.STRING },
-    receiptUrl: { type: DataTypes.STRING }, // S3 Public URL
+    receiptUrl: { type: DataTypes.STRING }, // S3 Private key; use signed URL for access
     status: {
         type: DataTypes.ENUM('PENDING', 'APPROVED', 'REJECTED', 'PAID'),
         defaultValue: 'PENDING'
     },
     auditTrail: { type: DataTypes.JSON, defaultValue: [] }
+}, {
+    indexes: [
+        { fields: ['companyId', 'date'] },
+    ]
 });
 
 
 // ── 9. Biometric ──────────────────────────────────────────────────────────────
+// PK is now auto-increment id (not employeeId) to allow multiple descriptors per employee
+// and to support separate face + fingerprint records in the future.
 const Biometric = sequelize.define('Biometric', {
-    employeeId: { type: DataTypes.STRING, primaryKey: true },
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    employeeId: { type: DataTypes.STRING, allowNull: false },       // indexed, not PK
     faceDescriptor: { type: DataTypes.JSON, defaultValue: null },   // Float32Array as number[]
-    thumbCredential: { type: DataTypes.JSON, defaultValue: null },   // { credentialId, rawId }
+    thumbCredential: { type: DataTypes.JSON, defaultValue: null },  // { credentialId, rawId }
     registeredAt: { type: DataTypes.STRING },
+}, {
+    indexes: [{ fields: ['employeeId'] }]
 });
 
 // ── 10. Advance Salary ───────────────────────────────────────────────────────
@@ -465,6 +497,11 @@ const AdvanceSalary = sequelize.define('AdvanceSalary', {
     installments: { type: DataTypes.INTEGER, defaultValue: 3 },
     monthlyDeduction: { type: DataTypes.FLOAT, defaultValue: 0 },
     remainingBalance: { type: DataTypes.FLOAT, defaultValue: 0 },
+}, {
+    indexes: [
+        { fields: ['companyId', 'employeeId'] },
+        { fields: ['companyId', 'status'] },
+    ]
 });
 
 // ── 11. Holiday ─────────────────────────────────────────────────────────────────
@@ -475,6 +512,10 @@ const Holiday = sequelize.define('Holiday', {
     date: { type: DataTypes.STRING, allowNull: false },   // YYYY-MM-DD
     type: { type: DataTypes.ENUM('NATIONAL', 'FESTIVAL', 'OPTIONAL'), defaultValue: 'FESTIVAL' },
     description: { type: DataTypes.STRING },
+}, {
+    indexes: [
+        { fields: ['companyId', 'date'] },
+    ]
 });
 
 // ── 12. Audit Log ────────────────────────────────────────────────────────────
@@ -627,8 +668,56 @@ const OvertimePolicy = sequelize.define('OvertimePolicy', {
 const initDB = async () => {
     try {
         console.log('Syncing database...');
-        // Safe Auto-Migration: { alter: { drop: false } } ensures Sequelize adds missing columns without deleting data.
-        // This guarantees continuous uptime and prevents "column does not exist" crashes on production (Render).
+
+        // ── Pre-sync Migration: Biometric table PK change ─────────────────────
+        // Old schema: employeeId STRING was the PRIMARY KEY.
+        // New schema: id INTEGER AUTO_INCREMENT is PK; employeeId is just an indexed column.
+        // SQLite does not support ALTER TABLE ... ADD PRIMARY KEY, so we must recreate the table.
+        try {
+            const [biometricCols] = await sequelize.query(
+                `PRAGMA table_info("Biometrics")`,
+                { type: sequelize.QueryTypes ? sequelize.QueryTypes.SELECT : 'SELECT' }
+            );
+            const colList = Array.isArray(biometricCols) ? biometricCols : [biometricCols];
+            const hasPkOnEmployeeId = colList.some(c => c.name === 'employeeId' && c.pk === 1);
+            const hasNewIdCol = colList.some(c => c.name === 'id');
+
+            if (hasPkOnEmployeeId && !hasNewIdCol) {
+                console.log('🔧 Migrating Biometric table PK from employeeId → auto-increment id...');
+                // 1. Backup existing data
+                const existing = await sequelize.query(`SELECT * FROM "Biometrics"`, { type: 'SELECT' });
+                // 2. Drop old table
+                await sequelize.query(`DROP TABLE IF EXISTS "Biometrics"`);
+                // 3. Recreate with new schema (sync will create it below, but we need it now for data restore)
+                await sequelize.query(`
+                    CREATE TABLE "Biometrics" (
+                        "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+                        "employeeId" VARCHAR(255) NOT NULL,
+                        "faceDescriptor" JSON,
+                        "thumbCredential" JSON,
+                        "registeredAt" VARCHAR(255),
+                        "createdAt" DATETIME,
+                        "updatedAt" DATETIME
+                    )
+                `);
+                await sequelize.query(`CREATE INDEX IF NOT EXISTS "biometrics_employee_id" ON "Biometrics" ("employeeId")`);
+                // 4. Restore data
+                for (const row of existing) {
+                    await sequelize.query(
+                        `INSERT INTO "Biometrics" ("employeeId","faceDescriptor","thumbCredential","registeredAt") VALUES (?,?,?,?)`,
+                        { replacements: [row.employeeId, row.faceDescriptor, row.thumbCredential, row.registeredAt] }
+                    );
+                }
+                console.log(`✅ Biometric migration complete — ${existing.length} records restored.`);
+            }
+        } catch (biometricMigErr) {
+            // If Biometrics table does not exist yet, skip — sync() will create it fresh
+            if (!biometricMigErr.message?.includes('no such table')) {
+                console.warn('⚠️  Biometric pre-migration warning:', biometricMigErr.message);
+            }
+        }
+
+        // Safe Auto-Migration: { alter: { drop: false } } adds missing columns without deleting data.
         await sequelize.sync({ alter: { drop: false } });
         console.log('Database synced successfully.');
 
@@ -650,6 +739,31 @@ const initDB = async () => {
             });
             console.log('✅ Admin ACLLP-01 created with default password.');
         }
+
+        // ── Post-sync Migration: backfill companyId on ScheduledReport + CustomReportTemplate ──
+        // These tables were created without companyId. Existing rows have companyId = NULL
+        // which makes them invisible to company-scoped queries. Assign them to the first company.
+        try {
+            const firstCompany = await Company.findOne({ order: [['createdAt', 'ASC']] });
+            if (firstCompany) {
+                const cid = firstCompany.id;
+
+                const nullReports = await ScheduledReport.count({ where: { companyId: null } });
+                if (nullReports > 0) {
+                    await ScheduledReport.update({ companyId: cid }, { where: { companyId: null } });
+                    console.log(`🔧 Backfilled companyId='${cid}' on ${nullReports} ScheduledReport record(s).`);
+                }
+
+                const nullTemplates = await CustomReportTemplate.count({ where: { companyId: null } });
+                if (nullTemplates > 0) {
+                    await CustomReportTemplate.update({ companyId: cid }, { where: { companyId: null } });
+                    console.log(`🔧 Backfilled companyId='${cid}' on ${nullTemplates} CustomReportTemplate record(s).`);
+                }
+            }
+        } catch (backfillErr) {
+            console.warn('⚠️  companyId backfill warning:', backfillErr.message);
+        }
+
     } catch (err) {
         console.error('Initial DB Sync Error:', err);
     }

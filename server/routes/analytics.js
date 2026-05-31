@@ -14,9 +14,24 @@ function init(models) {
     addError = models.addError;
 }
 
-// Simple in-memory cache for Dashboard KPIs (60s TTL)
-const dashboardCache = new Map();
+// LRU in-memory cache for Dashboard KPIs — max 100 entries, 60s TTL
 const CACHE_TTL_MS = 60 * 1000;
+const CACHE_MAX_SIZE = 100;
+const dashboardCache = new Map(); // key → { timestamp, data }
+
+function cacheSet(key, data) {
+    if (dashboardCache.size >= CACHE_MAX_SIZE) {
+        // Evict the oldest entry (Maps preserve insertion order)
+        dashboardCache.delete(dashboardCache.keys().next().value);
+    }
+    dashboardCache.set(key, { timestamp: Date.now(), data });
+}
+function cacheGet(key) {
+    const entry = dashboardCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.timestamp > CACHE_TTL_MS) { dashboardCache.delete(key); return null; }
+    return entry.data;
+}
 
 router.get('/dashboard', async (req, res) => {
     try {
@@ -24,10 +39,8 @@ router.get('/dashboard', async (req, res) => {
         if (!companyId || !month) return res.status(400).json({ error: 'companyId and month queries are required' });
 
         const cacheKey = `${companyId}_${month}`;
-        const cached = dashboardCache.get(cacheKey);
-        if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
-            return res.json(cached.data);
-        }
+        const cached = cacheGet(cacheKey);
+        if (cached) return res.json(cached);
 
         const today = new Date().toISOString().split('T')[0];
 
@@ -101,19 +114,33 @@ router.get('/dashboard', async (req, res) => {
         const netPayrollThisMonth = monthSlips.reduce((sum, s) => sum + s.netSalary, 0);
         const slipsGenerated = monthSlips.length;
 
-        // 7. Attendance Trend (Last 7 Days)
+        // 7. Attendance Trend (Last 7 Days) — single aggregated query instead of 7 round-trips
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+        const trendStartDate = sevenDaysAgo.toISOString().split('T')[0];
+
+        const trendRows = await Attendance.findAll({
+            where: {
+                date: { [Op.gte]: trendStartDate },
+                employeeId: { [Op.in]: empIds },
+                status: { [Op.in]: ['PRESENT', 'LATE'] },
+            },
+            attributes: ['date', [Attendance.sequelize.fn('COUNT', Attendance.sequelize.col('id')), 'cnt']],
+            group: ['date'],
+            raw: true,
+        });
+        const trendByDate = {};
+        trendRows.forEach(r => { trendByDate[r.date] = Number(r.cnt); });
+
         const attendanceTrendData = [];
         for (let i = 6; i >= 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
             const dateStr = d.toISOString().split('T')[0];
-            const present = await Attendance.count({
-                where: { date: dateStr, employeeId: { [Op.in]: empIds }, status: { [Op.in]: ['PRESENT', 'LATE'] } }
-            });
             attendanceTrendData.push({
                 name: d.toLocaleDateString('en-US', { weekday: 'short' }),
-                present,
-                total: activeEmployees
+                present: trendByDate[dateStr] || 0,
+                total: activeEmployees,
             });
         }
 
@@ -164,8 +191,7 @@ router.get('/dashboard', async (req, res) => {
             payrollDistribution
         };
 
-        // Save to cache
-        dashboardCache.set(cacheKey, { timestamp: Date.now(), data: responseData });
+        cacheSet(cacheKey, responseData);
 
         res.json(responseData);
 

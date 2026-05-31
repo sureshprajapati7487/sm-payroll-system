@@ -62,8 +62,9 @@ const useInternalPayrollStore = create<PayrollState>((set, get) => ({
         }
     },
 
-    // ── Generate Monthly Payroll + Save to Server ──────────────────────────────
-    // ── Generate Monthly Payroll + Save to Server ──────────────────────────────
+    // ── Generate Monthly Payroll — async worker-based ──────────────────────────
+    // POST /api/run returns { jobId } (202 Accepted) immediately.
+    // We poll GET /api/payroll/job/:jobId until COMPLETED or FAILED (max 10 min).
     generateMonthlyPayroll: async (month, generatedBy) => {
         set({ isSaving: true });
 
@@ -77,11 +78,41 @@ const useInternalPayrollStore = create<PayrollState>((set, get) => ({
 
             if (!res.ok) {
                 const errData = await res.json();
-                throw new Error(errData.why || errData.error || 'Failed to generate payroll');
+                throw new Error(errData.why || errData.error || 'Failed to start payroll run');
             }
 
-            // Immediately re-fetch the month's slips
+            const { jobId } = await res.json();
+
+            // Poll for completion — check every 3 seconds, timeout after 10 minutes
+            const MAX_POLLS = 200;
+            const POLL_INTERVAL_MS = 3000;
+            let polls = 0;
+            await new Promise<void>((resolve, reject) => {
+                const interval = setInterval(async () => {
+                    polls++;
+                    try {
+                        const statusRes = await apiFetch(`/payroll/job/${jobId}`);
+                        if (!statusRes.ok) { clearInterval(interval); reject(new Error('Failed to poll job status')); return; }
+                        const job = await statusRes.json();
+                        if (job.status === 'COMPLETED') { clearInterval(interval); resolve(); }
+                        else if (job.status === 'FAILED') { clearInterval(interval); reject(new Error(job.error || 'Payroll run failed')); }
+                        else if (polls >= MAX_POLLS) { clearInterval(interval); reject(new Error('Payroll run timed out after 10 minutes')); }
+                    } catch (e) { clearInterval(interval); reject(e); }
+                }, POLL_INTERVAL_MS);
+            });
+
+            // Re-fetch payroll slips after job completes
             await get().fetchPayroll(month);
+
+            // Invalidate dependent stores — loan balances and advances changed during run
+            const { useLoanStore } = await import('./loanStore');
+            const { useAdvanceSalaryStore } = await import('./advanceSalaryStore');
+            const { useAttendanceStore } = await import('./attendanceStore');
+            await Promise.allSettled([
+                useLoanStore.getState().fetchLoans(),
+                useAdvanceSalaryStore.getState().fetchAdvances?.(),
+                useAttendanceStore.getState().fetchAttendance(),
+            ]);
 
             // Audit payroll generation
             const slipsCount = get().slips.filter(s => s.month === month).length;
@@ -167,14 +198,22 @@ const useInternalPayrollStore = create<PayrollState>((set, get) => ({
                 details: { month: targetSlip.month, netSalary: targetSlip.netSalary, action: action.toUpperCase() },
                 status: 'SUCCESS',
             });
-        } catch (err) {
-            console.error('Failed to advance payroll state:', err);
-            // Revert
+        } catch (err: any) {
+            // Revert optimistic update
             set(state => ({
                 slips: state.slips.map(s =>
                     s.id === slipId ? { ...s, status: prevStatus } : s
                 )
             }));
+            // Surface error to user via notification
+            const errorMsg = err?.message || `Failed to ${action} payroll slip`;
+            useNotificationStore.getState().addNotification({
+                type: NotificationType.SYSTEM,
+                title: 'Payroll Action Failed',
+                message: errorMsg,
+                targetPermissions: [],
+            });
+            throw err; // Re-throw so UI can also catch if needed
         }
     },
 
@@ -218,7 +257,11 @@ export const usePayrollStore = () => {
     const { _rawStore } = useEmployeeStore();
     const employees = _rawStore?._rawEmployees || [];
 
+    const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
+
     const filteredSlips = store.slips.filter(s => {
+        // Always filter by current company first — prevents cross-company slip leakage on company switch
+        if (currentCompanyId && s.companyId && s.companyId !== currentCompanyId) return false;
         if (!user) return true;
 
         const scope = getScope(user.role);
@@ -227,7 +270,7 @@ export const usePayrollStore = () => {
         if (scope === 'TEAM') {
             const userEmp = employees.find((emp: any) => emp.id === user.id);
             const recordEmp = employees.find((emp: any) => emp.id === s.employeeId);
-            if (!userEmp?.department) return s.employeeId === user.id; // Fallback to OWN
+            if (!userEmp?.department) return s.employeeId === user.id;
             return recordEmp?.department === userEmp.department;
         }
 

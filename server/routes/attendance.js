@@ -180,12 +180,15 @@ router.post('/admin-punch', async (req, res) => {
     }
 });
 
-// POST /verify-location (Server-side GPS matching)
+// POST /verify-location (Server-side GPS matching) — authentication enforced globally
+// companyId comes from JWT (req.companyId) not from body — prevents cross-tenant location leaks
 router.post('/verify-location', async (req, res) => {
     try {
-        const { companyId, lat, lng } = req.body;
+        const { lat, lng } = req.body;
+        // companyId always from JWT session — never trust client-supplied value
+        const companyId = req.companyId;
         if (!companyId || lat === undefined || lng === undefined) {
-            return res.status(400).json({ error: 'companyId, lat, lng are required' });
+            return res.status(400).json({ error: 'lat and lng are required (companyId comes from session)' });
         }
 
         const locations = await PunchLocation.findAll({ where: { companyId, enabled: true } });

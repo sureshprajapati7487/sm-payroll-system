@@ -186,6 +186,32 @@ export const PayrollDashboard = () => {
 
     return (
         <div className="space-y-6">
+
+            {/* ── Async Payroll Run Progress Banner ─────────────────────────── */}
+            {isSaving && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+                    <div className="bg-dark-card border border-primary-500/30 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl text-center space-y-4">
+                        {/* Spinner */}
+                        <div className="flex items-center justify-center">
+                            <div className="w-14 h-14 rounded-full border-4 border-primary-500/20 border-t-primary-500 animate-spin" />
+                        </div>
+                        <div>
+                            <h3 className="text-white font-semibold text-lg">Payroll Generate Ho Raha Hai</h3>
+                            <p className="text-dark-muted text-sm mt-1">
+                                <span className="text-primary-400 font-medium">{selectedMonth}</span> ke liye salary slips calculate ki ja rahi hain...
+                            </p>
+                        </div>
+                        <div className="bg-dark-bg/60 rounded-xl p-3 text-xs text-dark-muted space-y-1 text-left">
+                            <p>✅ Attendance records fetch ho raha hai</p>
+                            <p>✅ Production earnings calculate ho rahi hain</p>
+                            <p>⏳ TDS, PF, ESIC compute ho raha hai...</p>
+                            <p className="opacity-50">⏳ Loan EMI deduct ho raha hai...</p>
+                        </div>
+                        <p className="text-xs text-dark-muted/60">Yeh 1-2 minute le sakta hai — page band mat karo</p>
+                    </div>
+                </div>
+            )}
+
             {/* ── Header ─────────────────────────────────────────────── */}
             <div className="flex flex-col gap-4">
                 <div>
@@ -231,18 +257,32 @@ export const PayrollDashboard = () => {
                     <div className="relative col-span-2 md:col-span-1">
                         <select
                             onChange={handleActionChange}
-                            className="appearance-none bg-primary-600 hover:bg-primary-500 text-white font-medium rounded-lg pl-4 pr-10 py-2 text-sm focus:outline-none cursor-pointer transition-colors shadow-lg shadow-primary-500/20 w-full"
+                            disabled={isSaving}
+                            className={`appearance-none font-medium rounded-lg pl-4 pr-10 py-2 text-sm focus:outline-none transition-colors shadow-lg w-full ${
+                                isSaving
+                                    ? 'bg-dark-card border border-dark-border text-dark-muted cursor-not-allowed'
+                                    : 'bg-primary-600 hover:bg-primary-500 text-white cursor-pointer shadow-primary-500/20'
+                            }`}
                             defaultValue=""
                         >
-                            <option value="" disabled>Select Action...</option>
-                            {canGenerate && <option value="GENERATE" disabled={!isIpAllowed}>{!isIpAllowed ? '🚫 Generate (Office IP Req.)' : isSaving ? '⏳ Saving...' : '⚡ Generate Salary Slips'}</option>}
+                            <option value="" disabled>
+                                {isSaving ? '⏳ Payroll generating...' : 'Select Action...'}
+                            </option>
+                            {canGenerate && !isSaving && (
+                                <option value="GENERATE" disabled={!isIpAllowed}>
+                                    {!isIpAllowed ? '🚫 Generate (Office IP Req.)' : '⚡ Generate Salary Slips'}
+                                </option>
+                            )}
                             {canViewAllSlips && <option value="REPORT">📊 Final Disbursement Report</option>}
                             {canViewAllSlips && <option value="TOGGLE_PENDING">{showPendingOnly ? '☑ Show All Records' : '☐ Show Pending Only'}</option>}
                             {canManageLoans && <option value="LOANS">💰 Manage Loans</option>}
                             <option value="HISTORY">📜 View History</option>
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                            <ClipboardList className="w-4 h-4 text-white/80" />
+                            {isSaving
+                                ? <div className="w-4 h-4 border-2 border-dark-muted/40 border-t-primary-400 rounded-full animate-spin" />
+                                : <ClipboardList className="w-4 h-4 text-white/80" />
+                            }
                         </div>
                     </div>
                 </div>

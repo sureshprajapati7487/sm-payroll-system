@@ -49,10 +49,12 @@ router.post('/pf-esi', async (req, res) => {
         const grossD = new Decimal(grossSalary);
 
         // PF Math
+        // Wage ceiling is derived from rule: pfCappedAmount / pfRate * 100 (e.g. 1800/12*100 = 15000)
+        const pfWageCeiling = pfCap && pfRate ? (pfCap / pfRate) * 100 : 15000;
         let pfRes = { isApplicable: false, employeeContribution: 0, employerContribution: 0, totalPF: 0, reason: '' };
         if (basicD.greaterThan(0)) {
             pfRes.isApplicable = true;
-            const pfWage = Decimal.min(basicD, 15000); // PF wage ceiling is universally 15k
+            const pfWage = Decimal.min(basicD, pfWageCeiling);
             const empPF = pfWage.times(pfRate).dividedBy(100).round();
             const emplPF = pfWage.times(pfRate).dividedBy(100).round(); // Employer PF matches employee rate historically
 
@@ -82,7 +84,7 @@ router.post('/pf-esi', async (req, res) => {
         res.json({
             pf: pfRes,
             esi: esiRes,
-            appliedRates: { pfRate, esiRate, esiThreshold }
+            appliedRates: { pfRate, pfCap, pfWageCeiling, esiRate, esiThreshold }
         });
 
     } catch (error) {
@@ -141,11 +143,13 @@ router.post('/ctc', async (req, res) => {
             esiThreshold = rule.esicThreshold;
         }
 
+        const ctcPfWageCeiling = rule ? (rule.pfCappedAmount / rule.pfRate) * 100 : 15000;
+        const ctcPfWage = Decimal.min(basicD, ctcPfWageCeiling);
         let empPF = new Decimal(0);
         let emplPF = new Decimal(0);
-        if (basicD.lessThanOrEqualTo(15000)) {
-            empPF = basicD.times(pfRate).dividedBy(100).round();
-            emplPF = basicD.times(pfRate).dividedBy(100).round();
+        if (basicD.greaterThan(0)) {
+            empPF = ctcPfWage.times(pfRate).dividedBy(100).round();
+            emplPF = ctcPfWage.times(pfRate).dividedBy(100).round();
         }
 
         let empESI = new Decimal(0);

@@ -1,9 +1,10 @@
-﻿// DataConsistencyChecker — Real store checks + working auto-fix actions
+﻿// DataConsistencyChecker — Store-level checks + DB-level backend checks
 import { useState, useCallback } from 'react';
 import {
     Shield, AlertTriangle, CheckCircle, RefreshCw, Zap, Loader2,
     Clock, Users, Banknote, Calendar, TrendingUp, XCircle, ChevronDown, ChevronUp
 } from 'lucide-react';
+import { apiFetch } from '@/lib/apiClient';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAttendanceStore } from '@/store/attendanceStore';
 import { usePayrollStore } from '@/store/payrollStore';
@@ -62,7 +63,7 @@ export const DataConsistencyChecker = () => {
         const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
     });
 
-    const runCheck = useCallback(() => {
+    const runCheck = useCallback(async () => {
         setChecking(true);
         setFixLog([]);
         const scopedEmps = currentCompanyId ? employees.filter(e => e.companyId === currentCompanyId) : employees;
@@ -191,6 +192,31 @@ export const DataConsistencyChecker = () => {
             affectedRecords: noDept.length, autoFixable: false,
             details: noDept.slice(0, 5).map(e => ({ label: e.name, value: `Code: ${e.code}` })),
         });
+
+        // ── Backend DB-level checks ──────────────────────────────────────────
+        try {
+            const res = await apiFetch(`/admin/consistency-report`);
+            if (res.ok) {
+                const { issues: dbIssues } = await res.json();
+                for (const dbIssue of (dbIssues || [])) {
+                    // Don't duplicate store-level issues already found
+                    if (!found.find(f => f.id === dbIssue.id)) {
+                        found.push({
+                            ...dbIssue,
+                            // Attach API-based fix if endpoint provided
+                            fix: dbIssue.fixEndpoint ? async () => {
+                                const method = dbIssue.fixEndpoint.includes('fix-orphan') ? 'DELETE' : 'PATCH';
+                                const r = await apiFetch(dbIssue.fixEndpoint, { method });
+                                if (!r.ok) throw new Error('Fix failed');
+                            } : undefined,
+                            fixLabel: dbIssue.autoFixable ? 'Fix via DB' : undefined,
+                        });
+                    }
+                }
+            }
+        } catch (dbErr) {
+            console.warn('[ConsistencyChecker] Backend check failed:', dbErr);
+        }
 
         const order: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
         found.sort((a, b) => order[a.severity] - order[b.severity]);

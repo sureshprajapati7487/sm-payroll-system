@@ -6,11 +6,18 @@ const { addError, formatError } = require('../middlewares/errorHandler');
 
 // All ESS routes use req.user.id from JWT — employee sees only their own data
 
+// ESS safe fields — personal profile only; no salary, bank details, or statutory config
+const ESS_SAFE_ATTRIBUTES = [
+    'id', 'companyId', 'code', 'name', 'email', 'phone', 'whatsappNumber',
+    'department', 'designation', 'role', 'joiningDate', 'status', 'shift',
+    'avatar', 'leaveBalance', 'groupId', 'reportsTo',
+];
+
 // GET /api/ess/me
 router.get('/me', async (req, res) => {
     try {
         const emp = await Employee.findByPk(req.user.id, {
-            attributes: { exclude: ['password'] },
+            attributes: ESS_SAFE_ATTRIBUTES,
         });
         if (!emp) return res.status(404).json({ error: 'Employee not found' });
         res.json(emp);
@@ -66,11 +73,29 @@ router.get('/loans', async (req, res) => {
     } catch (e) { addError(e, 'GET /api/ess/loans'); res.status(500).json(formatError(e)); }
 });
 
-// POST /api/ess/loans — request a loan
+// POST /api/ess/loans — request a loan (validates against employee's configured loan limit)
 router.post('/loans', async (req, res) => {
     try {
+        const { amount } = req.body;
+        if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+            return res.status(400).json({ error: 'A positive loan amount is required' });
+        }
+
+        // Enforce loanLimit — fetch employee's limit from the DB
+        const emp = await Employee.findByPk(req.user.id, { attributes: ['id', 'loanLimit', 'loanLimitType'] });
+        if (!emp) return res.status(404).json({ error: 'Employee not found' });
+
+        const loanLimit = emp.loanLimit ?? null;
+        if (loanLimit !== null && Number(amount) > loanLimit) {
+            return res.status(422).json({
+                error: `Requested amount ₹${Number(amount).toLocaleString('en-IN')} exceeds your loan limit of ₹${loanLimit.toLocaleString('en-IN')}`,
+                loanLimit,
+            });
+        }
+
         const data = {
             ...req.body,
+            amount: Number(amount),
             employeeId: req.user.id,
             companyId: req.user.companyId,
             status: 'REQUESTED',

@@ -315,16 +315,23 @@ router.post('/system-settings', async (req, res) => {
     } catch (e) { addError(e, 'POST /api/system-settings'); res.status(500).json({ error: e.message }); }
 });
 
-// ── System Keys (Super Admin) ──────────────────────────────────────────────────
-router.get('/system-keys', async (req, res) => {
+// ── System Keys (Super Admin / Account Admin only) ─────────────────────────────
+router.get('/system-keys', requireRole(['SUPER_ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const where = {};
         if (req.companyId) where.companyId = req.companyId;
-        res.json(await SystemKey.findAll({ where }));
+        const keys = await SystemKey.findAll({ where });
+        // Mask secret values before returning
+        const safe = keys.map(k => {
+            const data = k.toJSON();
+            if (data.isSecret) data.value = '••••••••';
+            return data;
+        });
+        res.json(safe);
     } catch (e) { addError(e, 'GET /api/system-keys'); res.status(500).json({ error: e.message }); }
 });
 
-router.post('/system-keys', async (req, res) => {
+router.post('/system-keys', requireRole(['SUPER_ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const { companyId, key, label, value, category } = req.body;
         if (!companyId || !key || !label || !value || !category) return res.status(400).json({ error: 'Required fields missing' });
@@ -334,7 +341,7 @@ router.post('/system-keys', async (req, res) => {
     } catch (e) { addError(e, 'POST /api/system-keys'); res.status(500).json({ error: e.message }); }
 });
 
-router.put('/system-keys/:id', async (req, res) => {
+router.put('/system-keys/:id', requireRole(['SUPER_ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const record = await SystemKey.findByPk(req.params.id);
         if (!record) return res.status(404).json({ error: 'System Key not found' });
@@ -343,7 +350,7 @@ router.put('/system-keys/:id', async (req, res) => {
     } catch (e) { addError(e, `PUT /api/system-keys/${req.params.id}`); res.status(500).json({ error: e.message }); }
 });
 
-router.delete('/system-keys/:id', async (req, res) => {
+router.delete('/system-keys/:id', requireRole(['SUPER_ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const record = await SystemKey.findByPk(req.params.id);
         if (!record) return res.status(404).json({ error: 'System Key not found' });
@@ -512,18 +519,19 @@ router.delete('/holidays/:id', async (req, res) => {
 });
 
 // ── Audit Logs ─────────────────────────────────────────────────────────────────
-router.get('/audit-logs', async (req, res) => {
+router.get('/audit-logs', requireRole(['ADMIN', 'SUPER_ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
-        const { companyId, action, userId, entityType, status, startDate, endDate, page = 1, limit = 100 } = req.query;
+        const { action, userId, entityType, status, startDate, endDate, page = 1, limit = 100 } = req.query;
         const where = {};
-        if (companyId) where.companyId = companyId;
+        // companyId always comes from JWT — prevents cross-tenant log access
+        if (req.companyId) where.companyId = req.companyId;
         if (action) where.action = action;
         if (userId) where.userId = userId;
         if (entityType) where.entityType = entityType;
         if (status) where.status = status;
         if (startDate || endDate) { where.timestamp = {}; if (startDate) where.timestamp[Op.gte] = startDate; if (endDate) where.timestamp[Op.lte] = endDate + 'T23:59:59.999Z'; }
         const offset = (Number(page) - 1) * Number(limit);
-        const { count, rows } = await AuditLog.findAndCountAll({ where, order: [['timestamp', 'DESC']], limit: Number(limit), offset });
+        const { count, rows } = await AuditLog.findAndCountAll({ where, order: [['timestamp', 'DESC']], limit: Math.min(Number(limit), 500), offset });
         res.json({ total: count, page: Number(page), limit: Number(limit), logs: rows });
     } catch (e) { addError(e, 'GET /api/audit-logs'); res.status(500).json({ error: e.message }); }
 });
@@ -560,47 +568,69 @@ router.delete('/sessions/:id', async (req, res) => {
 
 // ── Security / IP Restrictions ───────────────────────────────────────────────
 router.get('/ip-restrictions', async (req, res) => {
-    try { res.json(await IPRestriction.findAll()); }
+    try {
+        const where = {};
+        if (req.companyId) where.companyId = req.companyId;
+        res.json(await IPRestriction.findAll({ where }));
+    }
     catch (e) { addError(e, 'GET /api/ip-restrictions'); res.status(500).json({ error: e.message }); }
 });
 router.post('/ip-restrictions', async (req, res) => {
     try {
-        const r = await IPRestriction.create({ id: `ip-${Date.now()}`, ...req.body });
+        const companyId = req.companyId || req.body.companyId;
+        if (!companyId) return res.status(400).json({ error: 'companyId required' });
+        const r = await IPRestriction.create({ id: `ip-${Date.now()}`, ...req.body, companyId });
         res.status(201).json(r);
     } catch (e) { addError(e, 'POST /api/ip-restrictions'); res.status(500).json({ error: e.message }); }
 });
 router.delete('/ip-restrictions/:id', async (req, res) => {
     try {
-        const r = await IPRestriction.findByPk(req.params.id);
+        const where = { id: req.params.id };
+        if (req.companyId) where.companyId = req.companyId;
+        const r = await IPRestriction.findOne({ where });
         if (r) await r.destroy();
         res.json({ success: true });
     } catch (e) { addError(e, 'DELETE /api/ip-restrictions/:id'); res.status(500).json({ error: e.message }); }
 });
 
-// ── Audit Logs ───────────────────────────────────────────────────────────────
-router.get('/audit-logs', async (req, res) => {
-    try {
-        const userRole = req.user?.role;
-        if (!['ADMIN', 'SUPER_ADMIN'].includes(userRole)) {
-            return res.status(403).json({ error: 'Forbidden — Admin access required for Audit Logs.' });
-        }
-        const limit = Math.min(parseInt(req.query.limit) || 100, 500);
-        const logs = await AuditLog.findAll({
-            order: [['createdAt', 'DESC']],
-            limit: limit
-        });
-        res.json(logs);
-    } catch (e) {
-        addError(e, 'GET /api/audit-logs');
-        res.status(500).json({ error: e.message });
-    }
-});
+// NOTE: The second GET /api/audit-logs definition was removed — Express only honours
+// the first registered handler for a path. The complete implementation with RBAC,
+// pagination, and filters is the one defined above.
 
-// ── Factory / Data Clear (DANGEROUS) ─────────────────────────────────────────
-router.delete('/clear-data', async (req, res) => {
+// ── Factory / Data Clear (DANGEROUS — SUPER_ADMIN only) ───────────────────────
+// Requires: SUPER_ADMIN role + a confirmation token in the request body.
+// The token must be the SHA-256 hex of "CONFIRM_WIPE_<companyId>" to prevent
+// accidental mass deletions from a mistyped request.
+router.delete('/clear-data', requireRole(['SUPER_ADMIN']), async (req, res) => {
     try {
-        const { companyId } = req.body;
-        if (!companyId) return res.status(400).json({ error: 'companyId is required for wipe' });
+        const { companyId, confirmationToken } = req.body;
+        if (!companyId) return res.status(400).json({ error: 'companyId is required' });
+
+        // Verify double-submit confirmation token
+        const crypto = require('crypto');
+        const expected = crypto.createHash('sha256').update(`CONFIRM_WIPE_${companyId}`).digest('hex');
+        if (confirmationToken !== expected) {
+            return res.status(400).json({
+                error: 'Invalid confirmationToken. Compute SHA-256 of "CONFIRM_WIPE_<companyId>" to confirm.',
+                fix: `node -e "console.log(require('crypto').createHash('sha256').update('CONFIRM_WIPE_${companyId}').digest('hex'))"`,
+            });
+        }
+
+        // Write audit entry BEFORE deletion so we have a record
+        await AuditLog.create({
+            id: `audit-wipe-${Date.now()}`,
+            companyId,
+            userId: req.user?.id || 'SYSTEM',
+            userName: req.user?.name || 'SUPER_ADMIN',
+            userRole: req.user?.role || 'SUPER_ADMIN',
+            action: 'CLEAR_COMPANY_DATA',
+            entityType: 'COMPANY',
+            entityId: companyId,
+            entityName: companyId,
+            details: { initiatedBy: req.user?.id, timestamp: new Date().toISOString() },
+            status: 'SUCCESS',
+            timestamp: new Date().toISOString(),
+        });
 
         // Find employees for this company
         const emps = await Employee.findAll({ attributes: ['id'], where: { companyId } });
@@ -681,16 +711,29 @@ router.patch('/backup/config', (req, res) => {
 });
 
 // ── WhatsApp ───────────────────────────────────────────────────────────────────
+// GET never returns the actual token — only a boolean indicating if it is set.
+// PATCH always overwrites whatever value is provided (no mask-check bypass possible).
 router.get('/whatsapp/config', (req, res) => {
     const cfg = loadWAConfig();
-    res.json({ ...cfg, wabaToken: cfg.wabaToken ? '••••••••' : '' });
+    res.json({
+        enabled: cfg.enabled,
+        phoneNumberId: cfg.phoneNumberId,
+        businessName: cfg.businessName,
+        tokenIsSet: Boolean(cfg.wabaToken), // never return the actual token
+    });
 });
 router.patch('/whatsapp/config', (req, res) => {
     const existing = loadWAConfig();
     const { enabled, phoneNumberId, wabaToken, businessName } = req.body;
-    const updated = { enabled: enabled ?? existing.enabled, phoneNumberId: phoneNumberId ?? existing.phoneNumberId, wabaToken: wabaToken && wabaToken !== '••••••••' ? wabaToken : existing.wabaToken, businessName: businessName ?? existing.businessName };
+    const updated = {
+        enabled: enabled ?? existing.enabled,
+        phoneNumberId: phoneNumberId ?? existing.phoneNumberId,
+        // Always overwrite token if a new value is provided; otherwise retain existing
+        wabaToken: (wabaToken !== undefined && wabaToken !== null && wabaToken !== '') ? wabaToken : existing.wabaToken,
+        businessName: businessName ?? existing.businessName,
+    };
     saveWAConfig(updated);
-    res.json({ success: true, message: 'WhatsApp config saved.' });
+    res.json({ success: true, message: 'WhatsApp config saved.', tokenIsSet: Boolean(updated.wabaToken) });
 });
 router.post('/whatsapp/send', async (req, res) => {
     const cfg = loadWAConfig();
@@ -765,6 +808,126 @@ router.delete('/statutory-rules/:id', async (req, res) => {
         await rule.destroy();
         res.json({ success: true });
     } catch (e) { addError(e, `DELETE /api/statutory-rules/${req.params.id}`); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
+});
+
+// ── Data Consistency Report — DB-level orphan + integrity checks ───────────────
+// Frontend checker handles store-level checks; this handles DB-level issues.
+router.get('/consistency-report', requireRole(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+    try {
+        const companyId = req.companyId;
+        const issues = [];
+
+        // 1. Orphaned Attendance — attendance records with no matching employee
+        const orphanAttCount = await Attendance.count({
+            where: companyId ? { companyId } : {},
+            include: [{ model: Employee, required: false, as: 'employee', attributes: ['id'] }],
+        }).catch(() => 0);
+        // Simpler: count attendance where employeeId not in employees table
+        const [orphanAttRows] = await Employee.sequelize.query(
+            `SELECT COUNT(*) as cnt FROM "Attendances" a WHERE ${companyId ? `a."companyId" = '${companyId}' AND ` : ''}NOT EXISTS (SELECT 1 FROM "Employees" e WHERE e.id = a."employeeId")`
+        ).catch(() => [[{ cnt: 0 }]]);
+        const orphanAtt = Number(orphanAttRows[0]?.cnt || 0);
+        if (orphanAtt > 0) issues.push({ id: 'db_orphan_attendance', severity: 'medium', category: 'attendance', title: 'DB: Orphaned Attendance Records', description: `${orphanAtt} attendance record(s) in DB have no matching employee.`, affectedRecords: orphanAtt, autoFixable: true, fixEndpoint: '/api/admin/fix-orphan-attendance' });
+
+        // 2. Orphaned Salary Slips
+        const [orphanSlipRows] = await Employee.sequelize.query(
+            `SELECT COUNT(*) as cnt FROM "SalarySlips" s WHERE ${companyId ? `s."companyId" = '${companyId}' AND ` : ''}NOT EXISTS (SELECT 1 FROM "Employees" e WHERE e.id = s."employeeId")`
+        ).catch(() => [[{ cnt: 0 }]]);
+        const orphanSlips = Number(orphanSlipRows[0]?.cnt || 0);
+        if (orphanSlips > 0) issues.push({ id: 'db_orphan_slips', severity: 'high', category: 'payroll', title: 'DB: Orphaned Salary Slips', description: `${orphanSlips} salary slip(s) in DB have no matching employee.`, affectedRecords: orphanSlips, autoFixable: true, fixEndpoint: '/api/admin/fix-orphan-slips' });
+
+        // 3. Loans with balance < 0
+        const negBalanceLoans = await Loan.count({ where: companyId ? { companyId, balance: { [Op.lt]: 0 } } : { balance: { [Op.lt]: 0 } } }).catch(() => 0);
+        if (negBalanceLoans > 0) issues.push({ id: 'db_neg_loan_balance', severity: 'critical', category: 'loan', title: 'DB: Loans with Negative Balance', description: `${negBalanceLoans} active loan(s) have a negative balance — payroll over-deducted.`, affectedRecords: negBalanceLoans, autoFixable: true, fixEndpoint: '/api/admin/fix-loan-balances' });
+
+        // 4. Employees with duplicate code in same company
+        const [dupCodes] = await Employee.sequelize.query(
+            `SELECT "code", COUNT(*) as cnt FROM "Employees" WHERE ${companyId ? `"companyId" = '${companyId}' AND ` : ''}"status" != 'INACTIVE' GROUP BY "code" HAVING COUNT(*) > 1`
+        ).catch(() => [[]]);
+        if (dupCodes.length > 0) issues.push({ id: 'db_dup_codes', severity: 'critical', category: 'employee', title: 'DB: Duplicate Employee Codes', description: `${dupCodes.length} employee code(s) assigned to multiple active employees.`, affectedRecords: dupCodes.reduce((s, r) => s + Number(r.cnt), 0), autoFixable: false });
+
+        // 5. Salary slips with netSalary > grossSalary (deduction math error)
+        const [badSlips] = await Employee.sequelize.query(
+            `SELECT COUNT(*) as cnt FROM "SalarySlips" WHERE ${companyId ? `"companyId" = '${companyId}' AND ` : ''}"netSalary" > "grossSalary"`
+        ).catch(() => [[{ cnt: 0 }]]);
+        const badSlipCount = Number(badSlips[0]?.cnt || 0);
+        if (badSlipCount > 0) issues.push({ id: 'db_net_gt_gross', severity: 'critical', category: 'payroll', title: 'DB: Net Salary Exceeds Gross', description: `${badSlipCount} salary slip(s) have netSalary > grossSalary — calculation error.`, affectedRecords: badSlipCount, autoFixable: false });
+
+        res.json({ issues, checkedAt: new Date().toISOString(), companyId: companyId || 'ALL' });
+    } catch (e) {
+        addError(e, 'GET /api/admin/consistency-report');
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ── Fix: Orphaned Attendance ───────────────────────────────────────────────────
+router.delete('/fix-orphan-attendance', requireRole(['SUPER_ADMIN']), async (req, res) => {
+    try {
+        const companyId = req.companyId;
+        const [result] = await Attendance.sequelize.query(
+            `DELETE FROM "Attendances" WHERE ${companyId ? `"companyId" = '${companyId}' AND ` : ''}NOT EXISTS (SELECT 1 FROM "Employees" e WHERE e.id = "Attendances"."employeeId")`
+        );
+        res.json({ success: true, deleted: result?.changes || 0 });
+    } catch (e) { addError(e, 'DELETE /api/admin/fix-orphan-attendance'); res.status(500).json({ error: e.message }); }
+});
+
+// ── Fix: Orphaned Salary Slips ─────────────────────────────────────────────────
+router.delete('/fix-orphan-slips', requireRole(['SUPER_ADMIN']), async (req, res) => {
+    try {
+        const companyId = req.companyId;
+        const [result] = await SalarySlip.sequelize.query(
+            `DELETE FROM "SalarySlips" WHERE ${companyId ? `"companyId" = '${companyId}' AND ` : ''}NOT EXISTS (SELECT 1 FROM "Employees" e WHERE e.id = "SalarySlips"."employeeId")`
+        );
+        res.json({ success: true, deleted: result?.changes || 0 });
+    } catch (e) { addError(e, 'DELETE /api/admin/fix-orphan-slips'); res.status(500).json({ error: e.message }); }
+});
+
+// ── Fix: Loan balance floor at 0 ─────────────────────────────────────────────
+router.patch('/fix-loan-balances', requireRole(['SUPER_ADMIN']), async (req, res) => {
+    try {
+        const companyId = req.companyId;
+        const where = companyId ? { companyId, balance: { [Op.lt]: 0 } } : { balance: { [Op.lt]: 0 } };
+        const [count] = await Loan.update({ balance: 0, status: 'CLOSED' }, { where });
+        res.json({ success: true, fixed: count });
+    } catch (e) { addError(e, 'PATCH /api/admin/fix-loan-balances'); res.status(500).json({ error: e.message }); }
+});
+
+// ── Employee Permanent Delete (Trash) ─────────────────────────────────────────
+// Only deletes if status is INACTIVE (already soft-deleted). Requires SUPER_ADMIN.
+router.delete('/employees/:id/permanent', requireRole(['SUPER_ADMIN']), async (req, res) => {
+    try {
+        const where = { id: req.params.id, status: 'INACTIVE' };
+        if (req.companyId) where.companyId = req.companyId;
+        const emp = await Employee.findOne({ where });
+        if (!emp) return res.status(404).json({ error: 'Employee not found or is not soft-deleted' });
+        await emp.destroy();
+        await AuditLog.create({
+            id: `audit-permdel-${Date.now()}`,
+            companyId: req.companyId,
+            userId: req.user?.id,
+            userName: req.user?.name,
+            userRole: req.user?.role,
+            action: 'PERMANENT_DELETE_EMPLOYEE',
+            entityType: 'EMPLOYEE',
+            entityId: req.params.id,
+            entityName: emp.name,
+            status: 'SUCCESS',
+            timestamp: new Date().toISOString(),
+        });
+        res.json({ success: true });
+    } catch (e) { addError(e, 'DELETE /api/admin/employees/:id/permanent'); res.status(500).json({ error: e.message }); }
+});
+
+// ── Employee Restore (Trash → Active) ─────────────────────────────────────────
+router.patch('/employees/:id/restore', requireRole(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+    try {
+        const where = { id: req.params.id, status: 'INACTIVE' };
+        if (req.companyId) where.companyId = req.companyId;
+        const emp = await Employee.findOne({ where });
+        if (!emp) return res.status(404).json({ error: 'Employee not found or is already active' });
+        await emp.update({ status: 'ACTIVE' });
+        res.json({ success: true, employee: emp });
+    } catch (e) { addError(e, 'PATCH /api/admin/employees/:id/restore'); res.status(500).json({ error: e.message }); }
 });
 
 module.exports = { router, init };

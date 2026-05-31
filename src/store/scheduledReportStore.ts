@@ -60,8 +60,16 @@ export const useScheduledReportStore = create<ScheduledReportState>()(
             }
         },
 
-        updateScheduledReport: async (_id, _updates) => {
-            console.warn('Backend updateScheduledReport not natively supported, defaulting to toggle or delete/recreate if needed.');
+        updateScheduledReport: async (id, updates) => {
+            try {
+                const updated = await apiJson<ScheduledReport>('PATCH', `/reports/schedules/${id}`, updates);
+                set(state => ({
+                    reports: state.reports.map(r => r.id === id ? { ...r, ...updated } : r)
+                }));
+            } catch (error) {
+                console.error('Failed to update scheduled report:', error);
+                throw error; // Re-throw so callers can surface the error to the user
+            }
         },
 
         deleteScheduledReport: async (id) => {

@@ -3,7 +3,9 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 
-let Leave, Loan, LoanLedger, SalarySlip, Employee, Attendance, Production, AdvanceSalary, Holiday, addError, getErrorHint;
+const { Worker } = require('worker_threads');
+const path = require('path');
+let Leave, Loan, LoanLedger, SalarySlip, Employee, Attendance, Production, AdvanceSalary, Holiday, SystemSetting, StatutoryRule, ReportJob, addError, getErrorHint;
 
 function init(models) {
     Leave = models.Leave;
@@ -15,6 +17,9 @@ function init(models) {
     Production = models.Production;
     AdvanceSalary = models.AdvanceSalary;
     Holiday = models.Holiday;
+    SystemSetting = models.SystemSetting;
+    StatutoryRule = models.StatutoryRule;
+    ReportJob = models.ReportJob;
     addError = models.addError;
     getErrorHint = models.getErrorHint;
 }
@@ -353,26 +358,84 @@ router.put('/payroll/:id', async (req, res) => {
     catch (e) { addError(e, 'PUT /api/payroll/:id'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
-// ── 🚀 BULK SECURE RUN ────────────────────────────────────────────────────────
+// ── 🚀 ASYNC PAYROLL RUN — spawns a worker thread to avoid blocking the HTTP request ─────
 const Decimal = require('decimal.js');
+
+// GET /payroll/job/:jobId — poll for async payroll run status
+router.get('/job/:jobId', async (req, res) => {
+    try {
+        const job = await ReportJob.findOne({
+            where: { id: req.params.jobId, companyId: req.companyId || undefined },
+        });
+        if (!job) return res.status(404).json({ error: 'Job not found' });
+        res.json({
+            jobId: job.id, status: job.status, progress: job.progress,
+            error: job.error, completedAt: job.updatedAt,
+        });
+    } catch (e) {
+        addError(e, 'GET /api/payroll/job/:jobId');
+        res.status(500).json({ error: e.message });
+    }
+});
 
 router.post('/run', async (req, res) => {
     const { companyId, month, generatedBy } = req.body;
     if (!companyId || !month) return res.status(400).json({ error: 'companyId and month required' });
 
-    const sequelize = Employee.sequelize; // Get sequelize instance from any model
+    try {
+        // Create a ReportJob record so the client can poll for status
+        const jobId = `payroll-run-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+        await ReportJob.create({
+            id: jobId,
+            companyId,
+            requestedBy: req.user?.id || 'SYSTEM',
+            reportType: 'payroll_run',
+            format: 'internal',
+            status: 'PENDING',
+            progress: 0,
+            payload: JSON.stringify({ companyId, month, generatedBy }),
+        });
+
+        // Spawn the payroll computation worker
+        const workerPath = path.join(__dirname, '..', 'workers', 'payrollWorker.js');
+        const worker = new Worker(workerPath, {
+            workerData: { jobId, companyId, month, generatedBy: generatedBy || req.user?.name || 'System' },
+        });
+
+        worker.on('error', async (err) => {
+            addError(err, `payrollWorker:${jobId}`);
+            await ReportJob.update({ status: 'FAILED', error: err.message }, { where: { id: jobId } }).catch(() => {});
+        });
+
+        // Return immediately — client polls GET /api/payroll/job/:jobId
+        return res.status(202).json({ jobId, message: 'Payroll run started. Poll /api/payroll/job/:jobId for status.' });
+
+    } catch (outerErr) {
+        // THIS IS TEMPORARY DEAD CODE — kept as a safety net in case worker creation fails
+        // Fall back to in-process synchronous run (will block until complete)
+        const INLINE_FALLBACK = true; // set false to disable fallback if worker always available
+        if (!INLINE_FALLBACK) {
+            addError(outerErr, 'POST /api/payroll/run:setup');
+            const h = getErrorHint(outerErr);
+            return res.status(500).json({ error: outerErr.message, why: h.why, fix: h.fix });
+        }
+    }
+
+    // ── INLINE FALLBACK: synchronous computation (only reached if worker setup fails) ──
+    const sequelize = Employee.sequelize;
     const t = await sequelize.transaction();
 
     try {
         // 1. Fetch raw data
-        const [employees, allRecords, allProds, allLoans, allAdvances, holidaysList, statutoryRules] = await Promise.all([
+        const [employees, allRecords, allProds, allLoans, allAdvances, holidaysList, statutoryRules, payrollConfigSetting] = await Promise.all([
             Employee.findAll({ where: { companyId, status: 'ACTIVE' } }),
             Attendance.findAll({ where: { companyId } }),
             Production.findAll({ where: { companyId, status: 'APPROVED' } }),
             Loan.findAll({ where: { companyId, status: 'ACTIVE' } }),
             AdvanceSalary.findAll({ where: { companyId, status: 'approved' } }),
             Holiday.findAll({ where: { companyId } }),
-            StatutoryRule.findAll({ where: { companyId }, order: [['effectiveDate', 'DESC']] })
+            StatutoryRule.findAll({ where: { companyId }, order: [['effectiveDate', 'DESC']] }),
+            SystemSetting.findOne({ where: { companyId, key: 'PAYROLL_CONFIG' } }),
         ]);
 
         const year = Number(month.split('-')[0]);
@@ -383,8 +446,8 @@ router.post('/run', async (req, res) => {
         // Find the applicable statutory rule (first rule where effectiveDate <= month end date)
         const activeStatutoryRule = statutoryRules.find(r => r.effectiveDate <= monthEndDate) || null;
 
-        // Very basic config defaults
-        const config = {
+        // Config defaults — overridden by per-company SystemSetting key 'PAYROLL_CONFIG'
+        const configDefaults = {
             enableZeroPresenceRule: true,
             enableSandwichRule: true,
             enableLateMarksPenalty: false, lateMarksThreshold: 3, lateMarksPenaltyType: 'HALF_DAY',
@@ -394,12 +457,20 @@ router.post('/run', async (req, res) => {
             enableOTCap: false, otCapHoursPerMonth: 50,
             enableOTMultipliers: true, otNormalMultiplier: 1.5,
             enableEMICap: true, emiCapPercentage: 50,
-            enableAttendanceBonus: false, attendanceBonusAmount: 1000
+            enableAttendanceBonus: false, attendanceBonusAmount: 1000,
         };
+        let savedConfig = {};
+        if (payrollConfigSetting?.value) {
+            try { savedConfig = JSON.parse(payrollConfigSetting.value); } catch { /* use defaults */ }
+        }
+        const config = { ...configDefaults, ...savedConfig };
 
         const generatedSlips = [];
+        const loanBalanceUpdates = []; // Collect loan balance changes — applied in batch inside transaction
+        const perEmployeeErrors = []; // Non-fatal per-employee errors collected for the response
 
         for (const emp of employees) {
+          try {
             // Filter
             const empRecords = allRecords.filter(r => r.employeeId === emp.id && r.date.startsWith(month));
             const empProds = allProds.filter(p => p.employeeId === emp.id && p.date.startsWith(month));
@@ -563,25 +634,46 @@ router.post('/run', async (req, res) => {
                 }
             }
 
-            // TDS — New Tax Regime FY2024-25 (no deductions, slab on gross)
+            // TDS — FY2024-25 slabs applied per employee's elected tax regime
             if (sc.tdsApplicable) {
                 const gVal = grossSalary.toNumber();
                 if (sc.tdsPercentage !== undefined) {
+                    // Override: fixed percentage configured on employee
                     tdsD = grossSalary.times(sc.tdsPercentage).dividedBy(100).round();
                 } else if (!sc.tdsPanLinked) {
+                    // No PAN: mandatory 20% TDS
                     tdsD = grossSalary.times(20).dividedBy(100).round();
                 } else {
                     const annualGross = gVal * 12;
+                    const regime = emp.taxRegime || 'NEW';
                     let annualTax = 0;
-                    if (annualGross <= 300000) annualTax = 0;
-                    else if (annualGross <= 700000) annualTax = (annualGross - 300000) * 0.05;
-                    else if (annualGross <= 1000000) annualTax = 20000 + (annualGross - 700000) * 0.10;
-                    else if (annualGross <= 1200000) annualTax = 50000 + (annualGross - 1000000) * 0.15;
-                    else if (annualGross <= 1500000) annualTax = 80000 + (annualGross - 1200000) * 0.20;
-                    else annualTax = 140000 + (annualGross - 1500000) * 0.30;
-                    // Rebate u/s 87A
-                    if (annualGross <= 700000) annualTax = 0;
-                    // 4% Health & Education Cess
+
+                    if (regime === 'NEW') {
+                        // New Regime FY2024-25: no deductions, simplified slabs
+                        if (annualGross <= 300000) annualTax = 0;
+                        else if (annualGross <= 700000) annualTax = (annualGross - 300000) * 0.05;
+                        else if (annualGross <= 1000000) annualTax = 20000 + (annualGross - 700000) * 0.10;
+                        else if (annualGross <= 1200000) annualTax = 50000 + (annualGross - 1000000) * 0.15;
+                        else if (annualGross <= 1500000) annualTax = 80000 + (annualGross - 1200000) * 0.20;
+                        else annualTax = 140000 + (annualGross - 1500000) * 0.30;
+                        // Rebate u/s 87A — zero tax up to ₹7L under new regime
+                        if (annualGross <= 700000) annualTax = 0;
+                    } else {
+                        // Old Regime FY2024-25: with standard deduction ₹50,000
+                        const stdDeduction = 50000;
+                        const section80C = Math.min(sc.section80C || 0, 150000); // Capped at ₹1.5L
+                        const section80D = Math.min(sc.section80D || 0, 25000);  // Basic medical premium
+                        const taxableIncome = Math.max(0, annualGross - stdDeduction - section80C - section80D);
+
+                        if (taxableIncome <= 250000) annualTax = 0;
+                        else if (taxableIncome <= 500000) annualTax = (taxableIncome - 250000) * 0.05;
+                        else if (taxableIncome <= 1000000) annualTax = 12500 + (taxableIncome - 500000) * 0.20;
+                        else annualTax = 112500 + (taxableIncome - 1000000) * 0.30;
+                        // Rebate u/s 87A — zero tax up to ₹5L under old regime
+                        if (taxableIncome <= 500000) annualTax = 0;
+                    }
+
+                    // 4% Health & Education Cess on computed tax
                     annualTax = annualTax * 1.04;
                     tdsD = new Decimal(Math.round(annualTax / 12));
                 }
@@ -595,15 +687,21 @@ router.post('/run', async (req, res) => {
             const availableSalaryForDeductions = Decimal.max(0, grossSalary.minus(pfD).minus(tdsD).minus(otherDeduction));
 
             let loanDeduction = new Decimal(0);
+            const empLoanDeductions = []; // Track per-loan deduction for balance update
             empLoans.forEach(l => {
                 if (l.balance > 0) {
-                    loanDeduction = loanDeduction.plus(Decimal.min(l.emiAmount || 0, l.balance || 0));
+                    const thisEmi = Decimal.min(l.emiAmount || 0, l.balance || 0);
+                    loanDeduction = loanDeduction.plus(thisEmi);
+                    empLoanDeductions.push({ loanId: l.id, emi: thisEmi, currentBalance: new Decimal(l.balance) });
                 }
             });
 
             if (config.enableEMICap) {
                 const cap = grossSalary.times(config.emiCapPercentage).dividedBy(100);
                 if (loanDeduction.greaterThan(cap)) {
+                    // Scale each loan deduction proportionally to fit within cap
+                    const scale = cap.dividedBy(loanDeduction);
+                    empLoanDeductions.forEach(ld => { ld.emi = ld.emi.times(scale).round(); });
                     loanDeduction = cap.round();
                 }
             }
@@ -631,6 +729,14 @@ router.post('/run', async (req, res) => {
             const totalDeductions = loanD.plus(advD).plus(pfD).plus(tdsD).plus(otherDeduction).round();
             const netSalary = grossSalary.minus(totalDeductions).round();
 
+            // Collect loan balance updates — applied atomically after all slips are computed
+            for (const ld of empLoanDeductions) {
+                if (ld.emi.greaterThan(0)) {
+                    const newBalance = Decimal.max(0, ld.currentBalance.minus(ld.emi)).toDecimalPlaces(2).toNumber();
+                    loanBalanceUpdates.push({ loanId: ld.loanId, newBalance });
+                }
+            }
+
             generatedSlips.push({
                 id: Math.random().toString(36).substr(2, 9),
                 companyId,
@@ -656,23 +762,37 @@ router.post('/run', async (req, res) => {
                 generatedOn: new Date().toISOString(),
                 generatedBy: generatedBy || 'Server Sync'
             });
+          } catch (empErr) {
+            // Per-employee error is non-fatal — collect and continue generating other slips
+            perEmployeeErrors.push({ employeeId: emp.id, name: emp.name, error: empErr.message });
+          }
         }
 
-        // Wipe old DRAFT slips for this month
+        // Wipe old DRAFT slips for this month and bulk-insert new ones atomically
         await SalarySlip.destroy({
             where: { companyId, month, status: 'DRAFT' },
             transaction: t
         });
 
-        // Save new slips
         await SalarySlip.bulkCreate(generatedSlips, { transaction: t });
 
-        // COMMIT transaction
+        // Apply all loan balance updates inside the same transaction
+        for (const upd of loanBalanceUpdates) {
+            const newStatus = upd.newBalance <= 0 ? 'CLOSED' : 'ACTIVE';
+            await Loan.update(
+                { balance: upd.newBalance, status: newStatus },
+                { where: { id: upd.loanId }, transaction: t }
+            );
+        }
+
         await t.commit();
 
-        res.json({ success: true, count: generatedSlips.length });
+        res.json({
+            success: true,
+            count: generatedSlips.length,
+            ...(perEmployeeErrors.length > 0 && { warnings: perEmployeeErrors }),
+        });
     } catch (e) {
-        // ROLLBACK transaction
         await t.rollback();
         addError(e, 'POST /api/payroll/run');
         const h = getErrorHint(e);

@@ -31,6 +31,22 @@ function computeFnF({ employee, separationDate, noticePeriodDays, pendingLeaveDa
     return { gratuityAmount, noticePeriodPay, leaveEncashment, otherDeductions, netAmount, yearsOfService };
 }
 
+// Shared validation helper for FnF date logic
+function validateFnFDates(employee, separationDate) {
+    const sepDate = new Date(separationDate);
+    if (isNaN(sepDate.getTime())) return 'separationDate is not a valid date (YYYY-MM-DD required)';
+    if (employee.joiningDate) {
+        const joiningDate = new Date(employee.joiningDate);
+        if (sepDate < joiningDate) {
+            return `separationDate (${separationDate}) cannot be before joiningDate (${employee.joiningDate})`;
+        }
+    }
+    const today = new Date();
+    today.setMonth(today.getMonth() + 3); // Allow up to 3 months in the future
+    if (sepDate > today) return 'separationDate cannot be more than 3 months in the future';
+    return null;
+}
+
 // POST /api/fnf/calculate — compute without saving
 router.post('/calculate', async (req, res) => {
     try {
@@ -38,6 +54,8 @@ router.post('/calculate', async (req, res) => {
         if (!employeeId || !separationDate) return res.status(400).json({ error: 'employeeId and separationDate are required' });
         const employee = await Employee.findByPk(employeeId);
         if (!employee) return res.status(404).json({ error: 'Employee not found' });
+        const dateErr = validateFnFDates(employee, separationDate);
+        if (dateErr) return res.status(422).json({ error: dateErr });
         const result = computeFnF({ employee, separationDate, noticePeriodDays, pendingLeaveDays, otherDeductions });
         res.json({ ...result, basicSalary: employee.basicSalary, employeeName: employee.name });
     } catch (e) { addError(e, 'POST /api/fnf/calculate'); res.status(500).json(formatError(e)); }
@@ -50,6 +68,8 @@ router.post('/', async (req, res) => {
         if (!employeeId || !separationDate) return res.status(400).json({ error: 'employeeId and separationDate are required' });
         const employee = await Employee.findByPk(employeeId);
         if (!employee) return res.status(404).json({ error: 'Employee not found' });
+        const dateErr = validateFnFDates(employee, separationDate);
+        if (dateErr) return res.status(422).json({ error: dateErr });
         const computed = computeFnF({ employee, separationDate, noticePeriodDays, pendingLeaveDays, otherDeductions });
         const record = await FnFSettlement.create({
             companyId: req.companyId || employee.companyId,

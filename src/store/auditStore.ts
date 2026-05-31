@@ -42,6 +42,32 @@ interface AuditState {
     removeIPRestriction: (id: string) => Promise<void>;
 }
 
+// Retry up to 50 queued audit log entries that previously failed to POST
+async function drainAuditQueue() {
+    try {
+        const raw = localStorage.getItem('sm_audit_retry_queue');
+        if (!raw) return;
+        const queue: AuditLog[] = JSON.parse(raw);
+        if (queue.length === 0) return;
+
+        const remaining: AuditLog[] = [];
+        for (const entry of queue.slice(0, 50)) {
+            try {
+                const res = await apiFetch(`/audit-logs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(entry),
+                });
+                if (!res.ok) remaining.push(entry);
+            } catch {
+                remaining.push(entry);
+            }
+        }
+        const rest = queue.slice(50); // Entries beyond the batch stay for next drain
+        localStorage.setItem('sm_audit_retry_queue', JSON.stringify([...remaining, ...rest]));
+    } catch { /* localStorage unavailable or JSON malformed */ }
+}
+
 export const useAuditStore = create<AuditState>()(
     persist(
         (set, get) => ({
@@ -64,12 +90,24 @@ export const useAuditStore = create<AuditState>()(
                     logs: [newLog, ...state.logs].slice(0, 10000)
                 }));
 
-                // Fire-and-forget POST to backend (non-blocking)
+                // POST to backend — on failure, queue the entry in localStorage for retry
                 apiFetch(`/audit-logs`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(newLog)
-                }).catch(() => { /* silently fail — local state is always kept */ });
+                }).then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    // On success, flush any queued entries from previous failures
+                    drainAuditQueue();
+                }).catch(() => {
+                    try {
+                        const existing = JSON.parse(localStorage.getItem('sm_audit_retry_queue') || '[]');
+                        existing.push(newLog);
+                        // Keep max 200 entries to avoid unbounded growth
+                        const trimmed = existing.slice(-200);
+                        localStorage.setItem('sm_audit_retry_queue', JSON.stringify(trimmed));
+                    } catch { /* localStorage unavailable */ }
+                });
 
                 if (import.meta.env.DEV) console.log('🔍 Audit Log:', newLog);
             },

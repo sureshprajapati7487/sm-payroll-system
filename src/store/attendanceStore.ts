@@ -7,10 +7,21 @@ import { useAuthStore } from './authStore';
 import { useRolePermissionsStore } from './rolePermissionsStore';
 import { useEmployeeStore } from './employeeStore';
 
+const OFFLINE_MAX_RETRIES = 3;
+
+interface OfflineQueueItem {
+    method: 'POST' | 'PUT' | 'DELETE';
+    url: string;
+    body?: any;
+    id: string;
+    retryCount: number;   // incremented on each failure; removed when retryCount >= MAX_RETRIES
+}
+
 interface AttendanceState {
     records: AttendanceRecord[];
     isLoading: boolean;
-    offlineQueue: { method: 'POST' | 'PUT' | 'DELETE', url: string, body?: any, id: string }[];
+    offlineQueue: OfflineQueueItem[];
+    deadLetterQueue: OfflineQueueItem[]; // items that exhausted retries
     syncOfflineQueue: () => Promise<void>;
 
     // Core punch actions
@@ -79,13 +90,16 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
         records: [],
         isLoading: false,
         offlineQueue: loadQueue(),
+        deadLetterQueue: [],
 
         syncOfflineQueue: async () => {
             const q = get().offlineQueue;
-            if (q.length === 0 || typeof navigator !== 'undefined' && !navigator.onLine) return;
+            if (q.length === 0 || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
 
-            const remaining = [];
+            const remaining: OfflineQueueItem[] = [];
+            const deadLetters: OfflineQueueItem[] = [];
             let syncedAny = false;
+
             for (const item of q) {
                 try {
                     const res = await apiFetch(item.url, {
@@ -96,16 +110,33 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
                     if (res.ok) {
                         syncedAny = true;
                     } else {
-                        remaining.push(item);
+                        const newRetryCount = (item.retryCount || 0) + 1;
+                        if (newRetryCount >= OFFLINE_MAX_RETRIES) {
+                            deadLetters.push({ ...item, retryCount: newRetryCount });
+                        } else {
+                            remaining.push({ ...item, retryCount: newRetryCount });
+                        }
                     }
-                } catch (e) {
-                    remaining.push(item);
+                } catch {
+                    const newRetryCount = (item.retryCount || 0) + 1;
+                    if (newRetryCount >= OFFLINE_MAX_RETRIES) {
+                        deadLetters.push({ ...item, retryCount: newRetryCount });
+                    } else {
+                        remaining.push({ ...item, retryCount: newRetryCount });
+                    }
                 }
             }
-            if (syncedAny || remaining.length !== q.length) {
-                set({ offlineQueue: remaining });
+
+            if (syncedAny || remaining.length !== q.length || deadLetters.length > 0) {
+                set(state => ({
+                    offlineQueue: remaining,
+                    deadLetterQueue: [...(state.deadLetterQueue || []), ...deadLetters],
+                }));
                 saveQueue(remaining);
-                if (syncedAny) get().fetchAttendance(); // Refresh to get real IDs/timestamps
+                if (deadLetters.length > 0) {
+                    console.warn(`[AttendanceStore] ${deadLetters.length} offline item(s) moved to dead-letter queue after ${OFFLINE_MAX_RETRIES} failed attempts.`);
+                }
+                if (syncedAny) get().fetchAttendance();
             }
         },
 
@@ -190,7 +221,7 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
                 } else throw new Error('Server returned error');
             } catch (err) {
                 console.warn('Network error, saving check-in to offline queue', err);
-                const q = [...get().offlineQueue, { id: Math.random().toString(), method: 'POST' as const, url: '/attendance', body: newRecord }];
+                const q = [...get().offlineQueue, { id: Math.random().toString(), method: 'POST' as const, url: '/attendance', body: newRecord, retryCount: 0 }];
                 set({ offlineQueue: q });
                 saveQueue(q);
             }
@@ -243,7 +274,7 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
                 if (!res.ok) throw new Error('Server error on checkout');
             } catch (err) {
                 console.warn('Network error, saving check-out to offline queue', err);
-                const q = [...get().offlineQueue, { id: Math.random().toString(), method: 'PUT' as const, url: `/attendance/${todayRecord.id}`, body: checkOutPayload }];
+                const q = [...get().offlineQueue, { id: Math.random().toString(), method: 'PUT' as const, url: `/attendance/${todayRecord.id}`, body: checkOutPayload, retryCount: 0 }];
                 set({ offlineQueue: q });
                 saveQueue(q);
             }

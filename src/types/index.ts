@@ -77,9 +77,10 @@ export interface StatutoryConfig {
 
     // TDS - Tax Deducted at Source (based on income tax slabs)
     tdsApplicable: boolean;
-    tdsPanLinked?: boolean;   // If PAN is linked, uses slab; else 20% flat
-    tdsPercentage?: number;   // Optional manual override %
-    tdsDeclaredInvestment?: number; // Annual declared 80C investments
+    tdsPanLinked?: boolean;        // If PAN is linked, uses slab; else 20% flat
+    tdsPercentage?: number;        // Optional manual override %
+    tdsDeclaredInvestment?: number; // Annual declared 80C investments (PPF, LIC, ELSS etc.)
+    section80D?: number;           // Annual medical insurance premium — Old Regime only (max ₹25,000)
 }
 
 export interface Employee {
@@ -133,6 +134,11 @@ export interface Employee {
 
     // ── Statutory / Govt Deductions ──────────────────────────
     statutoryConfig?: StatutoryConfig;
+
+    // ── Income Tax Regime Election ────────────────────────────
+    // 'NEW' = New Regime (default, no deductions, lower slabs)
+    // 'OLD' = Old Regime (with 80C, 80D deductions, higher slabs)
+    taxRegime?: 'NEW' | 'OLD';
 
     // ── Dynamic Custom Fields ─────────────────────────────────
     customData?: Record<string, any>;

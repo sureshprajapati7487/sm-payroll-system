@@ -73,14 +73,15 @@ export const DEFAULT_SALESMAN_CONFIG: SalesmanConfig = {
 
 /** LocalStorage se Salesman Config load karo (Super Admin ne jo set kiya hai) */
 export function getSalesmanConfig(): SalesmanConfig {
-    // 1. Try Zustand store state via global accessor (backend DB — works on all devices)
-    //    systemSettingStore sets globalThis.__smSettingsStore on init
+    // 1. Try Zustand store state via the exported getSystemSettings function (backend DB)
     try {
-        const storeState = (globalThis as any).__smSettingsStore?.();
+        // Lazy import avoids circular dependency — systemSettingStore → salesmanConfig → systemSettingStore
+        const { getSystemSettings } = require('@/store/systemSettingStore') as { getSystemSettings: () => Record<string, any> };
+        const storeState = getSystemSettings?.();
         if (storeState?.SALESMAN_CONFIG) {
             return { ...DEFAULT_SALESMAN_CONFIG, ...storeState.SALESMAN_CONFIG };
         }
-    } catch { /* ignore */ }
+    } catch { /* store not initialized or circular import guard triggered */ }
     // 2. Fall back to localStorage (offline / before DB load)
     try {
         const raw = localStorage.getItem(LS_KEY);

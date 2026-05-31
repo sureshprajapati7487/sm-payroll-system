@@ -45,65 +45,69 @@ const HOST = '0.0.0.0';
 const SERVER_START_TIME = Date.now();
 
 // ── JWT Config ────────────────────────────────────────────────────────────────
-const DEFAULT_JWT_SECRET = 'sm-payroll-super-secret-jwt-key-2026';
-const DEFAULT_REFRESH_SECRET = 'sm-payroll-refresh-secret-key-2026-v2';
+// Secrets MUST be provided via environment variables — no hardcoded defaults.
+// In development: if missing, a random secret is generated at startup (ephemeral — sessions won't survive restarts).
+// In production: missing secrets cause an immediate process exit.
 
-const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
-const JWT_EXPIRES = process.env.JWT_EXPIRES || '15m';
-const REFRESH_SECRET = process.env.REFRESH_SECRET || DEFAULT_REFRESH_SECRET;
-const REFRESH_EXPIRES = '7d';
+function generateDevSecret(name) {
+    const crypto = require('crypto');
+    const s = crypto.randomBytes(64).toString('hex');
+    console.warn(`⚠️  ${name} not set — generated ephemeral secret for this session (tokens won't survive restarts). Copy server/.env.example → server/.env and set ${name}.`);
+    return s;
+}
 
-// ── Security Check: Block production with weak secrets ────────────────────────
 if (IS_PRODUCTION) {
-    if (!process.env.JWT_SECRET || JWT_SECRET === DEFAULT_JWT_SECRET) {
+    if (!process.env.JWT_SECRET) {
         console.error('🚨 SECURITY ERROR: JWT_SECRET is not set in environment variables!');
         console.error('   Generate one: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
         process.exit(1);
     }
-    if (!process.env.REFRESH_SECRET || REFRESH_SECRET === DEFAULT_REFRESH_SECRET) {
+    if (!process.env.REFRESH_SECRET) {
         console.error('🚨 SECURITY ERROR: REFRESH_SECRET is not set in environment variables!');
         process.exit(1);
     }
-} else if (!process.env.JWT_SECRET) {
-    console.warn('⚠️  JWT_SECRET not in .env — using insecure default (dev only). Copy server/.env.example to server/.env');
 }
+
+const JWT_SECRET = process.env.JWT_SECRET || generateDevSecret('JWT_SECRET');
+const JWT_EXPIRES = process.env.JWT_EXPIRES || '15m';
+const REFRESH_SECRET = process.env.REFRESH_SECRET || generateDevSecret('REFRESH_SECRET');
+const REFRESH_EXPIRES = '7d';
 
 // ── Error Hints / Error Log → see ./middlewares/errorHandler.js (IF-03) ──────
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
-// Static allow list (always allowed)
+// In production: only ALLOWED_ORIGINS env var origins are permitted.
+// In development: localhost ports + optionally LAN IPs (CORS_ALLOW_LAN=true).
 const ALLOWED_ORIGINS_STATIC = [
+    process.env.FRONTEND_URL,                // primary frontend origin
     'https://sm-payroll-system.vercel.app',  // production frontend (Vercel)
     'capacitor://localhost',                 // iOS Capacitor
     'http://localhost',                      // Android WebView
     'https://localhost',
-    process.env.FRONTEND_URL,
+    // Parse comma-separated additional origins from env (e.g. "https://app.example.com,https://admin.example.com")
+    ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()) : []),
 ].filter(Boolean);
 
-// Dynamic check: allow ANY localhost origin (any port) — covers dev server on any port
-// Also allow any 192.168.x.x local network origin for mobile testing on LAN
 function isAllowedOrigin(origin) {
-    if (!origin) return true; // server-to-server (no origin header)
+    if (!origin) return true; // server-to-server calls (no Origin header)
     if (ALLOWED_ORIGINS_STATIC.includes(origin)) return true;
-    // Allow localhost on any port (http or https)
-    if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
-    // Allow HTTPS localhost on any port (Vite dev SSL)
-    if (/^https:\/\/localhost(:\d+)?$/.test(origin)) return true;
-    // Allow local network IPs (192.168.x.x or 10.x.x.x) on any port
-    if (/^https?:\/\/(192\.168\.|10\.)\d+\.\d+(:\d+)?$/.test(origin)) return true;
+    // Localhost any port — development only
+    if (!IS_PRODUCTION && /^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
+    // LAN IPs — only when explicitly opted in via CORS_ALLOW_LAN=true (dev mobile testing)
+    if (!IS_PRODUCTION && process.env.CORS_ALLOW_LAN === 'true' && /^https?:\/\/(192\.168\.|10\.)\d+\.\d+(:\d+)?$/.test(origin)) return true;
     return false;
 }
 
 // ── Auth Middleware ───────────────────────────────────────────────────────────
 // PUBLIC_PATHS, isPublic, authMiddleware → see ./middlewares/auth.js (IF-02)
 
-// ── DEV ONLY: Reset Admin Password (localhost only, blocked in production) ────
+// ── DEV ONLY: Reset Admin Password — not registered at all in production ──────
+if (!IS_PRODUCTION) {
 app.get('/api/dev/reset-admin', async (req, res) => {
-    // 🔒 SECURITY: Only allow from localhost — never accessible from network or production
     const ip = req.socket.remoteAddress || req.ip || '';
     const isLocalhost = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-    if (IS_PRODUCTION || !isLocalhost) {
-        return res.status(403).json({ error: 'Access denied. This route is only available on localhost in development mode.' });
+    if (!isLocalhost) {
+        return res.status(403).json({ error: 'Access denied. Only accessible from localhost in development mode.' });
     }
     try {
         const emp = await Employee.findOne({ where: { code: 'ACLLP-01' } });
@@ -129,6 +133,7 @@ app.get('/api/dev/reset-admin', async (req, res) => {
         res.json({ error: e.message });
     }
 });
+} // end if (!IS_PRODUCTION)
 
 // ── IF-01: Helmet — HTTP Security Headers ────────────────────────────────────
 // CSP is set to report-only mode initially so no frontend assets break.

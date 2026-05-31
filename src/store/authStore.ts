@@ -244,18 +244,27 @@ export const useAuthStore = create<AuthState>()(
                     return;
                 }
 
-                // 2. Check real JWT expiry (decode payload without library)
+                // 2. Check real JWT expiry — decode payload (base64url → base64 → JSON)
                 if (token) {
                     try {
-                        const payload = JSON.parse(atob(token.split('.')[1]));
-                        const isExpired = payload.exp && Date.now() / 1000 > payload.exp;
+                        const parts = token.split('.');
+                        if (parts.length !== 3) throw new Error('Invalid JWT structure');
+
+                        // JWT uses base64url encoding: replace URL-safe chars before decoding
+                        const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+                        // Pad to multiple of 4 so atob() doesn't throw
+                        const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+                        const payload = JSON.parse(atob(padded));
+
+                        if (!payload || typeof payload !== 'object') throw new Error('Invalid JWT payload');
+
+                        const isExpired = payload.exp && (Date.now() / 1000) > payload.exp;
                         if (isExpired) {
-                            // Token expired — force re-login
                             state.token = null;
                             state.isAuthenticated = false;
                             state.user = null;
                         }
-                        // ✅ Token valid — isAuthenticated stays true (auto-dash redirect works)
+                        // ✅ Token valid — isAuthenticated stays true
                     } catch {
                         // Malformed token — clear everything
                         state.token = null;

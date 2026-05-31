@@ -291,14 +291,33 @@ function App() {
                                         <Route path="/calculators/pfesi" element={<PFESICalculator />} />
                                     </Route>
 
-                                    {/* Admin Tools */}
-                                    <Route path="/admin/bulk-import" element={<PageErrorBoundary pageName="Bulk Import"><BulkImport /></PageErrorBoundary>} />
-                                    <Route path="/admin/audit-logs" element={<PageErrorBoundary pageName="Audit Logs"><AuditLogs /></PageErrorBoundary>} />
-                                    <Route path="/admin/backup" element={<PageErrorBoundary pageName="Database Backup"><DatabaseBackup /></PageErrorBoundary>} />
-                                    <Route path="/admin/trash" element={<PageErrorBoundary pageName="Trash Management"><TrashManagement /></PageErrorBoundary>} />
+                                    {/* Admin Tools — role-guarded */}
+                                    <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.BULK_IMPORT} />}>
+                                        <Route path="/admin/bulk-import" element={<PageErrorBoundary pageName="Bulk Import"><BulkImport /></PageErrorBoundary>} />
+                                    </Route>
+
+                                    <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_AUDIT_LOGS} />}>
+                                        <Route path="/admin/audit-logs" element={<PageErrorBoundary pageName="Audit Logs"><AuditLogs /></PageErrorBoundary>} />
+                                    </Route>
+
+                                    <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.DATABASE_BACKUP} />}>
+                                        <Route path="/admin/backup" element={<PageErrorBoundary pageName="Database Backup"><DatabaseBackup /></PageErrorBoundary>} />
+                                    </Route>
+
+                                    <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.MANAGE_TRASH} />}>
+                                        <Route path="/admin/trash" element={<PageErrorBoundary pageName="Trash Management"><TrashManagement /></PageErrorBoundary>} />
+                                    </Route>
+
+                                    {/* Drafts — any authenticated user with basic view access */}
                                     <Route path="/admin/drafts" element={<PageErrorBoundary pageName="Draft Manager"><DraftManager /></PageErrorBoundary>} />
-                                    <Route path="/admin/consistency" element={<PageErrorBoundary pageName="Data Consistency"><DataConsistencyChecker /></PageErrorBoundary>} />
-                                    <Route path="/admin/seed" element={<PageErrorBoundary pageName="Data Seeding"><DataSeeding /></PageErrorBoundary>} />
+
+                                    <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.DATA_CONSISTENCY_CHECK} />}>
+                                        <Route path="/admin/consistency" element={<PageErrorBoundary pageName="Data Consistency"><DataConsistencyChecker /></PageErrorBoundary>} />
+                                    </Route>
+
+                                    <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.DATABASE_BACKUP} />}>
+                                        <Route path="/admin/seed" element={<PageErrorBoundary pageName="Data Seeding"><DataSeeding /></PageErrorBoundary>} />
+                                    </Route>
 
                                     {/* Reports & Finance */}
                                     <Route path="/reports/builder" element={<PageErrorBoundary pageName="Report Builder"><ReportBuilder /></PageErrorBoundary>} />

@@ -106,13 +106,16 @@ router.post('/', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'
         // Always enforce companyId from JWT (prevents cross-tenant employee creation)
         if (req.companyId) data.companyId = req.companyId;
 
-        // RBAC: Strip financial info if user lacks VIEW_SALARY permission equivalent
+        // RBAC: Reject financial fields if user lacks salary management permission
         const canManageFinancials = req.user && ['SUPER_ADMIN', 'ACCOUNT_ADMIN'].includes(req.user.role);
-        if (!canManageFinancials) {
-            delete data.basicSalary;
-            delete data.salaryType;
-            delete data.bankDetails;
-            delete data.statutoryConfig;
+        const FINANCIAL_FIELDS = ['basicSalary', 'salaryType', 'bankDetails', 'statutoryConfig'];
+        const attemptedFinancialFields = FINANCIAL_FIELDS.filter(f => data[f] !== undefined);
+        if (!canManageFinancials && attemptedFinancialFields.length > 0) {
+            return res.status(403).json({
+                error: 'You do not have permission to set salary or bank details.',
+                fields: attemptedFinancialFields,
+                fix: 'Only SUPER_ADMIN or ACCOUNT_ADMIN can manage financial data.',
+            });
         }
 
         const pwdErr = validatePasswordStrength(data.password);
@@ -138,13 +141,16 @@ router.put('/:id', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGE
 
         const data = { ...req.body };
 
-        // RBAC: Strip financial info if user lacks VIEW_SALARY permission equivalent
+        // RBAC: Reject financial fields if user lacks salary management permission
         const canManageFinancials = req.user && ['SUPER_ADMIN', 'ACCOUNT_ADMIN'].includes(req.user.role);
-        if (!canManageFinancials) {
-            delete data.basicSalary;
-            delete data.salaryType;
-            delete data.bankDetails;
-            delete data.statutoryConfig;
+        const FINANCIAL_FIELDS = ['basicSalary', 'salaryType', 'bankDetails', 'statutoryConfig'];
+        const attemptedFinancialFields = FINANCIAL_FIELDS.filter(f => data[f] !== undefined);
+        if (!canManageFinancials && attemptedFinancialFields.length > 0) {
+            return res.status(403).json({
+                error: 'You do not have permission to modify salary or bank details.',
+                fields: attemptedFinancialFields,
+                fix: 'Only SUPER_ADMIN or ACCOUNT_ADMIN can manage financial data.',
+            });
         }
 
         const pwdErr = validatePasswordStrength(data.password);
@@ -272,10 +278,23 @@ router.get('/:id/documents', async (req, res) => {
     } catch (e) { addError(e, 'GET /api/employees/:id/documents'); res.status(500).json(formatError(e)); }
 });
 
-router.get('/:id/documents/:filename', (req, res) => {
-    const filePath = path.join(__dirname, '..', 'uploads', req.params.id, req.params.filename);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
-    res.sendFile(filePath);
+router.get('/:id/documents/:filename', async (req, res) => {
+    try {
+        // Look up the stored filename from DB — never trust the URL param directly
+        const emp = await Employee.findByPk(req.params.id);
+        if (!emp) return res.status(404).json({ error: 'Employee not found' });
+
+        const docs = Array.isArray(emp.documents) ? emp.documents : [];
+        // Match the requested filename against the storedAs field in DB records only
+        const doc = docs.find(d => d.storedAs === req.params.filename);
+        if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+        // Use path.basename as an extra guard — strips any remaining directory components
+        const safeFilename = path.basename(doc.storedAs);
+        const filePath = path.join(__dirname, '..', 'uploads', req.params.id, safeFilename);
+        if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' });
+        res.sendFile(filePath);
+    } catch (e) { addError(e, 'GET /api/employees/:id/documents/:filename'); res.status(500).json(formatError(e)); }
 });
 
 module.exports = { router, init };

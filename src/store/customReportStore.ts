@@ -93,9 +93,16 @@ export const useCustomReportStore = create<CustomReportState>()(
             }
         },
 
-        updateTemplate: async (_id, _updates) => {
-            console.warn('Backend updateTemplate not fully implemented, falling back to read-only or delete-recreate if needed.');
-            // Implement /reports/templates/:id PUT/PATCH if desired
+        updateTemplate: async (id, updates) => {
+            try {
+                const updated = await apiJson<CustomReportTemplate>('PATCH', `/reports/templates/${id}`, updates);
+                set(state => ({
+                    templates: state.templates.map(t => t.id === id ? { ...t, ...updated } : t)
+                }));
+            } catch (error) {
+                console.error('Failed to update template:', error);
+                throw error; // Re-throw so callers can surface the error to the user
+            }
         },
 
         deleteTemplate: async (id) => {

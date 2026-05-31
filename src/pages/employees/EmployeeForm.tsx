@@ -751,35 +751,97 @@ export const EmployeeForm = () => {
 
                                 {/* TDS */}
                                 <StatutoryCard color="red" icon="📋" title="TDS — Tax Deducted at Source"
-                                    subtitle={sc.tdsApplicable ? (sc.tdsPercentage !== undefined ? `${sc.tdsPercentage}% flat override` : 'Auto income-tax slab calculation') : 'Not applicable'}
+                                    subtitle={sc.tdsApplicable ? (sc.tdsPercentage !== undefined ? `${sc.tdsPercentage}% flat override` : `Auto slab — ${(formData as any).taxRegime === 'OLD' ? 'Old Regime' : 'New Regime (Default)'}`) : 'Not applicable'}
                                     enabled={sc.tdsApplicable} onToggle={v => handleStatutoryChange('tdsApplicable', v)}>
                                     <div className="space-y-4">
                                         {sc.tdsApplicable && (
                                             <div className="space-y-4">
                                                 <Toggle checked={sc.tdsPanLinked ?? true} onChange={v => handleStatutoryChange('tdsPanLinked', v)} label="PAN is linked" desc="If unlinked, flat 20% TDS is deducted" />
+
+                                                {/* Tax Regime Selection — New / Old */}
+                                                <div className="space-y-2">
+                                                    <label className="text-xs text-dark-muted uppercase font-semibold">Income Tax Regime</label>
+                                                    <div className="flex gap-3">
+                                                        {[
+                                                            { value: 'NEW', label: 'New Regime', desc: 'No deductions, lower slabs' },
+                                                            { value: 'OLD', label: 'Old Regime', desc: 'With 80C/80D deductions' },
+                                                        ].map(opt => (
+                                                            <button
+                                                                key={opt.value}
+                                                                type="button"
+                                                                onClick={() => setFormData(prev => ({ ...prev, taxRegime: opt.value as 'NEW' | 'OLD' }))}
+                                                                className={`flex-1 rounded-xl border p-3 text-left transition-all ${
+                                                                    ((formData as any).taxRegime ?? 'NEW') === opt.value
+                                                                        ? 'border-red-500/60 bg-red-500/10 text-white'
+                                                                        : 'border-dark-border bg-dark-bg/40 text-dark-muted hover:border-dark-border/80'
+                                                                }`}
+                                                            >
+                                                                <p className="text-sm font-medium">{opt.label}</p>
+                                                                <p className="text-xs mt-0.5 opacity-70">{opt.desc}</p>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {/* 80C — shown for both regimes (used in Old; ignored in New) */}
                                                     <div className="space-y-1">
-                                                        <label className="text-xs text-dark-muted uppercase">Declared 80C Investments (₹/year)</label>
-                                                        <input type="number" min="0" max="150000" value={sc.tdsDeclaredInvestment ?? 0} onChange={e => handleStatutoryChange('tdsDeclaredInvestment', Number(e.target.value))}
-                                                            className={inputCls} placeholder="e.g. 100000" />
-                                                        <p className="text-xs text-dark-muted">Max ₹1,50,000 under 80C (PPF, LIC, ELSS etc.)</p>
+                                                        <label className="text-xs text-dark-muted uppercase">
+                                                            80C Declared Investments (₹/year)
+                                                            {((formData as any).taxRegime ?? 'NEW') === 'NEW' && (
+                                                                <span className="ml-2 text-yellow-500/70 normal-case">(not used in New Regime)</span>
+                                                            )}
+                                                        </label>
+                                                        <input type="number" min="0" max="150000" value={sc.tdsDeclaredInvestment ?? 0}
+                                                            onChange={e => handleStatutoryChange('tdsDeclaredInvestment', Number(e.target.value))}
+                                                            className={inputCls} placeholder="e.g. 100000"
+                                                            disabled={((formData as any).taxRegime ?? 'NEW') === 'NEW'} />
+                                                        <p className="text-xs text-dark-muted">Max ₹1,50,000 (PPF, LIC, ELSS etc.)</p>
                                                     </div>
+                                                    {/* 80D — only relevant for Old Regime */}
                                                     <div className="space-y-1">
-                                                        <label className="text-xs text-dark-muted uppercase">Manual TDS % Override (optional)</label>
-                                                        <input type="number" min="0" max="30" value={sc.tdsPercentage ?? ''} onChange={e => handleStatutoryChange('tdsPercentage', e.target.value === '' ? undefined : Number(e.target.value))}
-                                                            className={inputCls} placeholder="Leave blank for auto-slab" />
-                                                        <p className="text-xs text-dark-muted">Overrides auto-calculation if filled</p>
+                                                        <label className="text-xs text-dark-muted uppercase">
+                                                            80D Medical Premium (₹/year)
+                                                            {((formData as any).taxRegime ?? 'NEW') === 'NEW' && (
+                                                                <span className="ml-2 text-yellow-500/70 normal-case">(not used in New Regime)</span>
+                                                            )}
+                                                        </label>
+                                                        <input type="number" min="0" max="25000" value={sc.section80D ?? 0}
+                                                            onChange={e => handleStatutoryChange('section80D', Number(e.target.value))}
+                                                            className={inputCls} placeholder="e.g. 15000"
+                                                            disabled={((formData as any).taxRegime ?? 'NEW') === 'NEW'} />
+                                                        <p className="text-xs text-dark-muted">Max ₹25,000 (self + family health insurance)</p>
                                                     </div>
                                                 </div>
-                                                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                                                    <p className="text-xs text-blue-300 font-medium">ℹ️ New Regime Slabs (FY 2024-25)</p>
-                                                    <div className="grid grid-cols-2 gap-x-6 mt-2 text-xs text-dark-muted">
-                                                        <span>₹0 – ₹3L → Nil</span><span>₹3L – ₹6L → 5%</span>
-                                                        <span>₹6L – ₹9L → 10%</span><span>₹9L – ₹12L → 15%</span>
-                                                        <span>₹12L – ₹15L → 20%</span><span>Above ₹15L → 30%</span>
-                                                    </div>
-                                                    <p className="text-xs text-dark-muted mt-1">+ 4% Health &amp; Education Cess | Standard Deduction ₹50,000</p>
+
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-dark-muted uppercase">Manual TDS % Override (optional)</label>
+                                                    <input type="number" min="0" max="30" value={sc.tdsPercentage ?? ''} onChange={e => handleStatutoryChange('tdsPercentage', e.target.value === '' ? undefined : Number(e.target.value))}
+                                                        className={inputCls} placeholder="Leave blank for auto-slab" />
+                                                    <p className="text-xs text-dark-muted">Overrides all slab calculations if filled</p>
                                                 </div>
+
+                                                {/* Slab reference — changes with selected regime */}
+                                                {((formData as any).taxRegime ?? 'NEW') === 'NEW' ? (
+                                                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                                                        <p className="text-xs text-blue-300 font-medium">New Regime Slabs (FY 2024-25)</p>
+                                                        <div className="grid grid-cols-2 gap-x-6 mt-2 text-xs text-dark-muted">
+                                                            <span>₹0 – ₹3L → Nil</span><span>₹3L – ₹7L → 5% (rebate u/s 87A)</span>
+                                                            <span>₹7L – ₹10L → 10%</span><span>₹10L – ₹12L → 15%</span>
+                                                            <span>₹12L – ₹15L → 20%</span><span>Above ₹15L → 30%</span>
+                                                        </div>
+                                                        <p className="text-xs text-dark-muted mt-1">+ 4% Cess | No deductions | Zero tax up to ₹7L</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
+                                                        <p className="text-xs text-orange-300 font-medium">Old Regime Slabs (FY 2024-25)</p>
+                                                        <div className="grid grid-cols-2 gap-x-6 mt-2 text-xs text-dark-muted">
+                                                            <span>₹0 – ₹2.5L → Nil</span><span>₹2.5L – ₹5L → 5% (rebate u/s 87A)</span>
+                                                            <span>₹5L – ₹10L → 20%</span><span>Above ₹10L → 30%</span>
+                                                        </div>
+                                                        <p className="text-xs text-dark-muted mt-1">+ 4% Cess | Std deduction ₹50K | 80C + 80D applicable | Zero tax up to ₹5L</p>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>

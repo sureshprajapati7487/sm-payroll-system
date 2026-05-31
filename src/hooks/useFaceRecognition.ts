@@ -43,25 +43,39 @@ export function useFaceRecognition() {
     const matchLoopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const consecutiveHitsRef = useRef(0);  // for multi-frame confirmation
 
-    // ── Load models from CDN with progress steps ──────────────────────────────
+    const MODEL_LOAD_TIMEOUT_MS = 30_000; // 30 seconds max per model
+
+    // Race a promise against a timeout — rejects if model takes too long
+    const withTimeout = <T,>(promise: Promise<T>, label: string): Promise<T> => {
+        return Promise.race([
+            promise,
+            new Promise<T>((_, reject) =>
+                setTimeout(() => reject(new Error(`${label} load timeout (30s). Slow network ya server unavailable.`)), MODEL_LOAD_TIMEOUT_MS)
+            ),
+        ]);
+    };
+
+    // ── Load models from CDN with progress steps + per-model timeout ───────────
     const loadModels = useCallback(async (): Promise<boolean> => {
         if (modelsLoaded) return true;
         setStatus('loading_models');
         setError(null);
         setLoadProgress(0);
         try {
-            // Load models sequentially so we can track progress
-            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+            await withTimeout(faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL), 'TinyFaceDetector');
             setLoadProgress(33);
-            await faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL);
+            await withTimeout(faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL), 'FaceLandmark');
             setLoadProgress(66);
-            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            await withTimeout(faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL), 'FaceRecognition');
             setLoadProgress(100);
             setModelsLoaded(true);
             setStatus('idle');
             return true;
         } catch (e: any) {
-            const msg = 'Face AI models load nahi hue. Internet check karein.';
+            const isTimeout = e?.message?.includes('timeout');
+            const msg = isTimeout
+                ? 'Face AI models 30 seconds mein load nahi hue. Internet slow hai — PIN punch use karein ya retry karein.'
+                : 'Face AI models load nahi hue. Internet check karein.';
             setError(msg);
             setStatus('error');
             setLoadProgress(0);
