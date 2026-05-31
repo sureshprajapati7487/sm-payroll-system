@@ -2,8 +2,25 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { requireRole } = require('../rbac');
 const BCRYPT_ROUNDS = 10;
+
+// ── Multer — local disk storage under server/uploads/{employeeId}/ ─────────────
+const docStorage = multer.diskStorage({
+    destination: (req, _file, cb) => {
+        const dir = path.join(__dirname, '..', 'uploads', req.params.id);
+        fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (_req, file, cb) => {
+        const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+        cb(null, `${Date.now()}_${safe}`);
+    },
+});
+const uploadDoc = multer({ storage: docStorage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 // These are injected from index.js via router setup
 let Employee, Biometric, addError, getErrorHint;
@@ -222,6 +239,42 @@ router.post('/verify-face', async (req, res) => {
         const h = getErrorHint(e);
         res.status(500).json({ error: e.message, why: h.why, fix: h.fix });
     }
+});
+
+// ── P2-03: Document upload / list ─────────────────────────────────────────────
+router.post('/:id/documents', uploadDoc.single('file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const emp = await Employee.findByPk(req.params.id);
+        if (!emp) return res.status(404).json({ error: 'Employee not found' });
+
+        const existing = Array.isArray(emp.documents) ? emp.documents : [];
+        const newDoc = {
+            filename: req.file.originalname,
+            storedAs: req.file.filename,
+            uploadedAt: new Date().toISOString(),
+            size: req.file.size,
+            url: `/api/employees/${req.params.id}/documents/${req.file.filename}`,
+        };
+        emp.documents = [...existing, newDoc];
+        emp.changed('documents', true);
+        await emp.save();
+        res.status(201).json(newDoc);
+    } catch (e) { addError(e, 'POST /api/employees/:id/documents'); res.status(500).json({ error: e.message }); }
+});
+
+router.get('/:id/documents', async (req, res) => {
+    try {
+        const emp = await Employee.findByPk(req.params.id);
+        if (!emp) return res.status(404).json({ error: 'Employee not found' });
+        res.json(Array.isArray(emp.documents) ? emp.documents : []);
+    } catch (e) { addError(e, 'GET /api/employees/:id/documents'); res.status(500).json({ error: e.message }); }
+});
+
+router.get('/:id/documents/:filename', (req, res) => {
+    const filePath = path.join(__dirname, '..', 'uploads', req.params.id, req.params.filename);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+    res.sendFile(filePath);
 });
 
 module.exports = { router, init };

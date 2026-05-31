@@ -242,7 +242,8 @@ const Employee = sequelize.define('Employee', {
     leaveBalance: { type: DataTypes.JSON },
     loanLimit: { type: DataTypes.FLOAT },
     loanLimitType: { type: DataTypes.STRING },
-    salaryMultiplier: { type: DataTypes.FLOAT }
+    salaryMultiplier: { type: DataTypes.FLOAT },
+    documents: { type: DataTypes.JSON, defaultValue: [] }
 }, {
     indexes: [
         { fields: ['companyId', 'status'] },
