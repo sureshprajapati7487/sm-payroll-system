@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { API_URL } from '@/lib/apiConfig';
+import { authHeader } from '@/lib/authHeader';
 import { Calculator, CheckCircle, Save, ChevronRight } from 'lucide-react';
 
 interface FnFResult {
@@ -14,14 +15,6 @@ interface FnFResult {
     employeeName: string;
 }
 
-function authHeader(): Record<string, string> {
-    try {
-        const raw = localStorage.getItem('auth-storage');
-        const token = raw ? JSON.parse(raw)?.state?.token : null;
-        if (token) return { Authorization: `Bearer ${token}` };
-    } catch {}
-    return {};
-}
 
 export const FnFSettlement = () => {
     const { _rawEmployees: employees } = useEmployeeStore();

@@ -28,6 +28,7 @@ import {
     Paperclip,
 } from 'lucide-react';
 import { API_URL } from '@/lib/apiConfig';
+import { authHeader as getAuthHeader } from '@/lib/authHeader';
 
 export const EmployeeProfile = () => {
     const { id } = useParams();
@@ -85,15 +86,6 @@ export const EmployeeProfile = () => {
     const [docsLoaded, setDocsLoaded] = useState(false);
     const [docUploading, setDocUploading] = useState(false);
     const [docToast, setDocToast] = useState<string | null>(null);
-
-    const getAuthHeader = (): Record<string, string> => {
-        try {
-            const raw = localStorage.getItem('auth-storage');
-            const token = raw ? JSON.parse(raw)?.state?.token : null;
-            if (token) return { Authorization: `Bearer ${token}` };
-        } catch {}
-        return {};
-    };
 
     const loadDocs = async () => {
         try {

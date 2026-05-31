@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_URL } from '@/lib/apiConfig';
+import { authHeader } from '@/lib/authHeader';
 import { useAuthStore } from '@/store/authStore';
 import {
     User, Banknote, CalendarCheck, CreditCard,
@@ -14,14 +15,6 @@ interface ESSData {
     attendance: any[];
 }
 
-function authHeader(): Record<string, string> {
-    try {
-        const raw = localStorage.getItem('auth-storage');
-        const token = raw ? JSON.parse(raw)?.state?.token : null;
-        if (token) return { Authorization: `Bearer ${token}` };
-    } catch {}
-    return {};
-}
 
 const STATUS_ICON: Record<string, JSX.Element> = {
     PRESENT: <CheckCircle className="w-4 h-4 text-success" />,

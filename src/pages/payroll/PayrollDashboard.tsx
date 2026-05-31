@@ -19,6 +19,7 @@ import {
     Mail,
 } from 'lucide-react';
 import { API_URL } from '@/lib/apiConfig';
+import { authHeader as getAuthHeader } from '@/lib/authHeader';
 import { clsx } from 'clsx';
 import { LoanSummaryModal } from '@/components/loans/LoanSummaryModal';
 import { useDialog } from '@/components/DialogProvider';
@@ -104,14 +105,7 @@ export const PayrollDashboard = () => {
     const toggleSelect = (id: string) =>
         setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-    const authHeader = (): Record<string, string> => {
-        try {
-            const raw = localStorage.getItem('auth-storage');
-            const token = raw ? JSON.parse(raw)?.state?.token : null;
-            if (token) return { Authorization: `Bearer ${token}` };
-        } catch {}
-        return {};
-    };
+    const authHeader = getAuthHeader;
 
     const handleBulkAction = async (action: 'simulate' | 'approve' | 'lock') => {
         const statusMap = { simulate: 'DRAFT', approve: 'SIMULATION', lock: 'FINAL_APPROVED' } as const;
