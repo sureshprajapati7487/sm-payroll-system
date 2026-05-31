@@ -21,6 +21,10 @@ const compression = require('compression');
 const { authMiddleware, isPublic, PUBLIC_PATHS } = require('./middlewares/auth');
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── IF-03: Error Handler (extracted) ─────────────────────────────────────────
+const { addError, getErrorHint, getErrorLog, ERROR_LOG_PATH, errorHandlerMiddleware } = require('./middlewares/errorHandler');
+// ─────────────────────────────────────────────────────────────────────────────
+
 const { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, Expense, SalarySlip, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB } = require('./database');
 const { Op } = require('sequelize');
 const { startBackupScheduler, doBackup, getBackupStatus, getConfig, updateConfig } = require('./backup');
@@ -130,64 +134,7 @@ if (IS_PRODUCTION) {
     console.warn('⚠️  JWT_SECRET not in .env — using insecure default (dev only). Copy server/.env.example to server/.env');
 }
 
-// ── Error Hints ───────────────────────────────────────────────────────────────
-const ERROR_HINTS = {
-    'SequelizeConnectionError': { why: 'Database file is locked, missing, or corrupted.', fix: 'Restart the server. If it persists, delete database.sqlite and restart.' },
-    'SequelizeValidationError': { why: 'Required fields are missing or have invalid values.', fix: 'Check the request payload — ensure all required fields are present.' },
-    'SequelizeUniqueConstraintError': { why: 'A record with this unique value already exists.', fix: 'Use a different code/ID, or update the existing record.' },
-    'SequelizeDatabaseError': { why: 'SQL query failed — schema mismatch or missing table.', fix: 'Run "npm start" to re-sync the database schema.' },
-    'ENOENT': { why: 'A required file or directory was not found.', fix: 'Check that database.sqlite exists in /server folder.' },
-    'ECONNREFUSED': { why: 'The backend server is not running.', fix: 'Run "cd server && npm start".' },
-    'SyntaxError': { why: 'The request body contained invalid JSON.', fix: 'Ensure the frontend sends valid JSON with Content-Type: application/json.' },
-    'TypeError': { why: 'A variable or property is undefined/null.', fix: 'Check backend logs for the undefined property.' },
-    'SQLITE_CONSTRAINT': { why: 'A database constraint was violated.', fix: 'Ensure all required fields are provided and avoid duplicate entries.' },
-    'SQLITE_ERROR': { why: 'Generic SQLite error — table missing or query malformed.', fix: 'Restart server to sync database.' },
-    'DEFAULT': { why: 'An unexpected error occurred.', fix: 'Check the error message. Restart the server and try again.' },
-};
-function getErrorHint(err) {
-    if (!err) return ERROR_HINTS.DEFAULT;
-    const name = err.name || '';
-    const msg = (err.message || '').toUpperCase();
-    for (const key of Object.keys(ERROR_HINTS)) {
-        if (name.includes(key) || msg.includes(key)) return ERROR_HINTS[key];
-    }
-    return ERROR_HINTS.DEFAULT;
-}
-
-const ERROR_LOG_PATH = path.join(__dirname, 'errors.log');
-
-// Load existing errors on startup
-let errorLog = [];
-try {
-    if (fs.existsSync(ERROR_LOG_PATH)) {
-        // Read file, split by lines, parse valid JSON, get last 100
-        const content = fs.readFileSync(ERROR_LOG_PATH, 'utf-8').trim();
-        if (content) {
-            const lines = content.split('\n');
-            errorLog = lines.map(l => {
-                try { return JSON.parse(l); } catch { return null; }
-            }).filter(Boolean).reverse().slice(0, 100);
-        }
-    }
-} catch (e) {
-    console.error('Failed to load error log file', e);
-}
-
-const addError = (err, endpoint = 'system') => {
-    const hint = getErrorHint(typeof err === 'string' ? null : err);
-    const message = typeof err === 'string' ? err : (err.message || String(err));
-    const name = typeof err === 'object' ? (err.name || 'Error') : 'Error';
-    const logEntry = { id: Date.now(), timestamp: new Date().toISOString(), endpoint, errorType: name, message, why: hint.why, fix: hint.fix, stack: typeof err === 'object' ? (err.stack || null) : null };
-
-    errorLog.unshift(logEntry);
-    if (errorLog.length > 100) errorLog.pop();
-
-    try {
-        fs.appendFileSync(ERROR_LOG_PATH, JSON.stringify(logEntry) + '\n');
-    } catch (fsErr) {
-        console.error('Failed to write to error log file', fsErr);
-    }
-};
+// ── Error Hints / Error Log → see ./middlewares/errorHandler.js (IF-03) ──────
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 // Static allow list (always allowed)
@@ -327,7 +274,7 @@ app.get('/api/health', async (req, res) => {
         server: 'online', uptime: `${h}h ${m}m ${s}s`, uptimeSeconds,
         startedAt: new Date(SERVER_START_TIME).toISOString(), checkedAt: new Date().toISOString(),
         database: { status: dbStatus, error: dbError, why: dbWhy, fix: dbFix, engine: 'SQLite', file: 'database.sqlite' },
-        recentErrors: errorLog.slice(0, 20), totalErrors: errorLog.length,
+        recentErrors: getErrorLog().slice(0, 20), totalErrors: getErrorLog().length,
     });
 });
 
@@ -445,7 +392,7 @@ app.get('/api/health/deep', async (req, res) => {
     // ── 5. Error Analytics ─────────────────────────────────────────────────────
     const errorsByType = {};
     const errorsByPage = {};
-    for (const err of errorLog) {
+    for (const err of getErrorLog()) {
         // Group by errorType
         if (!errorsByType[err.errorType]) errorsByType[err.errorType] = 0;
         errorsByType[err.errorType]++;
@@ -455,10 +402,10 @@ app.get('/api/health/deep', async (req, res) => {
         errorsByPage[page]++;
     }
     results.errorAnalytics = {
-        total: errorLog.length,
+        total: getErrorLog().length,
         byType: Object.entries(errorsByType).map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count),
         byPage: Object.entries(errorsByPage).map(([page, count]) => ({ page, count })).sort((a, b) => b.count - a.count).slice(0, 10),
-        recentErrors: errorLog.slice(0, 10),
+        recentErrors: getErrorLog().slice(0, 10),
     };
 
     // ── 6. Server Runtime Info ────────────────────────────────────────────────
@@ -630,7 +577,7 @@ app.get('/api/health/deep', async (req, res) => {
     // ERRORS: Spike in last 1 hour
     try {
         const oneHourAgo = Date.now() - 60 * 60 * 1000;
-        const recent = errorLog.filter(e => new Date(e.timestamp).getTime() > oneHourAgo);
+        const recent = getErrorLog().filter(e => new Date(e.timestamp).getTime() > oneHourAgo);
         const byEndpoint = {};
         for (const e of recent) { byEndpoint[e.endpoint] = (byEndpoint[e.endpoint] || 0) + 1; }
         const top = Object.entries(byEndpoint).sort((a, b) => b[1] - a[1])[0];
@@ -685,7 +632,7 @@ app.get('/api/health/deep', async (req, res) => {
 
 app.delete('/api/health/errors', (req, res) => {
     try {
-        errorLog.length = 0; // clear in-memory array
+        getErrorLog().length = 0; // clear in-memory array
         fs.writeFileSync(ERROR_LOG_PATH, ''); // wipe the file on disk
         res.json({ success: true, message: 'All error logs cleared.' });
     } catch (e) {
@@ -748,7 +695,7 @@ app.get('/api/status/routes', (req, res) => {
     });
 });
 app.get('/api/status/errors', (req, res) => {
-    res.json({ errors: errorLog, total: errorLog.length });
+    res.json({ errors: getErrorLog(), total: getErrorLog().length });
 });
 app.post('/api/status/errors/report', (req, res) => {
     const { name, message, stack, route } = req.body || {};
@@ -1155,11 +1102,7 @@ app.delete('/api/backup/:filename', (req, res) => {
 app.use((req, res) => {
     res.status(404).json({ error: `Route not found: ${req.method} ${req.path}`, why: 'This API route is not registered on the backend.', fix: 'Visit /api/status/routes for the full list of available routes.' });
 });
-app.use((err, req, res, _next) => {
-    addError(err, `${req.method} ${req.path}`);
-    const h = getErrorHint(err);
-    res.status(500).json({ error: err.message, why: h.why, fix: h.fix });
-});
+app.use(errorHandlerMiddleware);
 
 // ── Start Server ──────────────────────────────────────────────────────────────
 const HTTPS_PORT = 3443;
