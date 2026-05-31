@@ -115,18 +115,17 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
             try {
                 const res = await apiFetch(`/attendance`);
                 if (res.ok) {
-                    const data = await res.json();
+                    const raw = await res.json();
+                    const rows: any[] = raw?.data ?? (Array.isArray(raw) ? raw : []);
                     // Normalize: SQLite returns `breaks` as JSON string or null — parse it back to array
-                    const normalized = Array.isArray(data)
-                        ? data.map((r: any) => ({
+                    const normalized = rows.map((r: any) => ({
                             ...r,
                             breaks: Array.isArray(r.breaks)
                                 ? r.breaks
                                 : typeof r.breaks === 'string' && r.breaks
                                     ? (() => { try { return JSON.parse(r.breaks); } catch { return []; } })()
                                     : [],
-                        }))
-                        : [];
+                        }));
                     set({ records: normalized });
                 }
             } catch (error) {

@@ -39,7 +39,8 @@ const useInternalPayrollStore = create<PayrollState>((set, get) => ({
             const path = month ? `/payroll?month=${month}` : `/payroll`;
             const res = await apiFetch(path);
             if (res.ok) {
-                const data: SalarySlip[] = await res.json();
+                const raw = await res.json();
+                const data: SalarySlip[] = raw?.data ?? (Array.isArray(raw) ? raw : []);
                 // Merge fetched slips into current state
                 set(state => {
                     const otherSlips = month
