@@ -8,7 +8,10 @@ export default defineConfig({
         environment: 'jsdom',
         globals: true,
         setupFiles: ['./src/tests/setup.ts'],
-        include: ['src/tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+        include: [
+            'src/tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+            'src/utils/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+        ],
         coverage: {
             reporter: ['text', 'json', 'html'],
             include: ['src/store/rolePermissionsStore.ts', 'src/hooks/usePermission.ts'],

@@ -14,8 +14,11 @@ import {
     Printer,
     Search,
     ClipboardList,
-    Eye // Added
+    Eye,
+    Download,
+    Mail,
 } from 'lucide-react';
+import { API_URL } from '@/lib/apiConfig';
 import { clsx } from 'clsx';
 import { LoanSummaryModal } from '@/components/loans/LoanSummaryModal';
 import { useDialog } from '@/components/DialogProvider';
@@ -49,6 +52,8 @@ export const PayrollDashboard = () => {
     const [showDisbursementModal, setShowDisbursementModal] = useState(false);
     const [selectedHistoryEmployee, setSelectedHistoryEmployee] = useState<Employee | null>(null);
     const [lockConfirmId, setLockConfirmId] = useState<string | null>(null);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isBulkLoading, setIsBulkLoading] = useState(false);
     const { confirm } = useDialog();
 
     // Fetch payroll data from server when month changes
@@ -91,6 +96,78 @@ export const PayrollDashboard = () => {
         if (ok) {
             await generateMonthlyPayroll(selectedMonth, user?.name);
         }
+    };
+
+    const hasActualSlips = filteredSlips.length > 0;
+    const allSelected = hasActualSlips && selectedIds.length === filteredSlips.length;
+    const toggleSelectAll = () => setSelectedIds(allSelected ? [] : filteredSlips.map(s => s.id));
+    const toggleSelect = (id: string) =>
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+    const authHeader = () => {
+        try {
+            const raw = localStorage.getItem('auth-storage');
+            const token = raw ? JSON.parse(raw)?.state?.token : null;
+            return token ? { Authorization: `Bearer ${token}` } : {};
+        } catch { return {}; }
+    };
+
+    const handleBulkAction = async (action: 'simulate' | 'approve' | 'lock') => {
+        const statusMap = { simulate: 'DRAFT', approve: 'SIMULATION', lock: 'FINAL_APPROVED' } as const;
+        const eligible = filteredSlips.filter(s => selectedIds.includes(s.id) && s.status === statusMap[action]);
+        if (eligible.length === 0) { alert(`No eligible slips for bulk ${action}.`); return; }
+        const ok = await confirm({
+            title: `Bulk ${action.charAt(0).toUpperCase() + action.slice(1)}`,
+            message: `${eligible.length} slip(s) ko ${action} karna chahte hain?`,
+            confirmLabel: 'Haan, Proceed',
+            cancelLabel: 'Cancel',
+            variant: 'warning',
+        });
+        if (!ok) return;
+        setIsBulkLoading(true);
+        for (const slip of eligible) await advanceState(slip.id, action);
+        setIsBulkLoading(false);
+        setSelectedIds([]);
+    };
+
+    const handleExport = async (type: 'pf-ecr' | 'esic') => {
+        try {
+            const res = await fetch(`${API_URL}/payroll/export/${type}?month=${selectedMonth}`, { headers: authHeader() });
+            if (!res.ok) { alert(`Export failed: ${res.statusText}`); return; }
+            const blob = await res.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${type}-${selectedMonth}.csv`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        } catch (e: any) { alert(`Export error: ${e.message}`); }
+    };
+
+    const handleEmailAll = async () => {
+        const slipsToEmail = filteredSlips.filter(s => s.status !== 'DRAFT');
+        if (slipsToEmail.length === 0) { alert('No finalized slips to email.'); return; }
+        const ok = await confirm({
+            title: 'Email All Payslips',
+            message: `${slipsToEmail.length} employees ko payslip email bhejein?`,
+            confirmLabel: 'Send',
+            cancelLabel: 'Cancel',
+            variant: 'warning',
+        });
+        if (!ok) return;
+        setIsBulkLoading(true);
+        let sent = 0, failed = 0;
+        for (const slip of slipsToEmail) {
+            try {
+                const res = await fetch(`${API_URL}/notifications/send-payslip`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...authHeader() },
+                    body: JSON.stringify({ employeeId: slip.employeeId, month: selectedMonth }),
+                });
+                if (res.ok) sent++; else failed++;
+            } catch { failed++; }
+        }
+        setIsBulkLoading(false);
+        alert(`Done: ${sent} sent, ${failed} failed.`);
     };
 
     const handleActionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -174,6 +251,44 @@ export const PayrollDashboard = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* P1-07: Bulk Actions & Export Buttons */}
+                {hasActualSlips && (
+                    <div className="flex flex-wrap items-center gap-2">
+                        {canSimulate && (
+                            <button onClick={() => handleBulkAction('simulate')} disabled={isBulkLoading || selectedIds.length === 0}
+                                className="px-3 py-1.5 text-xs font-medium bg-info/10 text-info hover:bg-info/20 rounded-lg transition-colors disabled:opacity-40">
+                                Bulk Simulate ({filteredSlips.filter(s => selectedIds.includes(s.id) && s.status === 'DRAFT').length})
+                            </button>
+                        )}
+                        {canApprove && (
+                            <button onClick={() => handleBulkAction('approve')} disabled={isBulkLoading || selectedIds.length === 0}
+                                className="px-3 py-1.5 text-xs font-medium bg-warning/10 text-warning hover:bg-warning/20 rounded-lg transition-colors disabled:opacity-40">
+                                Bulk Approve ({filteredSlips.filter(s => selectedIds.includes(s.id) && s.status === 'SIMULATION').length})
+                            </button>
+                        )}
+                        {canLock && (
+                            <button onClick={() => handleBulkAction('lock')} disabled={isBulkLoading || selectedIds.length === 0}
+                                className="px-3 py-1.5 text-xs font-medium bg-success/10 text-success hover:bg-success/20 rounded-lg transition-colors disabled:opacity-40">
+                                Bulk Lock ({filteredSlips.filter(s => selectedIds.includes(s.id) && s.status === 'FINAL_APPROVED').length})
+                            </button>
+                        )}
+                        <div className="ml-auto flex flex-wrap gap-2">
+                            <button onClick={() => handleExport('pf-ecr')} disabled={isBulkLoading}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-dark-card border border-dark-border text-dark-text hover:border-primary-500 rounded-lg transition-colors disabled:opacity-40">
+                                <Download className="w-3.5 h-3.5" /> Download PF ECR
+                            </button>
+                            <button onClick={() => handleExport('esic')} disabled={isBulkLoading}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-dark-card border border-dark-border text-dark-text hover:border-primary-500 rounded-lg transition-colors disabled:opacity-40">
+                                <Download className="w-3.5 h-3.5" /> Download ESIC CSV
+                            </button>
+                            <button onClick={handleEmailAll} disabled={isBulkLoading}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-dark-card border border-dark-border text-dark-text hover:border-primary-500 rounded-lg transition-colors disabled:opacity-40">
+                                <Mail className="w-3.5 h-3.5" /> Email All Payslips
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Summary Cards */}
@@ -208,6 +323,12 @@ export const PayrollDashboard = () => {
                     <table className="w-full text-left text-sm">
                         <thead className="bg-dark-bg/50 text-dark-muted border-b border-dark-border/50">
                             <tr>
+                                <th className="p-4 w-10">
+                                    {hasActualSlips && (
+                                        <input type="checkbox" checked={allSelected} onChange={toggleSelectAll}
+                                            className="rounded cursor-pointer accent-primary-500" />
+                                    )}
+                                </th>
                                 <th className="p-4">Employee</th>
                                 <th className="p-4">Basic + OT</th>
                                 <th className="p-4">Production</th>
@@ -244,7 +365,7 @@ export const PayrollDashboard = () => {
                                 if (dataToRender.length === 0) {
                                     return (
                                         <tr>
-                                            <td colSpan={8} className="p-8 text-center text-dark-muted">
+                                            <td colSpan={9} className="p-8 text-center text-dark-muted">
                                                 No employees found.
                                             </td>
                                         </tr>
@@ -257,6 +378,14 @@ export const PayrollDashboard = () => {
 
                                     return (
                                         <tr key={slip.employeeId + selectedMonth} className={clsx("transition-colors", isEstimate ? "opacity-75 hover:opacity-100 bg-white/5" : "hover:bg-dark-card/50")}>
+                                            <td className="p-4 w-10">
+                                                {!isEstimate && (
+                                                    <input type="checkbox"
+                                                        checked={selectedIds.includes(slip.id)}
+                                                        onChange={() => toggleSelect(slip.id)}
+                                                        className="rounded cursor-pointer accent-primary-500" />
+                                                )}
+                                            </td>
                                             <td className="p-4">
                                                 <div className="font-medium text-white">{emp?.name || 'Unknown'} {isEstimate && <span className="text-[10px] bg-primary-500/20 text-primary-400 px-1 rounded ml-1">ESTIMATE</span>}</div>
                                                 <div className="text-xs text-dark-muted">{emp?.code}</div>
