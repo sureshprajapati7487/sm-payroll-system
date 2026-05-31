@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useRef } from 'react';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/config/permissions';
@@ -21,8 +22,12 @@ import {
     CalendarCheck,
     FileText,
     Wallet,
-    Receipt
+    Receipt,
+    Upload,
+    Download,
+    Paperclip,
 } from 'lucide-react';
+import { API_URL } from '@/lib/apiConfig';
 
 export const EmployeeProfile = () => {
     const { id } = useParams();
@@ -73,6 +78,46 @@ export const EmployeeProfile = () => {
     // 4. Payroll Data
     const mySlips = slips.filter(s => s.employeeId === id);
     const lastSlip = mySlips.length > 0 ? mySlips[mySlips.length - 1] : null;
+
+    // 5. Documents
+    const fileRef = useRef<HTMLInputElement>(null);
+    const [docs, setDocs] = useState<any[]>([]);
+    const [docsLoaded, setDocsLoaded] = useState(false);
+    const [docUploading, setDocUploading] = useState(false);
+    const [docToast, setDocToast] = useState<string | null>(null);
+
+    const loadDocs = async () => {
+        try {
+            const raw = localStorage.getItem('auth-storage');
+            const token = raw ? JSON.parse(raw)?.state?.token : null;
+            const res = await fetch(`${API_URL}/employees/${id}/documents`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            if (res.ok) setDocs(await res.json());
+        } catch {}
+        setDocsLoaded(true);
+    };
+
+    const handleDocUpload = async (file: File) => {
+        const raw = localStorage.getItem('auth-storage');
+        const token = raw ? JSON.parse(raw)?.state?.token : null;
+        const fd = new FormData();
+        fd.append('file', file);
+        setDocUploading(true);
+        try {
+            const res = await fetch(`${API_URL}/employees/${id}/documents`, {
+                method: 'POST',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                body: fd,
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Upload failed');
+            setDocs(prev => [...prev, data]);
+            setDocToast('Uploaded successfully');
+        } catch (e: any) { setDocToast(e.message); }
+        setDocUploading(false);
+        setTimeout(() => setDocToast(null), 3000);
+    };
 
     return (
         <div className="max-w-5xl mx-auto">
@@ -350,6 +395,54 @@ export const EmployeeProfile = () => {
                         </div>
                         <button onClick={() => navigate('/payroll')} className="text-xs text-primary-500 hover:text-primary-400 font-medium text-left mt-auto pt-4">View Salary Slips →</button>
                     </div>
+                </div>
+            </div>
+
+            {/* P2-04: Documents Section */}
+            <div className="mt-6 mb-10">
+                <div className="glass rounded-2xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <Paperclip className="w-5 h-5 text-primary-400" />
+                            <h3 className="font-semibold text-dark-text">Documents</h3>
+                        </div>
+                        <div className="flex gap-2">
+                            {!docsLoaded && (
+                                <button onClick={loadDocs} className="text-xs text-primary-400 hover:text-primary-300 transition-colors">
+                                    Load Documents
+                                </button>
+                            )}
+                            <button onClick={() => fileRef.current?.click()} disabled={docUploading}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary-600 hover:bg-primary-500 text-white rounded-lg transition-colors disabled:opacity-60">
+                                <Upload className="w-3.5 h-3.5" />
+                                {docUploading ? 'Uploading...' : 'Upload'}
+                            </button>
+                            <input ref={fileRef} type="file" className="hidden"
+                                onChange={e => e.target.files?.[0] && handleDocUpload(e.target.files[0])} />
+                        </div>
+                    </div>
+                    {docToast && <p className="text-xs text-primary-400 mb-3">{docToast}</p>}
+                    {!docsLoaded ? (
+                        <p className="text-sm text-dark-muted">Click "Load Documents" to fetch uploaded files.</p>
+                    ) : docs.length === 0 ? (
+                        <p className="text-sm text-dark-muted">No documents uploaded yet.</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {docs.map((doc, i) => (
+                                <div key={i} className="flex items-center justify-between p-3 bg-dark-bg/50 rounded-lg border border-dark-border">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <FileText className="w-4 h-4 text-primary-400 shrink-0" />
+                                        <span className="text-sm text-dark-text truncate">{doc.filename}</span>
+                                        <span className="text-xs text-dark-muted shrink-0">{new Date(doc.uploadedAt).toLocaleDateString()}</span>
+                                    </div>
+                                    <a href={`${API_URL}${doc.url}`} download={doc.filename}
+                                        className="flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors shrink-0 ml-2">
+                                        <Download className="w-3.5 h-3.5" /> Download
+                                    </a>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
