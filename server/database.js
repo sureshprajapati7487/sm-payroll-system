@@ -587,6 +587,41 @@ const SalesTask = sequelize.define('SalesTask', {
     indexes: [{ fields: ['companyId'] }, { fields: ['salesmanId'] }]
 });
 
+// ── 16. Full & Final Settlement ───────────────────────────────────────────────
+const FnFSettlement = sequelize.define('FnFSettlement', {
+    id: { type: DataTypes.STRING, primaryKey: true, defaultValue: () => uuidv4() },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    employeeId: { type: DataTypes.STRING, allowNull: false },
+    separationDate: { type: DataTypes.STRING, allowNull: false },  // YYYY-MM-DD
+    reason: { type: DataTypes.STRING },  // RESIGNATION | TERMINATION | RETIREMENT | OTHER
+    noticePeriodDays: { type: DataTypes.INTEGER, defaultValue: 0 },
+    noticePeriodPay: { type: DataTypes.FLOAT, defaultValue: 0 },
+    gratuityAmount: { type: DataTypes.FLOAT, defaultValue: 0 },
+    leaveEncashment: { type: DataTypes.FLOAT, defaultValue: 0 },
+    otherDeductions: { type: DataTypes.FLOAT, defaultValue: 0 },
+    netAmount: { type: DataTypes.FLOAT, defaultValue: 0 },
+    status: { type: DataTypes.ENUM('DRAFT', 'APPROVED'), defaultValue: 'DRAFT' },
+    generatedBy: { type: DataTypes.STRING },
+}, {
+    indexes: [
+        { fields: ['companyId', 'employeeId'] },
+        { fields: ['companyId', 'status'] },
+    ]
+});
+
+// ── 17. Overtime Policy ────────────────────────────────────────────────────────
+const OvertimePolicy = sequelize.define('OvertimePolicy', {
+    id: { type: DataTypes.STRING, primaryKey: true, defaultValue: () => uuidv4() },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    name: { type: DataTypes.STRING, allowNull: false },
+    weeklyCapHours: { type: DataTypes.FLOAT, defaultValue: 48 },
+    dailyCapHours: { type: DataTypes.FLOAT, defaultValue: 12 },
+    multiplier: { type: DataTypes.FLOAT, defaultValue: 1.5 },
+    effectiveFrom: { type: DataTypes.STRING },  // YYYY-MM-DD
+}, {
+    indexes: [{ fields: ['companyId'] }]
+});
+
 // ── Sync Database ─────────────────────────────────────────────────────────────
 const initDB = async () => {
     try {
@@ -619,4 +654,4 @@ const initDB = async () => {
     }
 };
 
-module.exports = { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, LoanLedger, SalarySlip, Expense, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB };
+module.exports = { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, LoanLedger, SalarySlip, Expense, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, FnFSettlement, OvertimePolicy, initDB };

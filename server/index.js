@@ -25,7 +25,7 @@ const { authMiddleware, isPublic, PUBLIC_PATHS } = require('./middlewares/auth')
 const { addError, getErrorHint, getErrorLog, ERROR_LOG_PATH, errorHandlerMiddleware } = require('./middlewares/errorHandler');
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, LoanLedger, Expense, SalarySlip, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB } = require('./database');
+const { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, LoanLedger, Expense, SalarySlip, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, FnFSettlement, OvertimePolicy, initDB } = require('./database');
 const { Op } = require('sequelize');
 const { startBackupScheduler, doBackup, getBackupStatus, getConfig, updateConfig } = require('./backup');
 
@@ -952,6 +952,7 @@ const sharedModels = {
     addError, getErrorHint,
     doBackup, getBackupStatus, getConfig, updateConfig,
     CustomReportTemplate, ScheduledReport, StatutoryRule,
+    FnFSettlement, OvertimePolicy,
 };
 employeesRoute.init(sharedModels);
 attendanceRoute.init(sharedModels);
@@ -978,6 +979,9 @@ app.use('/api/upload', uploadRoute);
 app.use('/api/sales', salesRoute);                      // /api/sales/tasks
 app.use('/api/production', productionRoute);            // /api/production/*
 app.use('/api/notifications', require('./routes/notifications')); // P1-02
+app.use('/api/fnf', require('./routes/fnf'));                    // P2-01
+app.use('/api/overtime-policy', require('./routes/overtimePolicy')); // P2-05
+app.use('/api/ess', require('./routes/ess'));                    // P2-07
 
 app.use('/api/downloads', express.static(path.join(__dirname, 'public/downloads')));
 
