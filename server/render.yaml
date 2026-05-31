@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: sm-payroll-backend
+    name: sm-payroll-system
     runtime: node
     rootDir: server
     buildCommand: npm install
@@ -17,3 +17,14 @@ services:
         generateValue: true
       - key: FRONTEND_URL
         value: https://sm-payroll-system.vercel.app
+      # ─────────────────────────────────────────────────────────────────────────
+      # DATABASE_URL: Set this manually in Render Dashboard (never commit it).
+      # Use the EXTERNAL Database URL from your Render PostgreSQL instance.
+      # Format: postgres://user:pass@dpg-XXXX.oregon-postgres.render.com:5432/db
+      #         ↑ Must include full hostname with region (.oregon-postgres.render.com)
+      #           and port 5432.
+      # ⚠️  Do NOT use the Internal URL (dpg-XXXX-a without region) — it causes:
+      #     getaddrinfo ENOTFOUND dpg-XXXX-a
+      # ─────────────────────────────────────────────────────────────────────────
+      - key: CORS_ALLOW_LAN
+        value: false

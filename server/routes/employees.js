@@ -165,14 +165,25 @@ router.put('/:id', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGE
 });
 
 // PATCH /employees/:id/change-password
+// Employees can only change their OWN password. ADMIN+ can change anyone's in their company.
 router.patch('/:id/change-password', async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body || {};
         if (!currentPassword || !newPassword) {
             return res.status(400).json({ error: 'currentPassword aur newPassword dono required hain' });
         }
+        const requestingUser = req.user;
+        const isAdminRole = requestingUser && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN'].includes(requestingUser.role);
+        const isSelf = requestingUser && requestingUser.id === req.params.id;
+        if (!isAdminRole && !isSelf) {
+            return res.status(403).json({ error: 'Forbidden — aap sirf apna password change kar sakte hain' });
+        }
         const emp = await Employee.findOne({ where: { id: req.params.id } });
         if (!emp) return res.status(404).json({ error: 'Employee not found' });
+        // Cross-tenant check
+        if (req.companyId && emp.companyId !== req.companyId) {
+            return res.status(403).json({ error: 'Forbidden — cannot modify another company\'s employee' });
+        }
 
         const stored = emp.password || '';
         let currentValid = false;

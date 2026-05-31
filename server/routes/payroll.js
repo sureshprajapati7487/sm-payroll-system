@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
+const { requireRole } = require('../rbac');
 
 const { Worker } = require('worker_threads');
 const path = require('path');
@@ -378,7 +379,7 @@ router.get('/job/:jobId', async (req, res) => {
     }
 });
 
-router.post('/run', async (req, res) => {
+router.post('/run', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     const { companyId, month, generatedBy } = req.body;
     if (!companyId || !month) return res.status(400).json({ error: 'companyId and month required' });
 
@@ -801,7 +802,7 @@ router.post('/run', async (req, res) => {
 });
 
 // ── PAYROLL STATE MACHINE ───────────────────────────────────────────────────────
-router.patch('/:id/simulate', async (req, res) => {
+router.patch('/:id/simulate', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const slip = await SalarySlip.findByPk(req.params.id);
         if (!slip) return res.status(404).json({ error: 'Not found' });
@@ -813,7 +814,7 @@ router.patch('/:id/simulate', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.patch('/:id/approve', async (req, res) => {
+router.patch('/:id/approve', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const slip = await SalarySlip.findByPk(req.params.id);
         if (!slip) return res.status(404).json({ error: 'Not found' });
@@ -825,7 +826,7 @@ router.patch('/:id/approve', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.patch('/:id/lock', async (req, res) => {
+router.patch('/:id/lock', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const slip = await SalarySlip.findByPk(req.params.id);
         if (!slip) return res.status(404).json({ error: 'Not found' });
@@ -850,7 +851,7 @@ function csvEsc(v) {
 }
 
 // 1. PF ECR CSV
-router.get('/payroll/export/pf-ecr', async (req, res) => {
+router.get('/payroll/export/pf-ecr', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     const { month } = req.query;
     if (!month) return res.status(400).json({ error: 'month query param required (e.g. 2024-05)' });
     try {
@@ -886,7 +887,7 @@ router.get('/payroll/export/pf-ecr', async (req, res) => {
 });
 
 // 2. ESIC CSV
-router.get('/payroll/export/esic', async (req, res) => {
+router.get('/payroll/export/esic', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     const { month } = req.query;
     if (!month) return res.status(400).json({ error: 'month query param required (e.g. 2024-05)' });
     try {
@@ -920,7 +921,7 @@ router.get('/payroll/export/esic', async (req, res) => {
 });
 
 // 3. Form-16 HTML
-router.get('/payroll/export/form16/:employeeId', async (req, res) => {
+router.get('/payroll/export/form16/:employeeId', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     const { year } = req.query; // e.g. "2024-25"
     if (!year || !/^\d{4}-\d{2}$/.test(year)) return res.status(400).json({ error: 'year query param required (e.g. 2024-25)' });
     try {

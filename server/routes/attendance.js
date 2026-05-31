@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
+const { requireRole } = require('../rbac');
 
 let Attendance, PunchLocation, addError, getErrorHint;
 
@@ -135,8 +136,8 @@ router.post('/:id/break', async (req, res) => {
     }
 });
 
-// POST /attendance/admin-punch
-router.post('/admin-punch', async (req, res) => {
+// POST /attendance/admin-punch — admin/manager only
+router.post('/admin-punch', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER']), async (req, res) => {
     try {
         const { employeeId, type, time, reason, adminName, shiftId } = req.body;
         if (!employeeId || !type || !time || !reason || !adminName) {

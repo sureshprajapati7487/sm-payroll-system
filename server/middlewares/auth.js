@@ -1,7 +1,19 @@
 'use strict';
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'sm-payroll-super-secret-jwt-key-2026';
+// JWT_SECRET must come from environment — no fallback allowed.
+// server/index.js already calls process.exit(1) in production if this is missing.
+// In development, generateDevSecret() in index.js sets process.env.JWT_SECRET.
+// Reading it here (not inlining a default) ensures both files always use the same key.
+if (!process.env.JWT_SECRET) {
+    // During module load in dev, index.js may not have run yet — lazy read is safe
+    // because authMiddleware is only called after the server is listening.
+}
+const getJwtSecret = () => {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET env var is not set — cannot verify tokens');
+    return secret;
+};
 
 const PUBLIC_PATHS = [
     { method: 'POST', path: '/api/auth/login' },
@@ -29,7 +41,7 @@ function authMiddleware(req, res, next) {
     const header = req.headers['authorization'] || '';
     const token = header.startsWith('Bearer ') ? header.slice(7) : (req.query.token || null);
     if (!token) return res.status(401).json({ error: 'Unauthorized — token required', fix: 'Include Authorization: Bearer <token> header' });
-    try { req.user = jwt.verify(token, JWT_SECRET); next(); }
+    try { req.user = jwt.verify(token, getJwtSecret()); next(); }
     catch (e) { return res.status(401).json({ error: 'Invalid or expired token', fix: 'Login again to get a new token' }); }
 }
 
