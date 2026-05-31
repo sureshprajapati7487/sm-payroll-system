@@ -626,4 +626,126 @@ router.patch('/:id/lock', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── P1-01: Statutory Export Routes ───────────────────────────────────────────
+
+function csvEsc(v) {
+    const s = v == null ? '' : String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+// 1. PF ECR CSV
+router.get('/payroll/export/pf-ecr', async (req, res) => {
+    const { month } = req.query;
+    if (!month) return res.status(400).json({ error: 'month query param required (e.g. 2024-05)' });
+    try {
+        const where = { month };
+        if (req.companyId) where.companyId = req.companyId;
+        const slips = await SalarySlip.findAll({ where });
+        if (!slips.length) return res.status(404).json({ error: 'No payroll data for this period' });
+
+        const empIds = [...new Set(slips.map(s => s.employeeId))];
+        const employees = await Employee.findAll({ where: { id: empIds } });
+        const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
+
+        const header = ['UAN', 'EmployeeName', 'GrossWages', 'EPFWages', 'EPS', 'EPFContrib', 'EPSContrib'];
+        const rows = slips.map(s => {
+            const emp = empMap[s.employeeId] || {};
+            const bd = emp.bankDetails || {};
+            const epfWages = Math.min(s.grossSalary || 0, 15000);
+            return [
+                csvEsc(bd.uan || ''),
+                csvEsc(emp.name || ''),
+                csvEsc((s.grossSalary || 0).toFixed(2)),
+                csvEsc(epfWages.toFixed(2)),
+                csvEsc(epfWages.toFixed(2)),
+                csvEsc((epfWages * 0.12).toFixed(2)),
+                csvEsc((epfWages * 0.0833).toFixed(2)),
+            ].join(',');
+        });
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="pf-ecr-${month}.csv"`);
+        res.send([header.join(','), ...rows].join('\n'));
+    } catch (e) { addError(e, 'GET /api/payroll/export/pf-ecr'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
+});
+
+// 2. ESIC CSV
+router.get('/payroll/export/esic', async (req, res) => {
+    const { month } = req.query;
+    if (!month) return res.status(400).json({ error: 'month query param required (e.g. 2024-05)' });
+    try {
+        const where = { month };
+        if (req.companyId) where.companyId = req.companyId;
+        const slips = await SalarySlip.findAll({ where });
+        if (!slips.length) return res.status(404).json({ error: 'No payroll data for this period' });
+
+        const empIds = [...new Set(slips.map(s => s.employeeId))];
+        const employees = await Employee.findAll({ where: { id: empIds } });
+        const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
+
+        const header = ['ESICNumber', 'EmployeeName', 'GrossWages', 'EmployeeESIC', 'EmployerESIC'];
+        const rows = slips.map(s => {
+            const emp = empMap[s.employeeId] || {};
+            const bd = emp.bankDetails || {};
+            const gross = s.grossSalary || 0;
+            return [
+                csvEsc(bd.esicNumber || ''),
+                csvEsc(emp.name || ''),
+                csvEsc(gross.toFixed(2)),
+                csvEsc((gross * 0.0075).toFixed(2)),
+                csvEsc((gross * 0.0325).toFixed(2)),
+            ].join(',');
+        });
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="esic-${month}.csv"`);
+        res.send([header.join(','), ...rows].join('\n'));
+    } catch (e) { addError(e, 'GET /api/payroll/export/esic'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
+});
+
+// 3. Form-16 HTML
+router.get('/payroll/export/form16/:employeeId', async (req, res) => {
+    const { year } = req.query; // e.g. "2024-25"
+    if (!year || !/^\d{4}-\d{2}$/.test(year)) return res.status(400).json({ error: 'year query param required (e.g. 2024-25)' });
+    try {
+        const startY = parseInt(year.split('-')[0], 10);
+        const months = [];
+        for (let m = 4; m <= 12; m++) months.push(`${startY}-${String(m).padStart(2, '0')}`);
+        for (let m = 1; m <= 3; m++) months.push(`${startY + 1}-${String(m).padStart(2, '0')}`);
+
+        const where = { employeeId: req.params.employeeId, month: months };
+        if (req.companyId) where.companyId = req.companyId;
+        const slips = await SalarySlip.findAll({ where });
+        if (!slips.length) return res.status(404).json({ error: 'No payroll data for this period' });
+
+        const emp = await Employee.findOne({ where: { id: req.params.employeeId } });
+        const bd = emp?.bankDetails || {};
+        const totGross = slips.reduce((s, r) => s + (r.grossSalary || 0), 0);
+        const totTDS   = slips.reduce((s, r) => s + (r.taxDeduction || 0), 0);
+
+        const breakdown = slips
+            .sort((a, b) => a.month.localeCompare(b.month))
+            .map(s => `<tr><td>${s.month}</td><td>₹${(s.grossSalary||0).toFixed(2)}</td><td>₹${(s.taxDeduction||0).toFixed(2)}</td></tr>`)
+            .join('');
+
+        res.setHeader('Content-Type', 'text/html');
+        res.send(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Form-16 — ${year}</title>
+<style>body{font-family:Arial,sans-serif;padding:24px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f0f0f0}</style>
+</head><body>
+<h2>Form-16 — Financial Year ${year}</h2>
+<p><strong>Employee Name:</strong> ${emp?.name || req.params.employeeId}</p>
+<p><strong>PAN:</strong> ${bd.pan || 'N/A'}</p>
+<h3>Summary</h3>
+<table>
+  <tr><td><b>Total Gross Salary</b></td><td>₹${totGross.toFixed(2)}</td></tr>
+  <tr><td><b>Total TDS Deducted</b></td><td>₹${totTDS.toFixed(2)}</td></tr>
+</table>
+<h3>Annual Breakdown</h3>
+<table><tr><th>Month</th><th>Gross Salary</th><th>TDS</th></tr>${breakdown}</table>
+</body></html>`);
+    } catch (e) { addError(e, 'GET /api/payroll/export/form16/:employeeId'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
+});
+
 module.exports = { router, init };
