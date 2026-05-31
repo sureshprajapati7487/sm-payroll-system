@@ -124,6 +124,9 @@ const FinanceDashboard         = lazyLoad(() => import('@/pages/finance/FinanceD
 const DepartmentFinanceReport  = lazyLoad(() => import('@/pages/finance/DepartmentFinanceReport'), 'DepartmentFinanceReport');
 const CostCenterMapping        = lazyLoad(() => import('@/pages/finance/CostCenterMapping'), 'CostCenterMapping');
 const AdvanceSalaryManagement  = lazyLoad(() => import('@/pages/finance/AdvanceSalaryManagement'), 'AdvanceSalaryManagement');
+const FnFSettlement            = lazyLoad(() => import('@/pages/finance/FnFSettlement'), 'FnFSettlement');
+const OvertimePolicySettings   = lazyLoad(() => import('@/pages/settings/OvertimePolicySettings'), 'OvertimePolicySettings');
+const ESSDashboard             = lazyLoad(() => import('@/pages/ess/ESSDashboard'), 'ESSDashboard');
 
 // ── Helper component for Company Check ───────────────────────────────────────
 const CompanyGuard = ({ children }: { children: JSX.Element }) => {
@@ -305,6 +308,9 @@ function App() {
                                     <Route path="/finance/department" element={<PageErrorBoundary pageName="Department Finance"><DepartmentFinanceReport /></PageErrorBoundary>} />
                                     <Route path="/finance/cost-centers" element={<PageErrorBoundary pageName="Cost Centers"><CostCenterMapping /></PageErrorBoundary>} />
                                     <Route path="/finance/advance-salary" element={<PageErrorBoundary pageName="Advance Salary"><AdvanceSalaryManagement /></PageErrorBoundary>} />
+                                    <Route path="/finance/fnf-settlement" element={<PageErrorBoundary pageName="FnF Settlement"><FnFSettlement /></PageErrorBoundary>} />
+                                    <Route path="/settings/overtime-policy" element={<PageErrorBoundary pageName="Overtime Policy"><OvertimePolicySettings /></PageErrorBoundary>} />
+                                    <Route path="/ess/dashboard" element={<PageErrorBoundary pageName="ESS Dashboard"><ESSDashboard /></PageErrorBoundary>} />
 
                                     {/* Statutory Compliance */}
                                     <Route path="/statutory/form16" element={<PageErrorBoundary pageName="Form 16 Generator"><Form16Generator /></PageErrorBoundary>} />
