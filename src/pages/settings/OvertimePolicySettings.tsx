@@ -13,12 +13,14 @@ interface OTPolicy {
 
 const EMPTY: Omit<OTPolicy, 'id'> = { name: '', weeklyCapHours: 48, dailyCapHours: 12, multiplier: 1.5, effectiveFrom: '' };
 
-function authHeader() {
+function authHeader(): Record<string, string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     try {
         const raw = localStorage.getItem('auth-storage');
         const token = raw ? JSON.parse(raw)?.state?.token : null;
-        return token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
-    } catch { return { 'Content-Type': 'application/json' }; }
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+    } catch {}
+    return headers;
 }
 
 export const OvertimePolicySettings = () => {

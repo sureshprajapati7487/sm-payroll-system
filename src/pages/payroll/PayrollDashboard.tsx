@@ -104,12 +104,13 @@ export const PayrollDashboard = () => {
     const toggleSelect = (id: string) =>
         setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-    const authHeader = () => {
+    const authHeader = (): Record<string, string> => {
         try {
             const raw = localStorage.getItem('auth-storage');
             const token = raw ? JSON.parse(raw)?.state?.token : null;
-            return token ? { Authorization: `Bearer ${token}` } : {};
-        } catch { return {}; }
+            if (token) return { Authorization: `Bearer ${token}` };
+        } catch {}
+        return {};
     };
 
     const handleBulkAction = async (action: 'simulate' | 'approve' | 'lock') => {

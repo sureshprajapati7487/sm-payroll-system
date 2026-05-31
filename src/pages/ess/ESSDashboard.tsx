@@ -14,12 +14,13 @@ interface ESSData {
     attendance: any[];
 }
 
-function authHeader() {
+function authHeader(): Record<string, string> {
     try {
         const raw = localStorage.getItem('auth-storage');
         const token = raw ? JSON.parse(raw)?.state?.token : null;
-        return token ? { Authorization: `Bearer ${token}` } : {};
-    } catch { return {}; }
+        if (token) return { Authorization: `Bearer ${token}` };
+    } catch {}
+    return {};
 }
 
 const STATUS_ICON: Record<string, JSX.Element> = {
@@ -88,7 +89,7 @@ export const ESSDashboard = () => {
         );
     }
 
-    const { profile, latestSlip, leaves, loans, attendance } = data;
+    const { profile, latestSlip, loans, attendance } = data;
     const activeLoans = loans.filter((l: any) => l.status === 'ACTIVE');
     const totalLoanBalance = activeLoans.reduce((s: number, l: any) => s + (l.balance || 0), 0);
     const leaveBalance = profile?.leaveBalance || {};

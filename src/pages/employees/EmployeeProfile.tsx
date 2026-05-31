@@ -86,12 +86,19 @@ export const EmployeeProfile = () => {
     const [docUploading, setDocUploading] = useState(false);
     const [docToast, setDocToast] = useState<string | null>(null);
 
-    const loadDocs = async () => {
+    const getAuthHeader = (): Record<string, string> => {
         try {
             const raw = localStorage.getItem('auth-storage');
             const token = raw ? JSON.parse(raw)?.state?.token : null;
+            if (token) return { Authorization: `Bearer ${token}` };
+        } catch {}
+        return {};
+    };
+
+    const loadDocs = async () => {
+        try {
             const res = await fetch(`${API_URL}/employees/${id}/documents`, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                headers: getAuthHeader(),
             });
             if (res.ok) setDocs(await res.json());
         } catch {}
@@ -99,15 +106,13 @@ export const EmployeeProfile = () => {
     };
 
     const handleDocUpload = async (file: File) => {
-        const raw = localStorage.getItem('auth-storage');
-        const token = raw ? JSON.parse(raw)?.state?.token : null;
         const fd = new FormData();
         fd.append('file', file);
         setDocUploading(true);
         try {
             const res = await fetch(`${API_URL}/employees/${id}/documents`, {
                 method: 'POST',
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                headers: getAuthHeader(),
                 body: fd,
             });
             const data = await res.json();

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useEmployeeStore } from '@/store/employeeStore';
-import { useAuthStore } from '@/store/authStore';
 import { API_URL } from '@/lib/apiConfig';
 import { Calculator, CheckCircle, Save, ChevronRight } from 'lucide-react';
 
@@ -15,17 +14,17 @@ interface FnFResult {
     employeeName: string;
 }
 
-function authHeader() {
+function authHeader(): Record<string, string> {
     try {
         const raw = localStorage.getItem('auth-storage');
         const token = raw ? JSON.parse(raw)?.state?.token : null;
-        return token ? { Authorization: `Bearer ${token}` } : {};
-    } catch { return {}; }
+        if (token) return { Authorization: `Bearer ${token}` };
+    } catch {}
+    return {};
 }
 
 export const FnFSettlement = () => {
     const { _rawEmployees: employees } = useEmployeeStore();
-    const { user } = useAuthStore();
 
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [form, setForm] = useState({
