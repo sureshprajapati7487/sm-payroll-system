@@ -25,7 +25,7 @@ const { authMiddleware, isPublic, PUBLIC_PATHS } = require('./middlewares/auth')
 const { addError, getErrorHint, getErrorLog, ERROR_LOG_PATH, errorHandlerMiddleware } = require('./middlewares/errorHandler');
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, Expense, SalarySlip, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB } = require('./database');
+const { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, LoanLedger, Expense, SalarySlip, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB } = require('./database');
 const { Op } = require('sequelize');
 const { startBackupScheduler, doBackup, getBackupStatus, getConfig, updateConfig } = require('./backup');
 
@@ -228,6 +228,7 @@ app.get('/api/health/deep', async (req, res) => {
         { name: 'Production', model: Production, icon: '🏭' },
         { name: 'Leaves', model: Leave, icon: '🌿' },
         { name: 'Loans', model: Loan, icon: '💳' },
+        { name: 'LoanLedger', model: LoanLedger, icon: '📒' },
         { name: 'Expenses', model: Expense, icon: '🧾' },
         { name: 'SalarySlips', model: SalarySlip, icon: '📄' },
         { name: 'AuditLogs', model: AuditLog, icon: '🔍' },
@@ -943,7 +944,7 @@ const productionRoute = require('./routes/production');
 
 // Inject shared dependencies into each route module
 const sharedModels = {
-    Employee, Attendance, Production, Leave, Loan, SalarySlip,
+    Employee, Attendance, Production, Leave, Loan, LoanLedger, SalarySlip,
     Expense, Biometric, AdvanceSalary, Holiday, AuditLog,
     Client, ClientVisit, SalesTask, Company, sequelize,
     Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation,

@@ -1,5 +1,6 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
 // ── Database Connection ────────────────────────────────────────────────────────
 // Production (Render): uses DATABASE_URL (PostgreSQL)
@@ -370,6 +371,18 @@ const Loan = sequelize.define('Loan', {
     ]
 });
 
+// ── 6.1 Loan Ledger ──────────────────────────────────────────────────────────
+const LoanLedger = sequelize.define('LoanLedger', {
+    id: { type: DataTypes.STRING, primaryKey: true, defaultValue: () => uuidv4() },
+    loanId: { type: DataTypes.STRING, allowNull: false },
+    companyId: { type: DataTypes.STRING, allowNull: false },
+    employeeId: { type: DataTypes.STRING, allowNull: false },
+    date: { type: DataTypes.STRING, allowNull: false },       // YYYY-MM-DD
+    amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+    type: { type: DataTypes.STRING, defaultValue: 'EMI' },   // EMI | PREPAY | WAIVER
+    remarks: { type: DataTypes.STRING },
+}, { tableName: 'LoanLedgers' });
+
 // ── 7. Salary Slip / Payroll ──────────────────────────────────────────────────
 const SalarySlip = sequelize.define('SalarySlip', {
     id: { type: DataTypes.STRING, primaryKey: true },
@@ -606,4 +619,4 @@ const initDB = async () => {
     }
 };
 
-module.exports = { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, SalarySlip, Expense, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB };
+module.exports = { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, LoanLedger, SalarySlip, Expense, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB };

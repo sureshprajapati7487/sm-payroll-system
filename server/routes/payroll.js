@@ -1,12 +1,14 @@
 // ── PAYROLL + LOANS + LEAVES + PRODUCTION ROUTES ──────────────────────────────
 const express = require('express');
 const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
 
-let Leave, Loan, SalarySlip, Employee, Attendance, Production, AdvanceSalary, Holiday, addError, getErrorHint;
+let Leave, Loan, LoanLedger, SalarySlip, Employee, Attendance, Production, AdvanceSalary, Holiday, addError, getErrorHint;
 
 function init(models) {
     Leave = models.Leave;
     Loan = models.Loan;
+    LoanLedger = models.LoanLedger;
     SalarySlip = models.SalarySlip;
     Employee = models.Employee;
     Attendance = models.Attendance;
@@ -185,6 +187,19 @@ router.patch('/loans/:id/approve', async (req, res) => {
         loan.changed('auditTrail', true);
 
         await loan.save();
+
+        if (LoanLedger) {
+            await LoanLedger.create({
+                loanId: loan.id,
+                employeeId: loan.employeeId,
+                companyId: loan.companyId,
+                date: loan.issuedDate,
+                type: 'PREPAY',
+                amount: loan.amount,
+                remarks: 'Loan Approved & Issued',
+            });
+        }
+
         res.json(loan);
     } catch (e) { addError(e, 'PATCH /api/loans/:id/approve'); res.status(500).json({ error: e.message }); }
 });
@@ -220,19 +235,78 @@ router.post('/loans/:id/pay', async (req, res) => {
         loan.balance = newBal;
         if (newBal <= 0) loan.status = 'CLOSED';
 
+        const today = new Date().toISOString().split('T')[0];
         const newLedgerEntry = {
             id: Math.random().toString(36).substr(2, 9),
-            date: new Date().toISOString().split('T')[0],
+            date: today,
             amount: amount,
             type: 'EMI',
-            remarks: 'Manual Payment'
+            remarks: req.body.remarks || 'Manual Payment'
         };
         loan.ledger = [...(loan.ledger || []), newLedgerEntry];
         loan.changed('ledger', true);
 
         await loan.save();
+
+        if (LoanLedger) {
+            await LoanLedger.create({
+                loanId: loan.id,
+                employeeId: loan.employeeId,
+                companyId: loan.companyId,
+                date: today,
+                type: 'EMI',
+                amount,
+                remarks: req.body.remarks || 'Manual Payment',
+            });
+        }
+
         res.json(loan);
     } catch (e) { addError(e, 'POST /api/loans/:id/pay'); res.status(500).json({ error: e.message }); }
+});
+
+// ── P1-06: Loan Ledger Routes ─────────────────────────────────────────────────
+router.get('/loans/:id/ledger', async (req, res) => {
+    try {
+        if (!LoanLedger) return res.status(503).json({ error: 'LoanLedger not available' });
+        const entries = await LoanLedger.findAll({
+            where: { loanId: req.params.id },
+            order: [['createdAt', 'ASC']],
+        });
+        res.json(entries);
+    } catch (e) { addError(e, 'GET /api/loans/:id/ledger'); res.status(500).json({ error: e.message }); }
+});
+
+router.post('/loans/:id/ledger', async (req, res) => {
+    try {
+        if (!LoanLedger) return res.status(503).json({ error: 'LoanLedger not available' });
+        const loan = await Loan.findByPk(req.params.id);
+        if (!loan) return res.status(404).json({ error: 'Loan not found' });
+
+        const { type = 'EMI', amount, remarks, date } = req.body;
+        if (!amount || amount <= 0) return res.status(400).json({ error: 'amount is required and must be > 0' });
+
+        const entryDate = date || new Date().toISOString().split('T')[0];
+
+        if (type === 'EMI') {
+            const newBal = Math.max(0, (loan.balance || 0) - amount);
+            loan.balance = newBal;
+            if (newBal <= 0) loan.status = 'CLOSED';
+            loan.ledger = [...(loan.ledger || []), { id: uuidv4(), date: entryDate, amount, type, remarks }];
+            loan.changed('ledger', true);
+            await loan.save();
+        }
+
+        const entry = await LoanLedger.create({
+            loanId: loan.id,
+            employeeId: loan.employeeId,
+            companyId: loan.companyId,
+            date: entryDate,
+            type,
+            amount,
+            remarks: remarks || '',
+        });
+        res.status(201).json(entry);
+    } catch (e) { addError(e, 'POST /api/loans/:id/ledger'); res.status(500).json({ error: e.message }); }
 });
 
 // ── Payroll ───────────────────────────────────────────────────────────────────

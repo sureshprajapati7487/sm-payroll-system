@@ -1,7 +1,8 @@
 const cron = require('node-cron');
 const { Worker } = require('worker_threads');
 const path = require('path');
-const { ScheduledReport, ReportJob, AuditLog } = require('./database');
+const { v4: uuidv4 } = require('uuid');
+const { ScheduledReport, ReportJob, AuditLog, Company, Employee, Attendance } = require('./database');
 
 function initCronManager() {
     console.log('⏰ Initializing Cron Manager for Scheduled Reports...');
@@ -71,6 +72,48 @@ function initCronManager() {
             }
         } catch (error) {
             console.error('❌ Error running scheduled reports cron:', error);
+        }
+    });
+
+    // ── P1-05: Auto-Absent — runs daily at 23:59 ──────────────────────────────
+    cron.schedule('59 23 * * *', async () => {
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        console.log(`🕐 [Auto-Absent] Running for ${today}...`);
+        try {
+            const companies = await Company.findAll({ where: { isActive: true } });
+
+            for (const company of companies) {
+                const companyId = company.id;
+
+                const activeEmployees = await Employee.findAll({
+                    where: { companyId, status: 'ACTIVE' },
+                    attributes: ['id'],
+                });
+
+                const existingRecords = await Attendance.findAll({
+                    where: { companyId, date: today },
+                    attributes: ['employeeId'],
+                });
+
+                const recordedIds = new Set(existingRecords.map(a => a.employeeId));
+                const absentEmployees = activeEmployees.filter(e => !recordedIds.has(e.id));
+
+                for (const emp of absentEmployees) {
+                    await Attendance.create({
+                        id: uuidv4(),
+                        employeeId: emp.id,
+                        companyId,
+                        date: today,
+                        status: 'ABSENT',
+                    });
+                }
+
+                if (absentEmployees.length > 0) {
+                    console.log(`🕐 Auto-absent marked for ${absentEmployees.length} employees on ${today} (company: ${companyId})`);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error in auto-absent cron:', error);
         }
     });
 }
