@@ -47,14 +47,12 @@ export const LoginPage = () => {
         return () => { if (lockoutTimerRef.current) clearInterval(lockoutTimerRef.current); };
     }, [lockoutSeconds]);
 
-    // Initial load for Remember Me
+    // Initial load for Remember Me — only restore Login ID, never password
     useEffect(() => {
+        localStorage.removeItem('remembered_password'); // clear any plaintext password stored by older versions
         const savedUser = localStorage.getItem('remembered_user_id');
-        const savedPass = localStorage.getItem('remembered_password');
-
-        if (savedUser && savedPass) {
+        if (savedUser) {
             setUserId(savedUser);
-            setPassword(savedPass);
             setRememberMe(true);
         }
     }, []);
@@ -77,10 +75,8 @@ export const LoginPage = () => {
             if (loggedInUser?.companyId) switchCompany(loggedInUser.companyId);
             if (rememberMe) {
                 localStorage.setItem('remembered_user_id', userId.trim());
-                localStorage.setItem('remembered_password', password.trim());
             } else {
                 localStorage.removeItem('remembered_user_id');
-                localStorage.removeItem('remembered_password');
             }
             navigate('/dashboard');
         } else {
