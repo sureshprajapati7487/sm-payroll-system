@@ -75,6 +75,10 @@ export default defineConfig(async () => {
         }
       })
     ],
+    // Strip all console.* and debugger statements from production builds
+    esbuild: {
+      drop: isProd ? ['console', 'debugger'] : [],
+    },
     build: {
       rollupOptions: {
         output: {
