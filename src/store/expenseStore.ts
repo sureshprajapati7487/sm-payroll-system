@@ -74,7 +74,7 @@ export const useInternalExpenseStore = create<ExpenseState>((set, get) => ({
             if (res.ok) {
                 const data = await res.json();
                 // Parse auditTrail if stored as string
-                const parsed = data.map((e: any) => ({
+                const parsed = (data as any[]).map((e) => ({
                     ...e,
                     auditTrail: typeof e.auditTrail === 'string'
                         ? JSON.parse(e.auditTrail)
@@ -213,9 +213,9 @@ export const useExpenseStore = () => {
         if (scope === 'ALL') return true;
 
         if (scope === 'TEAM') {
-            const userEmp = employees.find((emp: any) => emp.id === user.id);
+            const userEmp = employees.find((emp) => emp.id === user.id);
             // Expense doesn't have employeeId, it has addedBy string name
-            const recordEmp = employees.find((emp: any) => emp.name === e.addedBy);
+            const recordEmp = employees.find((emp) => emp.name === e.addedBy);
             if (!userEmp?.department) return e.addedBy === user.name;
             return recordEmp?.department === userEmp.department;
         }

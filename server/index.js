@@ -915,6 +915,13 @@ app.get('/api/companies', async (req, res) => {
 });
 app.post('/api/companies', async (req, res) => {
     try {
+        // First company creation is public (setup wizard — no user exists yet).
+        // After that, only SUPER_ADMIN can create additional companies.
+        const companyCount = await Company.count();
+        if (companyCount > 0 && (!req.user || req.user.role !== 'SUPER_ADMIN')) {
+            return res.status(403).json({ error: 'Only SUPER_ADMIN can create additional companies.', fix: 'Login as SUPER_ADMIN first.' });
+        }
+
         const existing = await Company.findOne({ where: { id: req.body.id } });
         if (existing) { await existing.update(req.body); return res.json(existing); }
         let code = req.body.code || 'CO', newCompany;

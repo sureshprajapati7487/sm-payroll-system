@@ -69,7 +69,7 @@ export const useMultiCompanyStore = create<MultiCompanyState>()(
 
                     const res = await apiFetch(`/companies`, {
                         method: 'POST',
-                        skipAuth: true,
+                        skipAuth: true, // setup wizard runs before any user exists — no JWT available yet
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(newCompany)
                     });

@@ -138,13 +138,14 @@ router.delete('/leaves/:id', async (req, res) => {
 
 // ── Loans ─────────────────────────────────────────────────────────────────────
 router.get('/loans', async (req, res) => {
-    const { employeeId, status } = req.query;
+    const { employeeId, status, type } = req.query;
     try {
         const where = {};
         // Use req.companyId from JWT (enforced by requireCompanyScope)
         if (req.companyId) where.companyId = req.companyId;
         if (employeeId) where.employeeId = employeeId;
         if (status) where.status = status;
+        if (type) where.type = type;
         res.json(await Loan.findAll({ where }));
     } catch (e) { addError(e, 'GET /api/loans'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });

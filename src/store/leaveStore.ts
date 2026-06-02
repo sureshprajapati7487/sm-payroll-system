@@ -252,8 +252,8 @@ export const useLeaveStore = () => {
         if (scope === 'ALL') return true;
 
         if (scope === 'TEAM') {
-            const userEmp = employees.find((emp: any) => emp.id === user.id);
-            const recordEmp = employees.find((emp: any) => emp.id === r.employeeId);
+            const userEmp = employees.find((emp) => emp.id === user.id);
+            const recordEmp = employees.find((emp) => emp.id === r.employeeId);
             if (!userEmp?.department) return r.employeeId === user.id; // Fallback to OWN
             return recordEmp?.department === userEmp.department;
         }

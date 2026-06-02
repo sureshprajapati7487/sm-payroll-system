@@ -149,7 +149,7 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
                     const raw = await res.json();
                     const rows: any[] = raw?.data ?? (Array.isArray(raw) ? raw : []);
                     // Normalize: SQLite returns `breaks` as JSON string or null — parse it back to array
-                    const normalized = rows.map((r: any) => ({
+                    const normalized = rows.map((r) => ({
                             ...r,
                             breaks: Array.isArray(r.breaks)
                                 ? r.breaks
@@ -576,8 +576,8 @@ export const useAttendanceStore = () => {
         if (scope === 'ALL') return true;
 
         if (scope === 'TEAM') {
-            const userEmp = employees.find((emp: any) => emp.id === user.id);
-            const recordEmp = employees.find((emp: any) => emp.id === r.employeeId);
+            const userEmp = employees.find((emp) => emp.id === user.id);
+            const recordEmp = employees.find((emp) => emp.id === r.employeeId);
             if (!userEmp?.department) return r.employeeId === user.id; // Fallback to OWN
             return recordEmp?.department === userEmp.department;
         }

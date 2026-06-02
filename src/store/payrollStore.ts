@@ -268,8 +268,8 @@ export const usePayrollStore = () => {
         if (scope === 'ALL') return true;
 
         if (scope === 'TEAM') {
-            const userEmp = employees.find((emp: any) => emp.id === user.id);
-            const recordEmp = employees.find((emp: any) => emp.id === s.employeeId);
+            const userEmp = employees.find((emp) => emp.id === user.id);
+            const recordEmp = employees.find((emp) => emp.id === s.employeeId);
             if (!userEmp?.department) return s.employeeId === user.id;
             return recordEmp?.department === userEmp.department;
         }
@@ -282,7 +282,7 @@ export const usePayrollStore = () => {
     return {
         ...store,
         slips: filteredSlips,
-        getSlipsByMonth: (month: string) => filteredSlips.filter((s: any) => s.month === month),
+        getSlipsByMonth: (month: string) => filteredSlips.filter((s) => s.month === month),
         _rawStore: store
     };
 };
