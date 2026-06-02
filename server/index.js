@@ -1,5 +1,5 @@
 const express = require('express');
-require('dotenv').config(); // Load environment variables first
+require('dotenv').config({ path: require('path').join(__dirname, '.env') }); // always load from server/.env regardless of cwd
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const jwt = require('jsonwebtoken');
@@ -865,6 +865,38 @@ app.put('/api/auth/logout-password', async (req, res) => {
     } catch (e) {
         addError(e, 'PUT /api/auth/logout-password');
         res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// ── CROSS-COMPANY TOKEN ───────────────────────────────────────────────────────
+// SUPER_ADMIN calls this when switching to a different company.
+// Returns a daily HMAC token that rbac.js verifies on every cross-company request.
+app.post('/api/auth/cross-company-token', async (req, res) => {
+    if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'Only SUPER_ADMIN can request cross-company tokens.' });
+    }
+    const { targetCompanyId } = req.body || {};
+    if (!targetCompanyId) {
+        return res.status(400).json({ error: 'targetCompanyId is required' });
+    }
+    if (targetCompanyId === req.user.companyId) {
+        return res.status(400).json({ error: 'Cross-company token not needed for your own company' });
+    }
+    try {
+        const company = await Company.findOne({ where: { id: targetCompanyId } });
+        if (!company) return res.status(404).json({ error: 'Target company not found' });
+
+        const crypto = require('crypto');
+        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
+        const token = crypto
+            .createHmac('sha256', JWT_SECRET)
+            .update(`CROSS_COMPANY:${targetCompanyId}:${req.user.id}:${today}`)
+            .digest('hex');
+
+        res.json({ token, targetCompanyId, expiresAt: `${today}T23:59:59Z` });
+    } catch (e) {
+        addError(e, 'POST /api/auth/cross-company-token');
+        res.status(500).json({ error: e.message });
     }
 });
 

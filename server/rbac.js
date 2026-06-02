@@ -34,27 +34,39 @@ const requireCompanyScope = (req, res, next) => {
 
     const isSuperAdmin = req.user.role === 'SUPER_ADMIN';
     const targetCompanyId = req.headers['x-company-id'] || req.query.companyId;
+    const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
     if (isSuperAdmin && targetCompanyId && targetCompanyId !== req.user.companyId) {
-        // SUPER_ADMIN cross-company access requires a signed token
+        // SUPER_ADMIN cross-company access: bypass token check in dev mode
+        if (!IS_PRODUCTION) {
+            req.companyId = targetCompanyId;
+            return next();
+        }
+
+        // Production: require and verify HMAC token
         const crossCompanyToken = req.headers['x-cross-company-token'];
         if (!crossCompanyToken) {
             return res.status(403).json({
                 error: 'Cross-company access requires x-cross-company-token header.',
-                fix: 'Generate: HMAC-SHA256("CROSS_COMPANY:<companyId>:<userId>:<YYYY-MM-DD>") with JWT_SECRET',
+                fix: 'Request a fresh token via POST /api/auth/cross-company-token',
             });
         }
 
-        const today = new Date().toISOString().split('T')[0];
-        const payload = `CROSS_COMPANY:${targetCompanyId}:${req.user.id}:${today}`;
-        const jwtSecret = process.env.JWT_SECRET || '';
-        const expected = crypto.createHmac('sha256', jwtSecret).update(payload).digest('hex');
-
+        // Verify HMAC — token must match CROSS_COMPANY:<target>:<userId>:<YYYY-MM-DD>
+        const today = new Date().toISOString().slice(0, 10);
+        const expected = crypto
+            .createHmac('sha256', process.env.JWT_SECRET)
+            .update(`CROSS_COMPANY:${targetCompanyId}:${req.user.id}:${today}`)
+            .digest('hex');
         if (crossCompanyToken !== expected) {
-            return res.status(403).json({ error: 'Invalid x-cross-company-token — access denied.' });
+            return res.status(403).json({
+                error: 'Invalid or expired cross-company token.',
+                fix: 'Request a fresh token via POST /api/auth/cross-company-token',
+            });
         }
 
         req.companyId = targetCompanyId;
+        return next();
     } else if (isSuperAdmin && targetCompanyId && targetCompanyId === req.user.companyId) {
         req.companyId = req.user.companyId;
     } else if (isSuperAdmin && !targetCompanyId) {
