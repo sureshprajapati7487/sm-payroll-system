@@ -7,9 +7,13 @@ const { v4: uuidv4 } = require('uuid');
 // Development (local): uses SQLite file
 let sequelize;
 
-if (process.env.DATABASE_URL) {
+const dbUrl = process.env.DATABASE_URL;
+const isRenderInternal = dbUrl && dbUrl.includes('dpg-') && dbUrl.includes('.render.com');
+
+// Only use DATABASE_URL if it's not a Render-internal one, OR if we are actually ON Render
+if (dbUrl && (!isRenderInternal || process.env.RENDER)) {
     // PostgreSQL — Render free tier
-    sequelize = new Sequelize(process.env.DATABASE_URL, {
+    sequelize = new Sequelize(dbUrl, {
         dialect: 'postgres',
         dialectOptions: {
             ssl: {

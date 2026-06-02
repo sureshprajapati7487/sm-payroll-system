@@ -214,7 +214,7 @@ let ReportJob; // Will be initialized from models
 router.post('/generate', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
     try {
         const { columns, format } = req.body;
-        const companyId = req.user.companyId;
+        const companyId = req.companyId || req.user.companyId;
 
         if (!ReportJob) ReportJob = require('../database').ReportJob; // Lazy load if init not grabbed it
 

@@ -35,7 +35,8 @@ function cacheGet(key) {
 
 router.get('/dashboard', async (req, res) => {
     try {
-        const { companyId, month } = req.query;
+        const { month } = req.query;
+        const companyId = req.companyId || req.query.companyId; // req.companyId preferred (set by RBAC scope)
         if (!companyId || !month) return res.status(400).json({ error: 'companyId and month queries are required' });
 
         const cacheKey = `${companyId}_${month}`;

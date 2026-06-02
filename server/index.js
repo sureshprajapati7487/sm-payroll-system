@@ -112,11 +112,12 @@ app.get('/api/dev/reset-admin', async (req, res) => {
     try {
         const emp = await Employee.findOne({ where: { code: 'ACLLP-01' } });
         if (!emp) {
-            // Force create it
+            const firstCompany = await Company.findOne({ order: [['createdAt', 'ASC']] });
+            if (!firstCompany) return res.json({ error: 'No company found. Create a company first via /company-setup.' });
             const hashed = await bcrypt.hash('8824834657@AA', 10);
             await Employee.create({
                 id: 'admin-recovery',
-                companyId: 'c1',
+                companyId: firstCompany.id,
                 code: 'ACLLP-01',
                 name: 'Admin Recovered',
                 phone: '8824834657',
@@ -124,7 +125,7 @@ app.get('/api/dev/reset-admin', async (req, res) => {
                 password: hashed,
                 status: 'ACTIVE'
             });
-            return res.json({ msg: 'Admin did not exist. Force created.', code: 'ACLLP-01', pass: '8824834657@AA' });
+            return res.json({ msg: 'Admin did not exist. Force created.', code: 'ACLLP-01', pass: '8824834657@AA', companyId: firstCompany.id });
         }
         const hashed = await bcrypt.hash('8824834657@AA', 10);
         await emp.update({ password: hashed });
