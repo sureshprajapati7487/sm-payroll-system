@@ -2,6 +2,7 @@
 
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home, RotateCcw } from 'lucide-react';
+import { API_URL } from '@/lib/apiConfig';
 
 interface Props {
     children: ReactNode;
@@ -45,7 +46,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
         // Send frontend errors to backend Server Status dashboard
         try {
-            fetch('http://localhost:3000/api/status/errors/report', {
+            fetch(`${API_URL}/status/errors/report`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

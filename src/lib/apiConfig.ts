@@ -37,25 +37,32 @@ const isValidHttpUrl = rawViteUrl
     : false;
 const effectiveEnvUrl = isValidHttpUrl ? rawViteUrl! : undefined;
 
-// ── Production base URL ───────────────────────────────────────────────────────
-const rawEnv = (effectiveEnvUrl || 'https://sm-payroll-system.onrender.com')
-    .replace(/\/api\/?$/, '')   // strip accidental trailing /api
-    .replace(/\/$/, '');        // strip trailing slash
+// ── Production base URL (from .env.local or default Render URL) ──────────────
+const defaultProdUrl = 'https://sm-payroll-system.onrender.com';
+const rawEnv = (import.meta.env.VITE_API_URL || defaultProdUrl)
+    .replace(/\/api\/?$/, '')  // trailing /api remove
+    .replace(/\/$/, '');       // trailing slash remove
 
-const PROD_API = `${rawEnv}/api`;
+// 🚨 SAFETY CHECK: If the URL is a Render internal hostname (starts with dpg-), 
+// it won't be reachable from the public internet (Vercel/Browser).
+// We force the public URL in this case.
+const isInternalHost = rawEnv.includes('dpg-') && !rawEnv.startsWith('https://');
+const safeRawEnv = isInternalHost ? defaultProdUrl : rawEnv;
 
-// ── Use production URL when: native app, valid env override, or prod build ────
-const useProductionUrl =
-    isNative ||
-    !!effectiveEnvUrl ||
-    import.meta.env.PROD === true;  // Vite sets PROD=true on all production builds
+const PROD_API = `${safeRawEnv}/api`;
 
-export const API_URL: string = useProductionUrl ? PROD_API : '/api';
+// ── API URL Resolution ────────────────────────────────────────────────────────
+// Android (native)     → always production (Render)
+// Web with VITE_API_URL → production (Render)  ← .env.local set hai toh
+// Web without VITE_API_URL → '/api' (Vite proxy → localhost:3000)
+export const API_URL: string = isNative
+    ? PROD_API
+    : (import.meta.env.VITE_API_URL && !isInternalHost ? PROD_API : '/api');
 
 export const getApiUrl = () => API_URL;
 
 export const getEnvironmentMode = (): 'production' | 'local' =>
-    useProductionUrl ? 'production' : 'local';
+    (isNative || !!effectiveEnvUrl || import.meta.env.PROD === true) ? 'production' : 'local';
 
 export const getServerBaseUrl = (): string =>
-    useProductionUrl ? rawEnv : 'http://localhost:3000';
+    (isNative || !!effectiveEnvUrl || import.meta.env.PROD === true) ? rawEnv : 'http://localhost:3000';

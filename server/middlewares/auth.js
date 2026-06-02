@@ -16,20 +16,23 @@ const getJwtSecret = () => {
 };
 
 const PUBLIC_PATHS = [
+    // Auth — must be public for login flow
     { method: 'POST', path: '/api/auth/login' },
     { method: 'POST', path: '/api/auth/dev-login' },
     { method: 'POST', path: '/api/auth/refresh' },
     { method: 'POST', path: '/api/auth/verify-password' },
     { method: 'POST', path: '/api/auth/logout' },
+    // Health — for Render's health check probe (no token needed)
     { method: 'GET', path: '/api/health' },
-    { method: 'GET', path: '/api/status/routes' },
-    { method: 'GET', path: '/api/status/errors' },
-    { method: 'DELETE', path: '/api/health/errors' },
-    { method: 'GET', path: '/api/health/deep' },
-    { method: 'POST', path: '/api/status/errors/report' },
+    // Company setup wizard — new installs need to create first company before login
+    { method: 'GET', path: '/api/companies' },
     { method: 'POST', path: '/api/companies' },
-    { method: 'GET', path: '/api/clients/export' },
+    // Client CSV demo download — public sample file
     { method: 'GET', path: '/api/clients/demo-export' },
+    // Frontend error reporting — browser sends errors before auth is established
+    { method: 'POST', path: '/api/status/errors/report' },
+    // NOTE: /api/status/errors (GET), /api/health/deep, /api/status/routes
+    // are intentionally NOT in PUBLIC_PATHS — require authentication
 ];
 
 function isPublic(req) {
