@@ -312,7 +312,7 @@ export const ServerStatusDashboard = () => {
         try {
             await fetch(`${API_BASE}/api/health/errors`, { method: 'DELETE' });
             await fetchHealth();
-        } catch { }
+        } catch { setBackendOnline(false); }
         finally { setClearing(false); }
     };
 

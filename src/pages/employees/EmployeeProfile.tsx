@@ -93,7 +93,7 @@ export const EmployeeProfile = () => {
                 headers: getAuthHeader(),
             });
             if (res.ok) setDocs(await res.json());
-        } catch {}
+        } catch { /* docs list is optional — profile still usable without it */ }
         setDocsLoaded(true);
     };
 

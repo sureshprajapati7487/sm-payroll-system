@@ -19,7 +19,7 @@ function authHeader(): Record<string, string> {
         const raw = localStorage.getItem('auth-storage');
         const token = raw ? JSON.parse(raw)?.state?.token : null;
         if (token) headers['Authorization'] = `Bearer ${token}`;
-    } catch {}
+    } catch { /* localStorage unavailable (SSR/private browsing) */ }
     return headers;
 }
 
@@ -39,7 +39,7 @@ export const OvertimePolicySettings = () => {
         try {
             const res = await fetch(`${API_URL}/overtime-policy`, { headers: authHeader() });
             if (res.ok) setPolicies(await res.json());
-        } catch {}
+        } catch { showToast(false, 'Network error — policies load nahi huin. Server chal raha hai?'); }
         setLoading(false);
     };
 

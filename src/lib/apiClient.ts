@@ -70,7 +70,7 @@ function setToken(token: string | null) {
         if (!parsed?.state) return;
         parsed.state.token = token;
         localStorage.setItem('auth-storage', JSON.stringify(parsed));
-    } catch { }
+    } catch { /* localStorage unavailable or storage quota exceeded — token update skipped */ }
 }
 
 // Prevents multiple concurrent refresh attempts
@@ -175,7 +175,7 @@ export async function apiFetch(path: string, options: FetchOptions = {}): Promis
             return apiFetch(path, { ...options, _isRetry: true });
         }
         // Refresh failed — force logout
-        try { localStorage.removeItem('auth-storage'); } catch { }
+        try { localStorage.removeItem('auth-storage'); } catch { /* ignore — localStorage may be unavailable */ }
     }
 
     return response;

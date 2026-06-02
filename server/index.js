@@ -259,7 +259,7 @@ app.get('/api/health/deep', async (req, res) => {
             try {
                 const latest = await t.model.findOne({ order: [['updatedAt', 'DESC']], attributes: ['updatedAt'] });
                 lastUpdated = latest?.updatedAt || null;
-            } catch (_) { }
+            } catch (_) { /* updatedAt optional — older tables may not have this column */ }
             tableHealth.push({ name: t.name, icon: t.icon, count, status: 'ok', lastUpdated });
         } catch (e) {
             tableHealth.push({ name: t.name, icon: t.icon, count: 0, status: 'error', error: e.message });
@@ -305,7 +305,7 @@ app.get('/api/health/deep', async (req, res) => {
             const files = fs.readdirSync(backupDir).filter(f => f.endsWith('.sqlite'));
             backupInfo.backupCount = files.length;
             backupInfo.latestBackup = files.sort().pop() || null;
-        } catch (_) { }
+        } catch (_) { /* backup dir may not exist yet — non-critical */ }
     }
 
     fsChecks.push(checkFile('Database File', dbFile, '🗄️'));
@@ -765,7 +765,7 @@ app.post('/api/auth/logout', async (req, res) => {
 
             const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
             await AuditLog.create({ id: uuidv4(), timestamp: new Date().toISOString(), action: 'LOGOUT', userId: decoded.id, userName: decoded.name, userRole: decoded.role, entityType: 'USER', entityName: decoded.name, status: 'SUCCESS', ipAddress });
-        } catch (e) { }
+        } catch { /* logout always succeeds — session/audit update is best-effort */ }
     }
     res.clearCookie('refresh_token', { path: '/' });
     res.json({ success: true, message: 'Logged out successfully' });
