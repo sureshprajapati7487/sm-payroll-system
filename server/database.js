@@ -241,7 +241,7 @@ const Employee = sequelize.define('Employee', {
     },
     joiningDate: { type: DataTypes.STRING },
     status: {
-        type: DataTypes.ENUM('ACTIVE', 'INACTIVE', 'ON_LEAVE', 'SUSPENDED'),
+        type: DataTypes.ENUM('ACTIVE', 'INACTIVE', 'ON_LEAVE', 'SUSPENDED', 'PENDING'),
         defaultValue: 'ACTIVE'
     },
     shift: { type: DataTypes.STRING, defaultValue: 'GENERAL' },
@@ -725,23 +725,28 @@ const initDB = async () => {
         await sequelize.sync({ alter: { drop: false } });
         console.log('Database synced successfully.');
 
-        // Seed initial admin if database is empty (useful for fresh Render deployments)
-        const bcrypt = require('bcrypt');
-        const count = await Employee.count();
-        if (count === 0) {
-            console.log('🌱 Empty database detected. Seeding initial admin ACLLP-01...');
-            const hashedPassword = await bcrypt.hash('8824834657@AA', 10);
-            await Company.create({ id: 'c1', name: 'SM Payroll Default', code: 'SM' });
-            await Employee.create({
-                id: 'ACLLP-01',
-                companyId: 'c1',
-                name: 'Suresh Owner',
-                designation: 'Owner',
-                role: 'SUPER_ADMIN',
-                password: hashedPassword,
-                status: 'ACTIVE'
-            });
-            console.log('✅ Admin ACLLP-01 created with default password.');
+        // Seed initial admin only on Render (production) — not locally.
+        // Local dev starts fresh via Company Setup page.
+        const IS_RENDER = !!process.env.RENDER;
+        if (IS_RENDER) {
+            const bcrypt = require('bcrypt');
+            const count = await Employee.count();
+            if (count === 0) {
+                console.log('🌱 [Render] Empty database detected. Seeding initial admin ACLLP-01...');
+                const hashedPassword = await bcrypt.hash('8824834657@AA', 10);
+                await Company.create({ id: 'c1', name: 'SM Payroll Default', code: 'SM' });
+                await Employee.create({
+                    id: 'ACLLP-01',
+                    companyId: 'c1',
+                    code: 'ACLLP-01',
+                    name: 'Suresh Owner',
+                    designation: 'Owner',
+                    role: 'SUPER_ADMIN',
+                    password: hashedPassword,
+                    status: 'ACTIVE'
+                });
+                console.log('✅ Admin ACLLP-01 created with default password.');
+            }
         }
 
         // ── Post-sync Migration: backfill companyId on ScheduledReport + CustomReportTemplate ──

@@ -45,6 +45,8 @@ function lazyLoad<T extends Record<string, any>>(importer: () => Promise<T>, nam
 
 // ── Lazy Page Imports ─────────────────────────────────────────────────────────
 const LoginPage         = lazyLoad(() => import('@/pages/LoginPage'), 'LoginPage');
+const SignupPage          = lazyLoad(() => import('@/pages/SignupPage'), 'SignupPage');
+const ForgotPasswordPage  = lazyLoad(() => import('@/pages/ForgotPasswordPage'), 'ForgotPasswordPage');
 const UnauthorizedPage  = lazyLoad(() => import('@/pages/UnauthorizedPage'), 'UnauthorizedPage');
 const Dashboard         = lazyLoad(() => import('@/pages/Dashboard'), 'Dashboard');
 const QuickActionPage   = lazyLoad(() => import('@/pages/QuickActionPage'), 'QuickActionPage');
@@ -147,8 +149,10 @@ const CompanyGuard = ({ children }: { children: JSX.Element }) => {
 };
 
 // ── Auth Guard: agar token hai toh login page nahi dikhega, seedha dashboard ──
+// isHydrated check prevents redirect before Zustand has read localStorage.
 const AuthGuard = ({ children }: { children: JSX.Element }) => {
-    const { isAuthenticated } = useAuthStore();
+    const { isAuthenticated, isHydrated } = useAuthStore();
+    if (!isHydrated) return null; // wait silently — login page is default, no spinner needed
     if (isAuthenticated) return <Navigate to="/dashboard" replace />;
     return children;
 };
@@ -168,7 +172,7 @@ function App() {
     // Smart Auto-Sync: every 30s, only when tab is visible
     useDataSync(30000);
 
-    const { isAuthenticated } = useAuthStore();
+    const { isAuthenticated, logout } = useAuthStore();
 
     // ── Global GPS: App Load request, Always active ──
     useGlobalGPS();
@@ -177,6 +181,13 @@ function App() {
     useBackgroundServices();
 
     const { currentCompanyId } = useMultiCompanyStore();
+
+    // Force logout if authHeader detects corrupted localStorage token
+    useEffect(() => {
+        const handler = () => logout();
+        window.addEventListener('sm:auth:corrupted', handler);
+        return () => window.removeEventListener('sm:auth:corrupted', handler);
+    }, [logout]);
 
     useEffect(() => {
         // Fetch data on login OR when the active company changes
@@ -214,6 +225,8 @@ function App() {
                             {/* Public Routes — AuthGuard: already logged-in users seedha /dashboard jao */}
                             <Route path="/" element={<AuthGuard><LoginPage /></AuthGuard>} />
                             <Route path="/login" element={<AuthGuard><LoginPage /></AuthGuard>} />
+                            <Route path="/signup" element={<SignupPage />} />
+                            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                             <Route path="/company-setup" element={<CompanySetup />} />
                             <Route path="/quick-action" element={<QuickActionPage />} />
                             <Route path="/go/:action/:id" element={<QuickActionPage />} />

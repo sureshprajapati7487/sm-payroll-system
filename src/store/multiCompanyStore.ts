@@ -11,7 +11,7 @@ export interface Company {
     panNumber?: string;
     employeeCount: number;
     isActive: boolean;
-    admin?: { name: string; loginId: string; password: string }; // Optional for creation
+    admin?: { name: string; loginId: string; password: string; email?: string; role?: string }; // Optional for creation
 }
 
 interface MultiCompanyState {

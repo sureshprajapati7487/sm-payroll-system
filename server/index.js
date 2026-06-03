@@ -644,13 +644,16 @@ app.post('/api/status/errors/report', (req, res) => {
     res.json({ ok: true });
 });
 
+// ── In-memory store for password reset tokens (short-lived, no DB needed) ────
+const resetTokens = new Map(); // token → { employeeId, expiresAt }
+
 // ── AUTH ROUTES ───────────────────────────────────────────────────────────────
 app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
     try {
         const { idOrEmail, password } = req.body || {};
         const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
 
-        if (!idOrEmail || !password) return res.status(400).json({ error: 'idOrEmail and password are required' });
+        if (!idOrEmail || !password) return res.status(400).json({ error: 'Fields Required — Login ID aur Password dono bharein' });
 
         // IP Whitelist Check
         const restrictions = await IPRestriction.findAll();
@@ -660,7 +663,7 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
                 const isAllowed = whitelisted.some(r => r.ipAddress === ipAddress);
                 if (!isAllowed) {
                     await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', userId: 'UNKNOWN', userName: idOrEmail || 'UNKNOWN', entityType: 'USER', entityName: idOrEmail, status: 'FAILED', ipAddress, errorMessage: 'IP not whitelisted' });
-                    return res.status(403).json({ error: 'Access denied from this IP address.' });
+                    return res.status(403).json({ error: 'Access Denied — Is IP address se login allowed nahi hai. Admin se contact karein.' });
                 }
             }
         }
@@ -680,7 +683,15 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
         if (!employee) {
             recordFailedAttempt(attemptKey);
             await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', userId: 'UNKNOWN', userName: idOrEmail || 'UNKNOWN', entityType: 'USER', entityName: idOrEmail, status: 'FAILED', ipAddress, errorMessage: 'Invalid employee code/email' });
-            return res.status(401).json({ error: 'Invalid credentials', fix: 'Check your employee code/email and password' });
+            return res.status(401).json({ error: 'Invalid Credentials — Employee code ya email galat hai', fix: 'Apna employee code ya registered email check karein' });
+        }
+
+        // Block PENDING employees from logging in before admin approval
+        if (employee.status === 'PENDING') {
+            return res.status(403).json({
+                error: 'Account Pending Approval — Aapka account abhi admin se approve nahi hua',
+                fix: 'Admin se request karein ki aapka account activate karein',
+            });
         }
 
         const storedPass = (employee.password || '').trim();
@@ -701,7 +712,7 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
             await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', userId: employee.id, userName: employee.name, userRole: employee.role, entityType: 'USER', entityName: employee.name, status: 'FAILED', ipAddress, errorMessage: 'Invalid password' });
             const rem = MAX_FAILED_ATTEMPTS - entry.count;
             if (entry.lockedUntil) return res.status(429).json({ error: 'Too many failed attempts. Account locked for 15 minutes.', fix: '15 minute baad try karein.', lockedFor: LOCKOUT_DURATION_MS / 1000, retryAfter: LOCKOUT_DURATION_MS / 1000 });
-            return res.status(401).json({ error: 'Invalid credentials', fix: 'Check your password and try again', attemptsRemaining: rem > 0 ? rem : 0 });
+            return res.status(401).json({ error: 'Wrong Password — Password galat hai', fix: 'Apna password dobara check karein', attemptsRemaining: rem > 0 ? rem : 0 });
         }
 
         clearFailedAttempts(attemptKey);
@@ -717,10 +728,17 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
         const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRES });
 
+        // FIX 4: Explicit cookie settings per environment.
+        // Dev: secure:false + sameSite:lax so cookie works over HTTP/proxied HTTPS.
+        // Prod: secure:true + sameSite:none required for cross-origin cookie (Vercel → Render).
+        const origin = req.headers.origin || '';
+        if (!IS_PRODUCTION && origin.startsWith('https://')) {
+            console.warn(`[Cookie] Dev HTTPS origin detected (${origin}). Cookie is secure:false/sameSite:lax — ensure Vite proxy is active, not direct cross-origin calls.`);
+        }
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
-            secure: IS_PRODUCTION,
-            sameSite: IS_PRODUCTION ? 'none' : 'lax',
+            secure: IS_PRODUCTION,           // false in dev — allows HTTP (Vite proxy path)
+            sameSite: IS_PRODUCTION ? 'none' : 'lax', // 'none' required for cross-site in prod
             maxAge: 7 * 24 * 60 * 60 * 1000,
             path: '/',
         });
@@ -769,6 +787,179 @@ app.post('/api/auth/logout', async (req, res) => {
     }
     res.clearCookie('refresh_token', { path: '/' });
     res.json({ success: true, message: 'Logged out successfully' });
+});
+
+// ── Forgot Password — Step 1: verify employee code + phone ───────────────────
+app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+        const { employeeCode, phone } = req.body || {};
+        if (!employeeCode?.trim() || !phone?.trim())
+            return res.status(400).json({ error: 'Employee Code aur Phone Required — Dono fields bharein' });
+
+        const employee = await Employee.findOne({
+            where: { code: employeeCode.trim().toUpperCase(), phone: phone.trim() }
+        });
+
+        // Deliberate vague response — prevent user enumeration
+        if (!employee || employee.status === 'PENDING')
+            return res.status(404).json({ error: 'Record Not Found — Employee code ya phone number match nahi kiya' });
+
+        // Generate a short-lived signed token (15 min)
+        const resetToken = jwt.sign(
+            { employeeId: employee.id, purpose: 'password_reset' },
+            JWT_SECRET,
+            { expiresIn: '15m' }
+        );
+        resetTokens.set(resetToken, { employeeId: employee.id, expiresAt: Date.now() + 15 * 60 * 1000 });
+
+        await AuditLog.create({
+            id: uuidv4(), timestamp: new Date().toISOString(),
+            action: 'PASSWORD_RESET_REQUEST', userId: employee.id,
+            userName: employee.name, userRole: employee.role,
+            entityType: 'USER', entityName: employee.name, status: 'SUCCESS',
+            ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip,
+        });
+
+        res.json({ success: true, resetToken, employeeName: employee.name });
+    } catch (e) {
+        addError(e, 'POST /api/auth/forgot-password');
+        res.status(500).json({ error: 'Server Error — Dobara try karein' });
+    }
+});
+
+// ── Reset Password — Step 2: set new password with token ─────────────────────
+app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+        const { resetToken, newPassword, confirmPassword } = req.body || {};
+        if (!resetToken || !newPassword || !confirmPassword)
+            return res.status(400).json({ error: 'All Fields Required — Sabhi fields bharein' });
+        if (newPassword !== confirmPassword)
+            return res.status(400).json({ error: 'Passwords Do Not Match — Dono passwords same hone chahiye' });
+        if (newPassword.length < 8)
+            return res.status(400).json({ error: 'Password Too Short — Kam se kam 8 characters ka password banayein' });
+
+        // Verify token
+        let decoded;
+        try {
+            decoded = jwt.verify(resetToken, JWT_SECRET);
+        } catch {
+            resetTokens.delete(resetToken);
+            return res.status(401).json({ error: 'Token Expired — 15 minute mein reset nahi kiya, dobara try karein' });
+        }
+
+        if (decoded.purpose !== 'password_reset' || !resetTokens.has(resetToken))
+            return res.status(401).json({ error: 'Invalid Token — Reset link use-ho-chuka hai ya galat hai' });
+
+        const { employeeId } = resetTokens.get(resetToken);
+        resetTokens.delete(resetToken); // single-use
+
+        const employee = await Employee.findByPk(employeeId);
+        if (!employee)
+            return res.status(404).json({ error: 'Employee Not Found — Account nahi mila' });
+
+        const hashed = await bcrypt.hash(newPassword.trim(), BCRYPT_ROUNDS);
+        await employee.update({ password: hashed });
+
+        await AuditLog.create({
+            id: uuidv4(), timestamp: new Date().toISOString(),
+            action: 'PASSWORD_RESET', userId: employee.id,
+            userName: employee.name, userRole: employee.role,
+            entityType: 'USER', entityName: employee.name, status: 'SUCCESS',
+            ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip,
+        });
+
+        res.json({ success: true, message: 'Password Reset Successful — Ab naye password se login karein' });
+    } catch (e) {
+        addError(e, 'POST /api/auth/reset-password');
+        res.status(500).json({ error: 'Server Error — Dobara try karein' });
+    }
+});
+
+// ── Signup — self-registration (status: PENDING, requires admin approval) ─────
+app.post('/api/auth/signup', async (req, res) => {
+    try {
+        const { name, email, phone, password, confirmPassword, companyCode } = req.body || {};
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+
+        // ── Required field validation ──────────────────────────────────────────
+        if (!name?.trim())
+            return res.status(400).json({ error: 'Name Required — Apna poora naam darj karein' });
+        if (!email?.trim())
+            return res.status(400).json({ error: 'Email Required — Valid email address darj karein' });
+        if (!phone?.trim())
+            return res.status(400).json({ error: 'Phone Required — Apna mobile number darj karein' });
+        if (!password)
+            return res.status(400).json({ error: 'Password Required — Kam se kam 8 characters ka password banayein' });
+        if (!confirmPassword)
+            return res.status(400).json({ error: 'Confirm Password Required — Password dobara darj karein' });
+        if (!companyCode?.trim())
+            return res.status(400).json({ error: 'Company Code Required — Apne Admin se Company Code maangein' });
+
+        // ── Password rules ─────────────────────────────────────────────────────
+        if (password !== confirmPassword)
+            return res.status(400).json({ error: 'Passwords Do Not Match — Dono passwords same hone chahiye' });
+        if (password.length < 8)
+            return res.status(400).json({ error: 'Password Too Short — Password mein kam se kam 8 characters hone chahiye' });
+
+        // ── Find company by code ───────────────────────────────────────────────
+        const company = await Company.findOne({ where: { code: companyCode.trim().toUpperCase() } });
+        if (!company)
+            return res.status(404).json({ error: 'Company Not Found — Company Code galat hai, apne Admin se check karein' });
+
+        // ── Uniqueness checks (within the same company) ────────────────────────
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanPhone = phone.trim();
+
+        const emailTaken = await Employee.findOne({ where: { email: cleanEmail, companyId: company.id } });
+        if (emailTaken)
+            return res.status(409).json({ error: 'Email Already Registered — Yeh email pehle se registered hai, dusra email use karein' });
+
+        const phoneTaken = await Employee.findOne({ where: { phone: cleanPhone, companyId: company.id } });
+        if (phoneTaken)
+            return res.status(409).json({ error: 'Phone Already Registered — Yeh number pehle se registered hai, dusra number use karein' });
+
+        // ── Create employee (PENDING — admin must approve) ─────────────────────
+        const hashed = await bcrypt.hash(password.trim(), BCRYPT_ROUNDS);
+        const tempCode = `REG-${Date.now().toString().slice(-7)}`;
+
+        const employee = await Employee.create({
+            id: `emp-${Date.now()}-${uuidv4().substring(0, 6)}`,
+            companyId: company.id,
+            code: tempCode,
+            name: name.trim(),
+            email: cleanEmail,
+            phone: cleanPhone,
+            role: 'EMPLOYEE',
+            status: 'PENDING',
+            password: hashed,
+            joiningDate: new Date().toISOString().split('T')[0],
+        });
+
+        await AuditLog.create({
+            id: uuidv4(),
+            timestamp: new Date().toISOString(),
+            action: 'SIGNUP',
+            userId: employee.id,
+            userName: employee.name,
+            userRole: 'EMPLOYEE',
+            entityType: 'USER',
+            entityName: employee.name,
+            details: { companyId: company.id, companyCode: company.code, tempCode },
+            status: 'SUCCESS',
+            ipAddress: ip,
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Registration Successful — Aapka account ban gaya! Admin approval ke baad login kar sakenge.',
+            employeeCode: tempCode,
+            companyName: company.name,
+        });
+    } catch (e) {
+        addError(e, 'POST /api/auth/signup');
+        const h = getErrorHint(e);
+        res.status(500).json({ error: e.message, why: h.why, fix: h.fix });
+    }
 });
 
 app.post('/api/auth/dev-login', (req, res) => {
@@ -933,23 +1124,38 @@ app.post('/api/companies', async (req, res) => {
         }
         if (!newCompany) throw new Error('Could not create company — code conflict');
 
-        // Auto-create Admin if provided
+        // Auto-create Admin if provided (used by Company Setup wizard — no auth context yet)
         if (req.body.admin) {
-            const { name, loginId, email, password } = req.body.admin;
-            const adminCode = loginId ? loginId.trim() : `${newCompany.code}-01`;
-            const hashed = await bcrypt.hash(password, 10);
+            const { name, loginId, email, password, role } = req.body.admin;
+            if (!password) throw new Error('Admin password is required during company setup');
+            const adminCode = (loginId || '').trim().toUpperCase() || `${newCompany.code}-01`;
+            const hashed = await bcrypt.hash(password.trim(), BCRYPT_ROUNDS);
 
             await Employee.create({
                 id: `emp-${Date.now()}-${uuidv4().substring(0, 4)}`,
                 companyId: newCompany.id,
                 code: adminCode,
-                name: name || 'Admin',
+                name: (name || 'Admin').trim(),
                 phone: null,
                 email: email || null,
-                role: 'ADMIN',
+                role: role || 'SUPER_ADMIN',  // company owner is SUPER_ADMIN by default
                 password: hashed,
                 status: 'ACTIVE',
-                baseSalary: 0
+                basicSalary: 0,
+                joiningDate: new Date().toISOString().split('T')[0],
+            });
+
+            await AuditLog.create({
+                id: uuidv4(),
+                timestamp: new Date().toISOString(),
+                action: 'CREATE_EMPLOYEE',
+                userId: 'SYSTEM',
+                userName: 'Company Setup',
+                entityType: 'EMPLOYEE',
+                entityName: name || 'Admin',
+                details: { code: adminCode, companyId: newCompany.id, source: 'company_setup' },
+                status: 'SUCCESS',
+                ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip,
             });
         }
 

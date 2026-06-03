@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
-import { useEmployeeStore } from '@/store/employeeStore';
-import { Roles, EmployeeStatus } from '@/types';
 import { Building2, MapPin, ArrowRight } from 'lucide-react';
 import { PasswordStrengthInput, isPasswordValid } from '@/components/ui/PasswordStrengthInput';
 import { useDialog } from '@/components/DialogProvider';
@@ -10,7 +8,6 @@ import { useDialog } from '@/components/DialogProvider';
 export const CompanySetup = () => {
     const navigate = useNavigate();
     const { addCompany, switchCompany } = useMultiCompanyStore();
-    const { addEmployee } = useEmployeeStore();
     const { alert } = useDialog();
 
     // Form State
@@ -64,38 +61,22 @@ export const CompanySetup = () => {
             isActive: true
         };
 
-        // Await the async addCompany and get back the created company
-        const createdCompany = await addCompany({ ...newCompany });
+        // Pass admin credentials inside company payload so server creates the employee
+        // atomically in POST /api/companies — which is public (no JWT needed).
+        // Using separate addEmployee() was broken: POST /api/employees requires auth.
+        const createdCompany = await addCompany({
+            ...newCompany,
+            admin: {
+                name: formData.adminName,
+                loginId: formData.adminUserId.toUpperCase(),
+                email: formData.adminEmail,
+                password: formData.adminPassword,
+                role: 'SUPER_ADMIN',
+            },
+        });
 
         if (createdCompany) {
             switchCompany(createdCompany.id);
-
-            // Create Admin Employee — pass companyId explicitly so addEmployee
-            // doesn't fail due to currentCompanyId not being set yet in the store.
-            try {
-                await addEmployee({
-                    code: formData.adminUserId.toUpperCase(),
-                    name: formData.adminName,
-                    email: formData.adminEmail,
-                    phone: '',
-                    department: 'Administration',
-                    designation: 'Super Administrator',
-                    role: Roles.SUPER_ADMIN,
-                    joiningDate: new Date().toISOString().split('T')[0],
-                    status: EmployeeStatus.ACTIVE,
-                    shift: 'GENERAL',
-                    salaryType: 'MONTHLY' as any,
-                    basicSalary: 0,
-                    password: formData.adminPassword,
-                    companyId: createdCompany.id
-                }, createdCompany.id); // ← explicit companyId override
-            } catch (empErr: any) {
-                setError(`Company created but admin user setup failed: ${empErr?.message || empErr}. Please add admin manually.`);
-                setIsSubmitting(false);
-                // Still navigate to login — company exists, user can login via server fallback
-                setTimeout(() => navigate('/login'), 2500);
-                return;
-            }
 
             // Show Success Message
             await alert({

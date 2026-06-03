@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { clsx } from 'clsx';
-import { ShieldAlert, ChevronRight, User, Key, AlertCircle, Eye, EyeOff, Building2, PlusCircle, ArrowLeft, Lock, Clock } from 'lucide-react';
+import { ShieldAlert, ChevronRight, User, Key, AlertCircle, Eye, EyeOff, Building2, PlusCircle, ArrowLeft, Lock, Clock, UserPlus } from 'lucide-react';
 
 export const LoginPage = () => {
     const { loginWithCredentials, isLoading, isAuthenticated } = useAuthStore();
@@ -25,6 +25,7 @@ export const LoginPage = () => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [errorFix, setErrorFix] = useState<string | null>(null);
     const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
     const [lockoutSeconds, setLockoutSeconds] = useState<number>(0);
     const lockoutTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -60,6 +61,7 @@ export const LoginPage = () => {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+        setErrorFix(null);
         setAttemptsRemaining(null);
 
         if (lockoutSeconds > 0) return; // prevent submit during lockout
@@ -82,6 +84,7 @@ export const LoginPage = () => {
         } else {
             // Error
             setError(result.error);
+            setErrorFix(result.fix ?? null);
             if (result.retryAfter) {
                 setLockoutSeconds(result.retryAfter);
             } else if (result.attemptsRemaining !== undefined) {
@@ -108,7 +111,7 @@ export const LoginPage = () => {
                         <p className="text-slate-400">Select an option to proceed</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl px-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 w-full max-w-3xl px-4">
                         <button
                             onClick={() => setLoginView('LOGIN')}
                             className="group relative bg-slate-900/50 backdrop-blur-xl border border-slate-700 hover:border-primary-500 rounded-2xl p-8 text-left transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary-500/20"
@@ -119,6 +122,18 @@ export const LoginPage = () => {
                             </div>
                             <h3 className="text-2xl font-bold text-white mb-2">Login</h3>
                             <p className="text-slate-400 text-sm">Access your Workspace</p>
+                        </button>
+
+                        <button
+                            onClick={() => navigate('/signup')}
+                            className="group relative bg-slate-900/50 backdrop-blur-xl border border-slate-700 hover:border-emerald-500 rounded-2xl p-8 text-left transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-500/20"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+                            <div className="w-14 h-14 bg-slate-800 rounded-xl flex items-center justify-center mb-6 border border-slate-700 group-hover:bg-emerald-500 group-hover:border-emerald-400 transition-colors">
+                                <UserPlus className="w-7 h-7 text-emerald-400 group-hover:text-white transition-colors" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-white mb-2">Sign Up</h3>
+                            <p className="text-slate-400 text-sm">Register as Employee</p>
                         </button>
 
                         <button
@@ -192,9 +207,14 @@ export const LoginPage = () => {
                                 <div className="flex items-center gap-2">
                                     <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
                                 </div>
+                                {errorFix && (
+                                    <p className="mt-1 text-red-400/70 text-xs pl-6">
+                                        💡 {errorFix}
+                                    </p>
+                                )}
                                 {attemptsRemaining !== null && attemptsRemaining > 0 && (
                                     <p className="mt-1 text-red-400/70 text-xs pl-6">
-                                        ⚠️ {attemptsRemaining} attempt{attemptsRemaining !== 1 ? 's' : ''} remaining before 15-min lockout
+                                        ⚠️ {attemptsRemaining} attempt{attemptsRemaining !== 1 ? 's' : ''} remaining — phir 15 min lock
                                     </p>
                                 )}
                             </div>
@@ -258,6 +278,13 @@ export const LoginPage = () => {
                                 </div>
                                 <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">Remember Me</span>
                             </label>
+                            <button
+                                type="button"
+                                onClick={() => navigate('/forgot-password')}
+                                className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+                            >
+                                Forgot Password?
+                            </button>
                         </div>
 
                         <button
@@ -276,8 +303,15 @@ export const LoginPage = () => {
                     </form>
                 </div>
 
-                <p className="text-center text-xs text-slate-600 mt-8">
-                    Secure System • SM Payroll &copy; 2024
+                <p className="text-center text-sm text-slate-500 mt-5">
+                    Naya account chahiye?{' '}
+                    <button onClick={() => navigate('/signup')} className="text-primary-400 hover:text-primary-300 transition-colors font-medium">
+                        Sign Up karein
+                    </button>
+                </p>
+
+                <p className="text-center text-xs text-slate-600 mt-3">
+                    Secure System • SM Payroll &copy; {new Date().getFullYear()}
                 </p>
             </div>
         </div>

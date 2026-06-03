@@ -23,6 +23,7 @@ export enum EmployeeStatus {
     INACTIVE = 'INACTIVE',
     ON_LEAVE = 'ON_LEAVE',
     SUSPENDED = 'SUSPENDED',
+    PENDING = 'PENDING',
 }
 
 export type ShiftType = 'MORNING' | 'EVENING' | 'NIGHT' | 'GENERAL';
