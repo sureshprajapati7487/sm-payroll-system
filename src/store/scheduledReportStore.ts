@@ -37,7 +37,7 @@ export const useScheduledReportStore = create<ScheduledReportState>()(
                 const data = await apiGet<ScheduledReport[]>('/reports/schedules');
                 set({ reports: data });
             } catch (error) {
-                console.error('Failed to fetch scheduled reports:', error);
+                console.warn('[scheduledReports]', error);
             }
         },
 

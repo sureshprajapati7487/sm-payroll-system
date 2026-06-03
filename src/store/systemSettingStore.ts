@@ -32,7 +32,7 @@ export const useInternalSystemSettingStore = create<SystemSettingState>((set) =>
                 set({ settings: settingsRecord });
             }
         } catch (error) {
-            console.error('Failed to fetch system settings:', error);
+            console.warn('[systemSettings]', error);
         } finally {
             set({ isLoading: false });
         }

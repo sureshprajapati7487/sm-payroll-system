@@ -78,7 +78,7 @@ const useInternalEmployeeStore = create<EmployeeState>((set, get) => ({
                 });
             }
         } catch (error) {
-            console.error('Failed to fetch employees:', error);
+            console.warn('[employees]', error);
             set({ isLoading: false });
         }
     },

@@ -160,7 +160,7 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
                     set({ records: normalized });
                 }
             } catch (error) {
-                console.error('Failed to fetch attendance:', error);
+                console.warn('[attendance]', error);
             } finally {
                 set({ isLoading: false });
             }

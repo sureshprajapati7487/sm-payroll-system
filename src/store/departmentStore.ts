@@ -43,7 +43,7 @@ export const useInternalDepartmentStore = create<DepartmentState>((set) => ({
                 set({ departments: data });
             }
         } catch (error) {
-            console.error('Failed to fetch departments:', error);
+            console.warn('[departments]', error);
         } finally {
             set({ isLoading: false });
         }

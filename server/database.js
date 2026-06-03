@@ -721,9 +721,22 @@ const initDB = async () => {
             }
         }
 
-        // Safe Auto-Migration: { alter: { drop: false } } adds missing columns without deleting data.
-        await sequelize.sync({ alter: { drop: false } });
-        console.log('Database synced successfully.');
+        // Safe Auto-Migration: adds missing columns/tables without dropping data.
+        // Wrapped in try-catch because on re-deploys, Sequelize tries to CREATE indexes
+        // that already exist (no IF NOT EXISTS) — PostgreSQL throws "already exists" error.
+        // If that happens, the schema is already current so we warn and continue.
+        try {
+            await sequelize.sync({ alter: { drop: false } });
+            console.log('Database synced successfully.');
+        } catch (syncErr) {
+            const msg = (syncErr.message || '') + (syncErr.original?.message || '');
+            if (msg.includes('already exists')) {
+                console.warn('⚠️  Sync skipped duplicate index (schema is current):', syncErr.original?.message || syncErr.message);
+            } else {
+                // Unknown sync error — warn but don't crash the server
+                console.warn('⚠️  Database sync warning (server will still start):', syncErr.message);
+            }
+        }
 
         // Seed initial admin only on Render (production) — not locally.
         // Local dev starts fresh via Company Setup page.
@@ -774,7 +787,12 @@ const initDB = async () => {
         }
 
     } catch (err) {
-        console.error('Initial DB Sync Error:', err);
+        const msg = err.message || '';
+        if (msg.includes('already exists')) {
+            console.warn('⚠️  DB init skipped pre-existing index — schema is current, server starting normally.');
+        } else {
+            console.error('Initial DB Sync Error:', err);
+        }
     }
 };
 

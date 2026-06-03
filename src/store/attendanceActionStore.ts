@@ -59,7 +59,7 @@ export const useInternalAttendanceActionStore = create<AttendanceActionState>((s
                 set({ attendanceActions: data });
             }
         } catch (error) {
-            console.error('Failed to fetch attendance actions:', error);
+            console.warn('[attendanceActions]', error);
         } finally {
             set({ isLoading: false });
         }

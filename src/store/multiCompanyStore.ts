@@ -41,6 +41,21 @@ export const useMultiCompanyStore = create<MultiCompanyState>()(
 
             // Initial Fetch
             fetchCompanies: async () => {
+                // TASK 2 FIX: Guard against fetching before auth token is available.
+                // Read token directly from localStorage to avoid circular store import.
+                const hasToken = (() => {
+                    try {
+                        const raw = localStorage.getItem('auth-storage');
+                        if (!raw) return false;
+                        return !!(JSON.parse(raw)?.state?.token);
+                    } catch { return false; }
+                })();
+
+                if (!hasToken) {
+                    set({ isLoading: false });
+                    return; // Not authenticated yet — skip fetch silently
+                }
+
                 set({ isLoading: true });
                 try {
                     const res = await apiFetch(`/companies`);
@@ -57,7 +72,7 @@ export const useMultiCompanyStore = create<MultiCompanyState>()(
 
                     set({ companies, currentCompanyId: autoSelectId, isLoading: false });
                 } catch (error) {
-                    console.error('Failed to fetch companies:', error);
+                    console.warn('[multiCompanyStore] fetchCompanies failed:', error);
                     set({ isLoading: false });
                 }
             },

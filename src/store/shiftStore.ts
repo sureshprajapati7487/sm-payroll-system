@@ -27,7 +27,7 @@ export const useInternalShiftStore = create<ShiftState>((set, get) => ({
                 set({ shifts: data });
             }
         } catch (error) {
-            console.error('Failed to fetch shifts:', error);
+            console.warn('[shifts]', error);
         } finally {
             set({ isLoading: false });
         }

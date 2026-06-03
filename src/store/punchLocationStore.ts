@@ -39,7 +39,7 @@ export const useInternalPunchLocationStore = create<PunchLocationState>((set, ge
                 set({ punchLocations: data });
             }
         } catch (error) {
-            console.error('Failed to fetch punch locations:', error);
+            console.warn('[punchLocations]', error);
         } finally {
             set({ isLoading: false });
         }

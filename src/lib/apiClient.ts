@@ -138,7 +138,19 @@ export async function apiFetch(path: string, options: FetchOptions = {}): Promis
 
     // Inject JWT token and Company ID
     if (!skipAuth) {
-        const token = getToken();
+        let token = getToken();
+
+        // TASK 2 FIX: If auth-storage exists in localStorage but token is null,
+        // Zustand hydration may still be in-flight (parsing + onRehydrateStorage).
+        // Wait up to 300ms (6 × 50ms) for the token to appear before giving up.
+        if (!token && localStorage.getItem('auth-storage')) {
+            for (let i = 0; i < 6; i++) {
+                await new Promise<void>(r => setTimeout(r, 50));
+                token = getToken();
+                if (token) break;
+            }
+        }
+
         const companyId = getActiveCompanyId();
 
         if (companyId) {
@@ -152,7 +164,7 @@ export async function apiFetch(path: string, options: FetchOptions = {}): Promis
         }
 
         if (!token && !_isRetry) {
-            // No token — return synthetic 401 (prevents API loop on login page)
+            // No token after waiting — return synthetic 401
             return new Response(JSON.stringify({ error: 'No token' }), {
                 status: 401,
                 headers: { 'Content-Type': 'application/json' },

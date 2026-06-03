@@ -22,7 +22,7 @@ export const useRateStore = create<RateState>((set, get) => ({
             const res = await apiFetch(`/production/items/all?companyId=${companyId}`);
             if (res.ok) set({ items: await res.json() });
         } catch (err) {
-            console.error('Failed to fetch production items:', err);
+            console.warn('[productionItems]', err);
         } finally {
             set({ isLoading: false });
         }

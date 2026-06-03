@@ -35,7 +35,7 @@ export const useInternalSalaryTypeStore = create<SalaryTypeState>((set) => ({
                 set({ salaryTypes: data });
             }
         } catch (error) {
-            console.error('Failed to fetch salary types:', error);
+            console.warn('[salaryTypes]', error);
         } finally {
             set({ isLoading: false });
         }

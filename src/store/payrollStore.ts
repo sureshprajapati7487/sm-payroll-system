@@ -56,7 +56,7 @@ const useInternalPayrollStore = create<PayrollState>((set, get) => ({
                 });
             }
         } catch (err) {
-            console.error('Failed to fetch payroll from server:', err);
+            console.warn('[payroll]', err);
         } finally {
             set({ isLoading: false });
         }

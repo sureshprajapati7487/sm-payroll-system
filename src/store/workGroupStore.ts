@@ -52,7 +52,7 @@ export const useInternalWorkGroupStore = create<WorkGroupState>((set, get) => ({
                 set({ assignments: map });
             }
         } catch (error) {
-            console.error('Failed to fetch work groups:', error);
+            console.warn('[workGroups]', error);
         } finally {
             set({ isLoading: false });
         }
