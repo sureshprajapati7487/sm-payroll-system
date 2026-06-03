@@ -11,6 +11,9 @@ dist/
 .env.production
 server/.env
 
+# Personal credentials file — NEVER commit this
+Personal Details.md
+
 # SQLite database (data is local, not for git)
 server/*.sqlite
 server/backups/

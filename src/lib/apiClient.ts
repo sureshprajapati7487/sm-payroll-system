@@ -33,6 +33,34 @@ function getActiveCompanyId(): string | null {
     }
 }
 
+/** Read the logged-in user's own companyId from JWT (not the currently selected company) */
+function getUserCompanyId(): string | null {
+    try {
+        const raw = localStorage.getItem('auth-storage');
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed?.state?.user?.companyId ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/** Read cached cross-company HMAC token — only valid for today (UTC date match) */
+function getCrossCompanyToken(targetCompanyId: string): string | null {
+    try {
+        const raw = localStorage.getItem('cross-company-auth');
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const today = new Date().toISOString().slice(0, 10);
+        if (parsed?.targetCompanyId === targetCompanyId && parsed?.date === today) {
+            return parsed.token ?? null;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
 /** Set a new token in Zustand persisted storage directly (avoids circular import) */
 function setToken(token: string | null) {
     try {
@@ -42,7 +70,7 @@ function setToken(token: string | null) {
         if (!parsed?.state) return;
         parsed.state.token = token;
         localStorage.setItem('auth-storage', JSON.stringify(parsed));
-    } catch { }
+    } catch { /* localStorage unavailable or storage quota exceeded — token update skipped */ }
 }
 
 // Prevents multiple concurrent refresh attempts
@@ -117,6 +145,12 @@ export async function apiFetch(path: string, options: FetchOptions = {}): Promis
             headers['x-company-id'] = companyId;
         }
 
+        // When SUPER_ADMIN is viewing a different company, attach the daily HMAC token
+        if (companyId && companyId !== getUserCompanyId()) {
+            const ccToken = getCrossCompanyToken(companyId);
+            if (ccToken) headers['x-cross-company-token'] = ccToken;
+        }
+
         if (!token && !_isRetry) {
             // No token — return synthetic 401 (prevents API loop on login page)
             return new Response(JSON.stringify({ error: 'No token' }), {
@@ -141,7 +175,7 @@ export async function apiFetch(path: string, options: FetchOptions = {}): Promis
             return apiFetch(path, { ...options, _isRetry: true });
         }
         // Refresh failed — force logout
-        try { localStorage.removeItem('auth-storage'); } catch { }
+        try { localStorage.removeItem('auth-storage'); } catch { /* ignore — localStorage may be unavailable */ }
     }
 
     return response;

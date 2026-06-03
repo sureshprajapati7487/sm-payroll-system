@@ -15,7 +15,7 @@ export const TDSCalculator = () => {
     const customSlabs = useMemo(() => {
         const slabKey = keys.find(k => k.key === 'PAYROLL_TAX_SLABS');
         if (slabKey && slabKey.value) {
-            try { return JSON.parse(slabKey.value); } catch (e) { }
+            try { return JSON.parse(slabKey.value); } catch { /* malformed JSON in slabKey — fall through to undefined */ }
         }
         return undefined;
     }, [keys]);

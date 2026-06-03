@@ -1,5 +1,5 @@
 const express = require('express');
-require('dotenv').config(); // Load environment variables first
+require('dotenv').config({ path: require('path').join(__dirname, '.env') }); // always load from server/.env regardless of cwd
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const jwt = require('jsonwebtoken');
@@ -9,66 +9,35 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, Expense, SalarySlip, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, initDB } = require('./database');
+
+// ── IF-01: Security & Performance Middleware ──────────────────────────────────
+// helmet sets HTTP security headers (X-Frame-Options, X-Content-Type-Options, etc.)
+// compression enables gzip/brotli response compression for all API responses
+const helmet = require('helmet');
+const compression = require('compression');
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── IF-02: Auth Middleware (extracted) ────────────────────────────────────────
+const { authMiddleware, isPublic, PUBLIC_PATHS } = require('./middlewares/auth');
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── IF-03: Error Handler (extracted) ─────────────────────────────────────────
+const { addError, getErrorHint, getErrorLog, ERROR_LOG_PATH, errorHandlerMiddleware } = require('./middlewares/errorHandler');
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { sequelize, Company, Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Attendance, Production, ProductionItem, Leave, Loan, LoanLedger, Expense, SalarySlip, Biometric, AdvanceSalary, Holiday, AuditLog, Client, ClientVisit, SalesTask, UserSession, IPRestriction, CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule, FnFSettlement, OvertimePolicy, initDB } = require('./database');
 const { Op } = require('sequelize');
 const { startBackupScheduler, doBackup, getBackupStatus, getConfig, updateConfig } = require('./backup');
 
 const BCRYPT_ROUNDS = 10;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-// ── Brute Force Protection ───────────────────────────────────────────────────
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+// ── Brute Force Protection → see ./middlewares/bruteForce.js (IF-04) ─────────
+const { getAttemptKey, isLocked, lockoutRemainingSeconds, recordFailedAttempt, clearFailedAttempts, MAX_FAILED_ATTEMPTS, LOCKOUT_DURATION_MS } = require('./middlewares/bruteForce');
 
-const failedAttempts = new Map();
-
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, val] of failedAttempts.entries()) {
-        if (val.lockedUntil && now > val.lockedUntil) failedAttempts.delete(key);
-    }
-}, 30 * 60 * 1000);
-
-// getAttemptKey — returns a consistent, unified key for brute-force tracking
-// Employee code is stored as UPPERCASE (e.g. "ACLLP-01"), email as lowercase
-// We normalize BOTH so lockout works regardless of what the user typed
-function getAttemptKey(idOrEmail) {
-    const clean = (idOrEmail || '').trim();
-    // If it looks like an email (has @), use lowercase; otherwise uppercase for emp code
-    return clean.includes('@') ? clean.toLowerCase() : clean.toUpperCase();
-}
-function isLocked(key) {
-    const entry = failedAttempts.get(key);
-    if (!entry || !entry.lockedUntil) return false;
-    if (Date.now() > entry.lockedUntil) { failedAttempts.delete(key); return false; }
-    return true;
-}
-function lockoutRemainingSeconds(key) {
-    const entry = failedAttempts.get(key);
-    if (!entry || !entry.lockedUntil) return 0;
-    return Math.ceil((entry.lockedUntil - Date.now()) / 1000);
-}
-function recordFailedAttempt(key) {
-    const entry = failedAttempts.get(key) || { count: 0, lockedUntil: null };
-    entry.count += 1;
-    if (entry.count >= MAX_FAILED_ATTEMPTS) {
-        entry.lockedUntil = Date.now() + LOCKOUT_DURATION_MS;
-        console.warn(`🔒 Account locked (${MAX_FAILED_ATTEMPTS} failed attempts): ${key}`);
-    }
-    failedAttempts.set(key, entry);
-    return entry;
-}
-function clearFailedAttempts(key) { failedAttempts.delete(key); }
-
-// IP-level rate limiter
-const loginRateLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 20,
-    standardHeaders: true,
-    legacyHeaders: false,
-    skipSuccessfulRequests: true,
-    message: { error: 'Too many login attempts from this device.', fix: 'Please wait 15 minutes before trying again.', retryAfter: 15 * 60 },
-});
+// ── Rate Limiters → see ./middlewares/rateLimiters.js (IF-05A) ───────────────
+const { loginRateLimiter, writeRateLimiter } = require('./middlewares/rateLimiters');
+// ─────────────────────────────────────────────────────────────────────────────
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -76,146 +45,79 @@ const HOST = '0.0.0.0';
 const SERVER_START_TIME = Date.now();
 
 // ── JWT Config ────────────────────────────────────────────────────────────────
-const DEFAULT_JWT_SECRET = 'sm-payroll-super-secret-jwt-key-2026';
-const DEFAULT_REFRESH_SECRET = 'sm-payroll-refresh-secret-key-2026-v2';
+// Secrets MUST be provided via environment variables — no hardcoded defaults.
+// In development: if missing, a random secret is generated at startup (ephemeral — sessions won't survive restarts).
+// In production: missing secrets cause an immediate process exit.
 
-const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
-const JWT_EXPIRES = process.env.JWT_EXPIRES || '15m';
-const REFRESH_SECRET = process.env.REFRESH_SECRET || DEFAULT_REFRESH_SECRET;
-const REFRESH_EXPIRES = '7d';
+function generateDevSecret(name) {
+    const crypto = require('crypto');
+    const s = crypto.randomBytes(64).toString('hex');
+    console.warn(`⚠️  ${name} not set — generated ephemeral secret for this session (tokens won't survive restarts). Copy server/.env.example → server/.env and set ${name}.`);
+    return s;
+}
 
-// ── Security Check: Block production with weak secrets ────────────────────────
 if (IS_PRODUCTION) {
-    if (!process.env.JWT_SECRET || JWT_SECRET === DEFAULT_JWT_SECRET) {
+    if (!process.env.JWT_SECRET) {
         console.error('🚨 SECURITY ERROR: JWT_SECRET is not set in environment variables!');
         console.error('   Generate one: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
         process.exit(1);
     }
-    if (!process.env.REFRESH_SECRET || REFRESH_SECRET === DEFAULT_REFRESH_SECRET) {
+    if (!process.env.REFRESH_SECRET) {
         console.error('🚨 SECURITY ERROR: REFRESH_SECRET is not set in environment variables!');
         process.exit(1);
     }
-} else if (!process.env.JWT_SECRET) {
-    console.warn('⚠️  JWT_SECRET not in .env — using insecure default (dev only). Copy server/.env.example to server/.env');
 }
 
-// ── Error Hints ───────────────────────────────────────────────────────────────
-const ERROR_HINTS = {
-    'SequelizeConnectionError': { why: 'Database file is locked, missing, or corrupted.', fix: 'Restart the server. If it persists, delete database.sqlite and restart.' },
-    'SequelizeValidationError': { why: 'Required fields are missing or have invalid values.', fix: 'Check the request payload — ensure all required fields are present.' },
-    'SequelizeUniqueConstraintError': { why: 'A record with this unique value already exists.', fix: 'Use a different code/ID, or update the existing record.' },
-    'SequelizeDatabaseError': { why: 'SQL query failed — schema mismatch or missing table.', fix: 'Run "npm start" to re-sync the database schema.' },
-    'ENOENT': { why: 'A required file or directory was not found.', fix: 'Check that database.sqlite exists in /server folder.' },
-    'ECONNREFUSED': { why: 'The backend server is not running.', fix: 'Run "cd server && npm start".' },
-    'SyntaxError': { why: 'The request body contained invalid JSON.', fix: 'Ensure the frontend sends valid JSON with Content-Type: application/json.' },
-    'TypeError': { why: 'A variable or property is undefined/null.', fix: 'Check backend logs for the undefined property.' },
-    'SQLITE_CONSTRAINT': { why: 'A database constraint was violated.', fix: 'Ensure all required fields are provided and avoid duplicate entries.' },
-    'SQLITE_ERROR': { why: 'Generic SQLite error — table missing or query malformed.', fix: 'Restart server to sync database.' },
-    'DEFAULT': { why: 'An unexpected error occurred.', fix: 'Check the error message. Restart the server and try again.' },
-};
-function getErrorHint(err) {
-    if (!err) return ERROR_HINTS.DEFAULT;
-    const name = err.name || '';
-    const msg = (err.message || '').toUpperCase();
-    for (const key of Object.keys(ERROR_HINTS)) {
-        if (name.includes(key) || msg.includes(key)) return ERROR_HINTS[key];
-    }
-    return ERROR_HINTS.DEFAULT;
-}
+const JWT_SECRET = process.env.JWT_SECRET || generateDevSecret('JWT_SECRET');
+const JWT_EXPIRES = process.env.JWT_EXPIRES || '15m';
+const REFRESH_SECRET = process.env.REFRESH_SECRET || generateDevSecret('REFRESH_SECRET');
+const REFRESH_EXPIRES = '7d';
 
-const ERROR_LOG_PATH = path.join(__dirname, 'errors.log');
-
-// Load existing errors on startup
-let errorLog = [];
-try {
-    if (fs.existsSync(ERROR_LOG_PATH)) {
-        // Read file, split by lines, parse valid JSON, get last 100
-        const content = fs.readFileSync(ERROR_LOG_PATH, 'utf-8').trim();
-        if (content) {
-            const lines = content.split('\n');
-            errorLog = lines.map(l => {
-                try { return JSON.parse(l); } catch { return null; }
-            }).filter(Boolean).reverse().slice(0, 100);
-        }
-    }
-} catch (e) {
-    console.error('Failed to load error log file', e);
-}
-
-const addError = (err, endpoint = 'system') => {
-    const hint = getErrorHint(typeof err === 'string' ? null : err);
-    const message = typeof err === 'string' ? err : (err.message || String(err));
-    const name = typeof err === 'object' ? (err.name || 'Error') : 'Error';
-    const logEntry = { id: Date.now(), timestamp: new Date().toISOString(), endpoint, errorType: name, message, why: hint.why, fix: hint.fix, stack: typeof err === 'object' ? (err.stack || null) : null };
-
-    errorLog.unshift(logEntry);
-    if (errorLog.length > 100) errorLog.pop();
-
-    try {
-        fs.appendFileSync(ERROR_LOG_PATH, JSON.stringify(logEntry) + '\n');
-    } catch (fsErr) {
-        console.error('Failed to write to error log file', fsErr);
-    }
-};
+// ── Error Hints / Error Log → see ./middlewares/errorHandler.js (IF-03) ──────
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
-// Static allow list (always allowed)
+// In production: only ALLOWED_ORIGINS env var origins are permitted.
+// In development: localhost ports + optionally LAN IPs (CORS_ALLOW_LAN=true).
 const ALLOWED_ORIGINS_STATIC = [
+    process.env.FRONTEND_URL,                // primary frontend origin
     'https://sm-payroll-system.vercel.app',  // production frontend (Vercel)
     'capacitor://localhost',                 // iOS Capacitor
     'http://localhost',                      // Android WebView
     'https://localhost',
-    process.env.FRONTEND_URL,
+    // Parse comma-separated additional origins from env (e.g. "https://app.example.com,https://admin.example.com")
+    ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()) : []),
 ].filter(Boolean);
 
-// Dynamic check: allow ANY localhost origin (any port) — covers dev server on any port
-// Also allow any 192.168.x.x local network origin for mobile testing on LAN
 function isAllowedOrigin(origin) {
-    if (!origin) return true; // server-to-server (no origin header)
+    if (!origin) return true; // server-to-server calls (no Origin header)
     if (ALLOWED_ORIGINS_STATIC.includes(origin)) return true;
-    // Allow localhost on any port (http or https)
-    if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
-    // Allow HTTPS localhost on any port (Vite dev SSL)
-    if (/^https:\/\/localhost(:\d+)?$/.test(origin)) return true;
-    // Allow local network IPs (192.168.x.x or 10.x.x.x) on any port
-    if (/^https?:\/\/(192\.168\.|10\.)\d+\.\d+(:\d+)?$/.test(origin)) return true;
+    // Localhost any port — development only
+    if (!IS_PRODUCTION && /^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
+    // LAN IPs — only when explicitly opted in via CORS_ALLOW_LAN=true (dev mobile testing)
+    if (!IS_PRODUCTION && process.env.CORS_ALLOW_LAN === 'true' && /^https?:\/\/(192\.168\.|10\.)\d+\.\d+(:\d+)?$/.test(origin)) return true;
     return false;
 }
 
 // ── Auth Middleware ───────────────────────────────────────────────────────────
-const PUBLIC_PATHS = [
-    { method: 'POST', path: '/api/auth/login' },
-    { method: 'POST', path: '/api/auth/dev-login' },
-    { method: 'POST', path: '/api/auth/refresh' },
-    { method: 'POST', path: '/api/auth/verify-password' },
-    { method: 'POST', path: '/api/auth/logout' },
-    { method: 'GET', path: '/api/health' },
-    { method: 'GET', path: '/api/status/routes' },
-    { method: 'GET', path: '/api/status/errors' },
-    { method: 'DELETE', path: '/api/health/errors' },
-    { method: 'GET', path: '/api/health/deep' },
-    { method: 'POST', path: '/api/status/errors/report' },
-    { method: 'POST', path: '/api/companies' },
-    { method: 'GET', path: '/api/clients/export' },
-    { method: 'GET', path: '/api/clients/demo-export' },
-];
+// PUBLIC_PATHS, isPublic, authMiddleware → see ./middlewares/auth.js (IF-02)
 
-// ── DEV ONLY: Reset Admin Password (localhost only, blocked in production) ────
+// ── DEV ONLY: Reset Admin Password — not registered at all in production ──────
+if (!IS_PRODUCTION) {
 app.get('/api/dev/reset-admin', async (req, res) => {
-    // 🔒 SECURITY: Only allow from localhost — never accessible from network or production
     const ip = req.socket.remoteAddress || req.ip || '';
     const isLocalhost = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-    if (IS_PRODUCTION || !isLocalhost) {
-        return res.status(403).json({ error: 'Access denied. This route is only available on localhost in development mode.' });
+    if (!isLocalhost) {
+        return res.status(403).json({ error: 'Access denied. Only accessible from localhost in development mode.' });
     }
     try {
         const emp = await Employee.findOne({ where: { code: 'ACLLP-01' } });
         if (!emp) {
-            // Force create it
+            const firstCompany = await Company.findOne({ order: [['createdAt', 'ASC']] });
+            if (!firstCompany) return res.json({ error: 'No company found. Create a company first via /company-setup.' });
             const hashed = await bcrypt.hash('8824834657@AA', 10);
             await Employee.create({
                 id: 'admin-recovery',
-                companyId: 'c1',
+                companyId: firstCompany.id,
                 code: 'ACLLP-01',
                 name: 'Admin Recovered',
                 phone: '8824834657',
@@ -223,7 +125,7 @@ app.get('/api/dev/reset-admin', async (req, res) => {
                 password: hashed,
                 status: 'ACTIVE'
             });
-            return res.json({ msg: 'Admin did not exist. Force created.', code: 'ACLLP-01', pass: '8824834657@AA' });
+            return res.json({ msg: 'Admin did not exist. Force created.', code: 'ACLLP-01', pass: '8824834657@AA', companyId: firstCompany.id });
         }
         const hashed = await bcrypt.hash('8824834657@AA', 10);
         await emp.update({ password: hashed });
@@ -232,19 +134,43 @@ app.get('/api/dev/reset-admin', async (req, res) => {
         res.json({ error: e.message });
     }
 });
+} // end if (!IS_PRODUCTION)
 
-function isPublic(req) {
-    return PUBLIC_PATHS.some(p => p.method === req.method && req.path.startsWith(p.path));
-}
-function authMiddleware(req, res, next) {
-    if (isPublic(req)) return next();
-    const header = req.headers['authorization'] || '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : (req.query.token || null);
-    if (!token) return res.status(401).json({ error: 'Unauthorized — token required', fix: 'Include Authorization: Bearer <token> header' });
-    try { req.user = jwt.verify(token, JWT_SECRET); next(); }
-    catch (e) { return res.status(401).json({ error: 'Invalid or expired token', fix: 'Login again to get a new token' }); }
-}
+// ── IF-01: Helmet — HTTP Security Headers ────────────────────────────────────
+// CSP is set to report-only mode initially so no frontend assets break.
+// Report-only means violations are logged (console) but NOT blocked.
+// This lets us observe what would break before we switch to enforce mode (IF-09).
+// Other headers (X-Frame-Options, X-Content-Type-Options, HSTS, etc.) are active.
+app.use(helmet({
+    // CSP in report-only mode — safe for existing React + camera features
+    contentSecurityPolicy: {
+        useDefaults: true,
+        reportOnly: false, // ← CSP enforced (IF-09)
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'"], // 'unsafe-eval' removed — not needed in production build
+            styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+            fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+            imgSrc: ["'self'", 'data:', 'blob:'], // blob: needed for camera/face scan
+            connectSrc: ["'self'", 'http://localhost:*', 'http://192.168.*', 'ws://localhost:*'],
+            mediaSrc: ["'self'", 'blob:'],        // blob: needed for camera streams
+            workerSrc: ["'self'", 'blob:'],       // blob: needed for web workers
+            objectSrc: ["'none'"],
+            frameAncestors: ["'self'"],
+        },
+    },
+    // Disable COEP — required for camera/face-scan iframe-embedded resources
+    crossOriginEmbedderPolicy: false,
+    // Allow cross-origin resource loading (needed for fonts, CDN assets)
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 
+// ── IF-01: Compression — gzip/brotli all API responses ───────────────────────
+// Compresses responses > 1KB automatically. Clients that don't support
+// compression receive plain responses — fully backward compatible.
+app.use(compression());
+
+// ── CORS ──────────────────────────────────────────────────────────────────────
 app.use(cors({
     origin: (origin, callback) => {
         if (isAllowedOrigin(origin)) return callback(null, true);
@@ -256,6 +182,11 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(authMiddleware);
+
+// ── IF-01: Apply Global Write-API Rate Limiter ────────────────────────────────
+// Applied AFTER authMiddleware so authenticated context is available if needed.
+// Skips GET requests automatically (defined in writeRateLimiter config above).
+app.use(writeRateLimiter);
 
 // ── Company Scope Enforcement — prevents cross-tenant data bleed ──────────────
 const { requireCompanyScope } = require('./rbac');
@@ -283,7 +214,7 @@ app.get('/api/health', async (req, res) => {
         server: 'online', uptime: `${h}h ${m}m ${s}s`, uptimeSeconds,
         startedAt: new Date(SERVER_START_TIME).toISOString(), checkedAt: new Date().toISOString(),
         database: { status: dbStatus, error: dbError, why: dbWhy, fix: dbFix, engine: 'SQLite', file: 'database.sqlite' },
-        recentErrors: errorLog.slice(0, 20), totalErrors: errorLog.length,
+        recentErrors: getErrorLog().slice(0, 20), totalErrors: getErrorLog().length,
     });
 });
 
@@ -303,6 +234,7 @@ app.get('/api/health/deep', async (req, res) => {
         { name: 'Production', model: Production, icon: '🏭' },
         { name: 'Leaves', model: Leave, icon: '🌿' },
         { name: 'Loans', model: Loan, icon: '💳' },
+        { name: 'LoanLedger', model: LoanLedger, icon: '📒' },
         { name: 'Expenses', model: Expense, icon: '🧾' },
         { name: 'SalarySlips', model: SalarySlip, icon: '📄' },
         { name: 'AuditLogs', model: AuditLog, icon: '🔍' },
@@ -327,7 +259,7 @@ app.get('/api/health/deep', async (req, res) => {
             try {
                 const latest = await t.model.findOne({ order: [['updatedAt', 'DESC']], attributes: ['updatedAt'] });
                 lastUpdated = latest?.updatedAt || null;
-            } catch (_) { }
+            } catch (_) { /* updatedAt optional — older tables may not have this column */ }
             tableHealth.push({ name: t.name, icon: t.icon, count, status: 'ok', lastUpdated });
         } catch (e) {
             tableHealth.push({ name: t.name, icon: t.icon, count: 0, status: 'error', error: e.message });
@@ -373,7 +305,7 @@ app.get('/api/health/deep', async (req, res) => {
             const files = fs.readdirSync(backupDir).filter(f => f.endsWith('.sqlite'));
             backupInfo.backupCount = files.length;
             backupInfo.latestBackup = files.sort().pop() || null;
-        } catch (_) { }
+        } catch (_) { /* backup dir may not exist yet — non-critical */ }
     }
 
     fsChecks.push(checkFile('Database File', dbFile, '🗄️'));
@@ -401,7 +333,7 @@ app.get('/api/health/deep', async (req, res) => {
     // ── 5. Error Analytics ─────────────────────────────────────────────────────
     const errorsByType = {};
     const errorsByPage = {};
-    for (const err of errorLog) {
+    for (const err of getErrorLog()) {
         // Group by errorType
         if (!errorsByType[err.errorType]) errorsByType[err.errorType] = 0;
         errorsByType[err.errorType]++;
@@ -411,10 +343,10 @@ app.get('/api/health/deep', async (req, res) => {
         errorsByPage[page]++;
     }
     results.errorAnalytics = {
-        total: errorLog.length,
+        total: getErrorLog().length,
         byType: Object.entries(errorsByType).map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count),
         byPage: Object.entries(errorsByPage).map(([page, count]) => ({ page, count })).sort((a, b) => b.count - a.count).slice(0, 10),
-        recentErrors: errorLog.slice(0, 10),
+        recentErrors: getErrorLog().slice(0, 10),
     };
 
     // ── 6. Server Runtime Info ────────────────────────────────────────────────
@@ -586,7 +518,7 @@ app.get('/api/health/deep', async (req, res) => {
     // ERRORS: Spike in last 1 hour
     try {
         const oneHourAgo = Date.now() - 60 * 60 * 1000;
-        const recent = errorLog.filter(e => new Date(e.timestamp).getTime() > oneHourAgo);
+        const recent = getErrorLog().filter(e => new Date(e.timestamp).getTime() > oneHourAgo);
         const byEndpoint = {};
         for (const e of recent) { byEndpoint[e.endpoint] = (byEndpoint[e.endpoint] || 0) + 1; }
         const top = Object.entries(byEndpoint).sort((a, b) => b[1] - a[1])[0];
@@ -641,7 +573,7 @@ app.get('/api/health/deep', async (req, res) => {
 
 app.delete('/api/health/errors', (req, res) => {
     try {
-        errorLog.length = 0; // clear in-memory array
+        getErrorLog().length = 0; // clear in-memory array
         fs.writeFileSync(ERROR_LOG_PATH, ''); // wipe the file on disk
         res.json({ success: true, message: 'All error logs cleared.' });
     } catch (e) {
@@ -704,7 +636,7 @@ app.get('/api/status/routes', (req, res) => {
     });
 });
 app.get('/api/status/errors', (req, res) => {
-    res.json({ errors: errorLog, total: errorLog.length });
+    res.json({ errors: getErrorLog(), total: getErrorLog().length });
 });
 app.post('/api/status/errors/report', (req, res) => {
     const { name, message, stack, route } = req.body || {};
@@ -712,13 +644,16 @@ app.post('/api/status/errors/report', (req, res) => {
     res.json({ ok: true });
 });
 
+// ── In-memory store for password reset tokens (short-lived, no DB needed) ────
+const resetTokens = new Map(); // token → { employeeId, expiresAt }
+
 // ── AUTH ROUTES ───────────────────────────────────────────────────────────────
 app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
     try {
         const { idOrEmail, password } = req.body || {};
         const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
 
-        if (!idOrEmail || !password) return res.status(400).json({ error: 'idOrEmail and password are required' });
+        if (!idOrEmail || !password) return res.status(400).json({ error: 'Fields Required — Login ID aur Password dono bharein' });
 
         // IP Whitelist Check
         const restrictions = await IPRestriction.findAll();
@@ -728,7 +663,7 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
                 const isAllowed = whitelisted.some(r => r.ipAddress === ipAddress);
                 if (!isAllowed) {
                     await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', userId: 'UNKNOWN', userName: idOrEmail || 'UNKNOWN', entityType: 'USER', entityName: idOrEmail, status: 'FAILED', ipAddress, errorMessage: 'IP not whitelisted' });
-                    return res.status(403).json({ error: 'Access denied from this IP address.' });
+                    return res.status(403).json({ error: 'Access Denied — Is IP address se login allowed nahi hai. Admin se contact karein.' });
                 }
             }
         }
@@ -748,7 +683,15 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
         if (!employee) {
             recordFailedAttempt(attemptKey);
             await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', userId: 'UNKNOWN', userName: idOrEmail || 'UNKNOWN', entityType: 'USER', entityName: idOrEmail, status: 'FAILED', ipAddress, errorMessage: 'Invalid employee code/email' });
-            return res.status(401).json({ error: 'Invalid credentials', fix: 'Check your employee code/email and password' });
+            return res.status(401).json({ error: 'Invalid Credentials — Employee code ya email galat hai', fix: 'Apna employee code ya registered email check karein' });
+        }
+
+        // Block PENDING employees from logging in before admin approval
+        if (employee.status === 'PENDING') {
+            return res.status(403).json({
+                error: 'Account Pending Approval — Aapka account abhi admin se approve nahi hua',
+                fix: 'Admin se request karein ki aapka account activate karein',
+            });
         }
 
         const storedPass = (employee.password || '').trim();
@@ -769,7 +712,7 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
             await AuditLog.create({ id: `audit-${Date.now()}-${uuidv4().substring(0, 8)}`, timestamp: new Date().toISOString(), action: 'LOGIN_FAILED', userId: employee.id, userName: employee.name, userRole: employee.role, entityType: 'USER', entityName: employee.name, status: 'FAILED', ipAddress, errorMessage: 'Invalid password' });
             const rem = MAX_FAILED_ATTEMPTS - entry.count;
             if (entry.lockedUntil) return res.status(429).json({ error: 'Too many failed attempts. Account locked for 15 minutes.', fix: '15 minute baad try karein.', lockedFor: LOCKOUT_DURATION_MS / 1000, retryAfter: LOCKOUT_DURATION_MS / 1000 });
-            return res.status(401).json({ error: 'Invalid credentials', fix: 'Check your password and try again', attemptsRemaining: rem > 0 ? rem : 0 });
+            return res.status(401).json({ error: 'Wrong Password — Password galat hai', fix: 'Apna password dobara check karein', attemptsRemaining: rem > 0 ? rem : 0 });
         }
 
         clearFailedAttempts(attemptKey);
@@ -785,10 +728,17 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
         const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRES });
 
+        // FIX 4: Explicit cookie settings per environment.
+        // Dev: secure:false + sameSite:lax so cookie works over HTTP/proxied HTTPS.
+        // Prod: secure:true + sameSite:none required for cross-origin cookie (Vercel → Render).
+        const origin = req.headers.origin || '';
+        if (!IS_PRODUCTION && origin.startsWith('https://')) {
+            console.warn(`[Cookie] Dev HTTPS origin detected (${origin}). Cookie is secure:false/sameSite:lax — ensure Vite proxy is active, not direct cross-origin calls.`);
+        }
         res.cookie('refresh_token', refreshToken, {
             httpOnly: true,
-            secure: IS_PRODUCTION,
-            sameSite: IS_PRODUCTION ? 'none' : 'lax',
+            secure: IS_PRODUCTION,           // false in dev — allows HTTP (Vite proxy path)
+            sameSite: IS_PRODUCTION ? 'none' : 'lax', // 'none' required for cross-site in prod
             maxAge: 7 * 24 * 60 * 60 * 1000,
             path: '/',
         });
@@ -833,10 +783,183 @@ app.post('/api/auth/logout', async (req, res) => {
 
             const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
             await AuditLog.create({ id: uuidv4(), timestamp: new Date().toISOString(), action: 'LOGOUT', userId: decoded.id, userName: decoded.name, userRole: decoded.role, entityType: 'USER', entityName: decoded.name, status: 'SUCCESS', ipAddress });
-        } catch (e) { }
+        } catch { /* logout always succeeds — session/audit update is best-effort */ }
     }
     res.clearCookie('refresh_token', { path: '/' });
     res.json({ success: true, message: 'Logged out successfully' });
+});
+
+// ── Forgot Password — Step 1: verify employee code + phone ───────────────────
+app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+        const { employeeCode, phone } = req.body || {};
+        if (!employeeCode?.trim() || !phone?.trim())
+            return res.status(400).json({ error: 'Employee Code aur Phone Required — Dono fields bharein' });
+
+        const employee = await Employee.findOne({
+            where: { code: employeeCode.trim().toUpperCase(), phone: phone.trim() }
+        });
+
+        // Deliberate vague response — prevent user enumeration
+        if (!employee || employee.status === 'PENDING')
+            return res.status(404).json({ error: 'Record Not Found — Employee code ya phone number match nahi kiya' });
+
+        // Generate a short-lived signed token (15 min)
+        const resetToken = jwt.sign(
+            { employeeId: employee.id, purpose: 'password_reset' },
+            JWT_SECRET,
+            { expiresIn: '15m' }
+        );
+        resetTokens.set(resetToken, { employeeId: employee.id, expiresAt: Date.now() + 15 * 60 * 1000 });
+
+        await AuditLog.create({
+            id: uuidv4(), timestamp: new Date().toISOString(),
+            action: 'PASSWORD_RESET_REQUEST', userId: employee.id,
+            userName: employee.name, userRole: employee.role,
+            entityType: 'USER', entityName: employee.name, status: 'SUCCESS',
+            ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip,
+        });
+
+        res.json({ success: true, resetToken, employeeName: employee.name });
+    } catch (e) {
+        addError(e, 'POST /api/auth/forgot-password');
+        res.status(500).json({ error: 'Server Error — Dobara try karein' });
+    }
+});
+
+// ── Reset Password — Step 2: set new password with token ─────────────────────
+app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+        const { resetToken, newPassword, confirmPassword } = req.body || {};
+        if (!resetToken || !newPassword || !confirmPassword)
+            return res.status(400).json({ error: 'All Fields Required — Sabhi fields bharein' });
+        if (newPassword !== confirmPassword)
+            return res.status(400).json({ error: 'Passwords Do Not Match — Dono passwords same hone chahiye' });
+        if (newPassword.length < 8)
+            return res.status(400).json({ error: 'Password Too Short — Kam se kam 8 characters ka password banayein' });
+
+        // Verify token
+        let decoded;
+        try {
+            decoded = jwt.verify(resetToken, JWT_SECRET);
+        } catch {
+            resetTokens.delete(resetToken);
+            return res.status(401).json({ error: 'Token Expired — 15 minute mein reset nahi kiya, dobara try karein' });
+        }
+
+        if (decoded.purpose !== 'password_reset' || !resetTokens.has(resetToken))
+            return res.status(401).json({ error: 'Invalid Token — Reset link use-ho-chuka hai ya galat hai' });
+
+        const { employeeId } = resetTokens.get(resetToken);
+        resetTokens.delete(resetToken); // single-use
+
+        const employee = await Employee.findByPk(employeeId);
+        if (!employee)
+            return res.status(404).json({ error: 'Employee Not Found — Account nahi mila' });
+
+        const hashed = await bcrypt.hash(newPassword.trim(), BCRYPT_ROUNDS);
+        await employee.update({ password: hashed });
+
+        await AuditLog.create({
+            id: uuidv4(), timestamp: new Date().toISOString(),
+            action: 'PASSWORD_RESET', userId: employee.id,
+            userName: employee.name, userRole: employee.role,
+            entityType: 'USER', entityName: employee.name, status: 'SUCCESS',
+            ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip,
+        });
+
+        res.json({ success: true, message: 'Password Reset Successful — Ab naye password se login karein' });
+    } catch (e) {
+        addError(e, 'POST /api/auth/reset-password');
+        res.status(500).json({ error: 'Server Error — Dobara try karein' });
+    }
+});
+
+// ── Signup — self-registration (status: PENDING, requires admin approval) ─────
+app.post('/api/auth/signup', async (req, res) => {
+    try {
+        const { name, email, phone, password, confirmPassword, companyCode } = req.body || {};
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+
+        // ── Required field validation ──────────────────────────────────────────
+        if (!name?.trim())
+            return res.status(400).json({ error: 'Name Required — Apna poora naam darj karein' });
+        if (!email?.trim())
+            return res.status(400).json({ error: 'Email Required — Valid email address darj karein' });
+        if (!phone?.trim())
+            return res.status(400).json({ error: 'Phone Required — Apna mobile number darj karein' });
+        if (!password)
+            return res.status(400).json({ error: 'Password Required — Kam se kam 8 characters ka password banayein' });
+        if (!confirmPassword)
+            return res.status(400).json({ error: 'Confirm Password Required — Password dobara darj karein' });
+        if (!companyCode?.trim())
+            return res.status(400).json({ error: 'Company Code Required — Apne Admin se Company Code maangein' });
+
+        // ── Password rules ─────────────────────────────────────────────────────
+        if (password !== confirmPassword)
+            return res.status(400).json({ error: 'Passwords Do Not Match — Dono passwords same hone chahiye' });
+        if (password.length < 8)
+            return res.status(400).json({ error: 'Password Too Short — Password mein kam se kam 8 characters hone chahiye' });
+
+        // ── Find company by code ───────────────────────────────────────────────
+        const company = await Company.findOne({ where: { code: companyCode.trim().toUpperCase() } });
+        if (!company)
+            return res.status(404).json({ error: 'Company Not Found — Company Code galat hai, apne Admin se check karein' });
+
+        // ── Uniqueness checks (within the same company) ────────────────────────
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanPhone = phone.trim();
+
+        const emailTaken = await Employee.findOne({ where: { email: cleanEmail, companyId: company.id } });
+        if (emailTaken)
+            return res.status(409).json({ error: 'Email Already Registered — Yeh email pehle se registered hai, dusra email use karein' });
+
+        const phoneTaken = await Employee.findOne({ where: { phone: cleanPhone, companyId: company.id } });
+        if (phoneTaken)
+            return res.status(409).json({ error: 'Phone Already Registered — Yeh number pehle se registered hai, dusra number use karein' });
+
+        // ── Create employee (PENDING — admin must approve) ─────────────────────
+        const hashed = await bcrypt.hash(password.trim(), BCRYPT_ROUNDS);
+        const tempCode = `REG-${Date.now().toString().slice(-7)}`;
+
+        const employee = await Employee.create({
+            id: `emp-${Date.now()}-${uuidv4().substring(0, 6)}`,
+            companyId: company.id,
+            code: tempCode,
+            name: name.trim(),
+            email: cleanEmail,
+            phone: cleanPhone,
+            role: 'EMPLOYEE',
+            status: 'PENDING',
+            password: hashed,
+            joiningDate: new Date().toISOString().split('T')[0],
+        });
+
+        await AuditLog.create({
+            id: uuidv4(),
+            timestamp: new Date().toISOString(),
+            action: 'SIGNUP',
+            userId: employee.id,
+            userName: employee.name,
+            userRole: 'EMPLOYEE',
+            entityType: 'USER',
+            entityName: employee.name,
+            details: { companyId: company.id, companyCode: company.code, tempCode },
+            status: 'SUCCESS',
+            ipAddress: ip,
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Registration Successful — Aapka account ban gaya! Admin approval ke baad login kar sakenge.',
+            employeeCode: tempCode,
+            companyName: company.name,
+        });
+    } catch (e) {
+        addError(e, 'POST /api/auth/signup');
+        const h = getErrorHint(e);
+        res.status(500).json({ error: e.message, why: h.why, fix: h.fix });
+    }
 });
 
 app.post('/api/auth/dev-login', (req, res) => {
@@ -937,6 +1060,38 @@ app.put('/api/auth/logout-password', async (req, res) => {
     }
 });
 
+// ── CROSS-COMPANY TOKEN ───────────────────────────────────────────────────────
+// SUPER_ADMIN calls this when switching to a different company.
+// Returns a daily HMAC token that rbac.js verifies on every cross-company request.
+app.post('/api/auth/cross-company-token', async (req, res) => {
+    if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'Only SUPER_ADMIN can request cross-company tokens.' });
+    }
+    const { targetCompanyId } = req.body || {};
+    if (!targetCompanyId) {
+        return res.status(400).json({ error: 'targetCompanyId is required' });
+    }
+    if (targetCompanyId === req.user.companyId) {
+        return res.status(400).json({ error: 'Cross-company token not needed for your own company' });
+    }
+    try {
+        const company = await Company.findOne({ where: { id: targetCompanyId } });
+        if (!company) return res.status(404).json({ error: 'Target company not found' });
+
+        const crypto = require('crypto');
+        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
+        const token = crypto
+            .createHmac('sha256', JWT_SECRET)
+            .update(`CROSS_COMPANY:${targetCompanyId}:${req.user.id}:${today}`)
+            .digest('hex');
+
+        res.json({ token, targetCompanyId, expiresAt: `${today}T23:59:59Z` });
+    } catch (e) {
+        addError(e, 'POST /api/auth/cross-company-token');
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // ── COMPANY ROUTES ────────────────────────────────────────────────────────────
 app.get('/api/companies', async (req, res) => {
     try {
@@ -951,6 +1106,13 @@ app.get('/api/companies', async (req, res) => {
 });
 app.post('/api/companies', async (req, res) => {
     try {
+        // First company creation is public (setup wizard — no user exists yet).
+        // After that, only SUPER_ADMIN can create additional companies.
+        const companyCount = await Company.count();
+        if (companyCount > 0 && (!req.user || req.user.role !== 'SUPER_ADMIN')) {
+            return res.status(403).json({ error: 'Only SUPER_ADMIN can create additional companies.', fix: 'Login as SUPER_ADMIN first.' });
+        }
+
         const existing = await Company.findOne({ where: { id: req.body.id } });
         if (existing) { await existing.update(req.body); return res.json(existing); }
         let code = req.body.code || 'CO', newCompany;
@@ -962,23 +1124,38 @@ app.post('/api/companies', async (req, res) => {
         }
         if (!newCompany) throw new Error('Could not create company — code conflict');
 
-        // Auto-create Admin if provided
+        // Auto-create Admin if provided (used by Company Setup wizard — no auth context yet)
         if (req.body.admin) {
-            const { name, loginId, email, password } = req.body.admin;
-            const adminCode = loginId ? loginId.trim() : `${newCompany.code}-01`;
-            const hashed = await bcrypt.hash(password, 10);
+            const { name, loginId, email, password, role } = req.body.admin;
+            if (!password) throw new Error('Admin password is required during company setup');
+            const adminCode = (loginId || '').trim().toUpperCase() || `${newCompany.code}-01`;
+            const hashed = await bcrypt.hash(password.trim(), BCRYPT_ROUNDS);
 
             await Employee.create({
                 id: `emp-${Date.now()}-${uuidv4().substring(0, 4)}`,
                 companyId: newCompany.id,
                 code: adminCode,
-                name: name || 'Admin',
+                name: (name || 'Admin').trim(),
                 phone: null,
                 email: email || null,
-                role: 'ADMIN',
+                role: role || 'SUPER_ADMIN',  // company owner is SUPER_ADMIN by default
                 password: hashed,
                 status: 'ACTIVE',
-                baseSalary: 0
+                basicSalary: 0,
+                joiningDate: new Date().toISOString().split('T')[0],
+            });
+
+            await AuditLog.create({
+                id: uuidv4(),
+                timestamp: new Date().toISOString(),
+                action: 'CREATE_EMPLOYEE',
+                userId: 'SYSTEM',
+                userName: 'Company Setup',
+                entityType: 'EMPLOYEE',
+                entityName: name || 'Admin',
+                details: { code: adminCode, companyId: newCompany.id, source: 'company_setup' },
+                status: 'SUCCESS',
+                ipAddress: req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip,
             });
         }
 
@@ -1018,7 +1195,7 @@ const productionRoute = require('./routes/production');
 
 // Inject shared dependencies into each route module
 const sharedModels = {
-    Employee, Attendance, Production, Leave, Loan, SalarySlip,
+    Employee, Attendance, Production, Leave, Loan, LoanLedger, SalarySlip,
     Expense, Biometric, AdvanceSalary, Holiday, AuditLog,
     Client, ClientVisit, SalesTask, Company, sequelize,
     Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation,
@@ -1026,6 +1203,7 @@ const sharedModels = {
     addError, getErrorHint,
     doBackup, getBackupStatus, getConfig, updateConfig,
     CustomReportTemplate, ScheduledReport, StatutoryRule,
+    FnFSettlement, OvertimePolicy,
 };
 employeesRoute.init(sharedModels);
 attendanceRoute.init(sharedModels);
@@ -1051,6 +1229,10 @@ app.use('/api/calculators', calculatorsRoutes);
 app.use('/api/upload', uploadRoute);
 app.use('/api/sales', salesRoute);                      // /api/sales/tasks
 app.use('/api/production', productionRoute);            // /api/production/*
+app.use('/api/notifications', require('./routes/notifications')); // P1-02
+app.use('/api/fnf', require('./routes/fnf'));                    // P2-01
+app.use('/api/overtime-policy', require('./routes/overtimePolicy')); // P2-05
+app.use('/api/ess', require('./routes/ess'));                    // P2-07
 
 app.use('/api/downloads', express.static(path.join(__dirname, 'public/downloads')));
 
@@ -1111,11 +1293,7 @@ app.delete('/api/backup/:filename', (req, res) => {
 app.use((req, res) => {
     res.status(404).json({ error: `Route not found: ${req.method} ${req.path}`, why: 'This API route is not registered on the backend.', fix: 'Visit /api/status/routes for the full list of available routes.' });
 });
-app.use((err, req, res, _next) => {
-    addError(err, `${req.method} ${req.path}`);
-    const h = getErrorHint(err);
-    res.status(500).json({ error: err.message, why: h.why, fix: h.fix });
-});
+app.use(errorHandlerMiddleware);
 
 // ── Start Server ──────────────────────────────────────────────────────────────
 const HTTPS_PORT = 3443;

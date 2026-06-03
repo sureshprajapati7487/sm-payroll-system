@@ -167,11 +167,14 @@ export const Form16Generator = () => {
 </body>
 </html>`;
 
-        const win = window.open('', '_blank', 'width=900,height=700');
+        // Use Blob URL instead of document.write to avoid XSS risk
+        const blob = new Blob([html], { type: 'text/html; charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+        const win = window.open(blobUrl, '_blank', 'width=900,height=700');
         if (win) {
-            win.document.write(html);
-            win.document.close();
-            setTimeout(() => { win.print(); }, 600);
+            setTimeout(() => { win.print(); URL.revokeObjectURL(blobUrl); }, 600);
+        } else {
+            URL.revokeObjectURL(blobUrl);
         }
         setIsPrinting(false);
     };

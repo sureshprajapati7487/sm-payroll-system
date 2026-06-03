@@ -26,12 +26,13 @@ const useInternalLeaveStore = create<LeaveState>((set, get) => ({
     isLoading: false,
 
     // ── Fetch from server ─────────────────────────────────────────────────────
+    // companyId comes from the JWT on the server (requireCompanyScope middleware).
+    // We do NOT pass it as a query param — non-SUPER_ADMIN users have it ignored anyway,
+    // and passing it was redundant. Server always scopes to the authenticated user's company.
     fetchLeaves: async () => {
-        const companyId = useMultiCompanyStore.getState().currentCompanyId;
         set({ isLoading: true });
         try {
-            const params = companyId ? `?companyId=${companyId}` : '';
-            const res = await apiFetch(`/leaves${params}`);
+            const res = await apiFetch(`/leaves`);
             if (res.ok) {
                 const data = await res.json();
                 set({ requests: data });
@@ -47,23 +48,15 @@ const useInternalLeaveStore = create<LeaveState>((set, get) => ({
     requestLeave: async (req) => {
         const companyId = useMultiCompanyStore.getState().currentCompanyId;
 
-        // 🛡️ Leave > 15 days Rule: Mandatory 2-step approval
-        let workflowApprovals = [];
-        if (req.daysCount && req.daysCount > 15) {
-            workflowApprovals = [
-                { stepId: 's1', roleId: 'MANAGER', roleName: 'Manager', status: 'PENDING' as const },
-                { stepId: 's2', roleId: 'ADMIN', roleName: 'Admin', status: 'PENDING' as const },
-            ];
-        } else {
-            // Check if there's an active workflow for 'leave'
-            const activeWorkflow = useWorkflowStore.getState().getWorkflowByModule('leave');
-            workflowApprovals = activeWorkflow?.steps.map(step => ({
-                stepId: step.id,
-                roleId: step.roleId,
-                roleName: step.roleName,
-                status: 'PENDING' as const,
-            })) || [];
-        }
+        // Use the active workflow for the company — no hardcoded day-count override.
+        // If no workflow is configured, the leave is single-step (approved by any manager).
+        const activeWorkflow = useWorkflowStore.getState().getWorkflowByModule('leave');
+        const workflowApprovals = activeWorkflow?.steps.map(step => ({
+            stepId: step.id,
+            roleId: step.roleId,
+            roleName: step.roleName,
+            status: 'PENDING' as const,
+        })) || [];
 
         const newRequest: LeaveRequest = {
             ...req,
@@ -259,8 +252,8 @@ export const useLeaveStore = () => {
         if (scope === 'ALL') return true;
 
         if (scope === 'TEAM') {
-            const userEmp = employees.find((emp: any) => emp.id === user.id);
-            const recordEmp = employees.find((emp: any) => emp.id === r.employeeId);
+            const userEmp = employees.find((emp) => emp.id === user.id);
+            const recordEmp = employees.find((emp) => emp.id === r.employeeId);
             if (!userEmp?.department) return r.employeeId === user.id; // Fallback to OWN
             return recordEmp?.department === userEmp.department;
         }

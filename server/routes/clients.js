@@ -95,48 +95,42 @@ router.post('/', async (req, res) => {
 });
 
 // POST /api/clients/bulk
+// Allowed fields — column whitelist prevents injection via field names
+const BULK_CLIENT_ALLOWED_FIELDS = ['id', 'companyId', 'code', 'name', 'shopName', 'ownerName', 'phone', 'phone2', 'email', 'address', 'city', 'state', 'pincode', 'type', 'category', 'notes', 'status', 'creditLimit', 'assignedTo', 'assignedToName'];
+
 router.post('/bulk', async (req, res) => {
     try {
         const { clients, companyId } = req.body;
         if (!Array.isArray(clients) || !companyId) return res.status(400).json({ error: 'clients[] and companyId required' });
 
-        let inserted = 0;
-        const now = new Date().toISOString();
+        const succeeded = [];
+        const errors = [];
 
-        // Disable alter config that might lock DB
         for (let i = 0; i < clients.length; i++) {
             const c = clients[i];
-            const row = {
-                id: c.id || uuidv4(),
-                companyId,
-                code: c.code || `C-${String(Date.now()).slice(-4)}${i}`,
-                name: c.name || 'Unknown',
-                shopName: c.shopName || null,
-                phone: c.phone || null,
-                city: c.city || null,
-                type: c.type || 'RETAIL',
-                createdAt: now,
-                updatedAt: now
-            };
+            // Build row using only allowed fields — prevents injection via unknown keys
+            const row = { id: uuidv4(), companyId, code: `C-${String(Date.now()).slice(-4)}${i}`, name: 'Unknown', type: 'RETAIL', status: 'ACTIVE' };
+            for (const key of BULK_CLIENT_ALLOWED_FIELDS) {
+                if (c[key] !== undefined) row[key] = c[key];
+            }
+            // Ensure companyId always comes from request, not payload
+            row.companyId = companyId;
+            if (!row.id || row.id === companyId) row.id = uuidv4();
 
             try {
-                // Force raw insertion to prevent Sequelize Model hook/validation infinite locks
-                const keys = Object.keys(row);
-                const values = keys.map(k => row[k]);
-                const placeholders = keys.map(() => '?').join(', ');
-
-                await sequelize.query(
-                    `INSERT INTO "Clients" ("${keys.join('", "')}") VALUES (${placeholders})`,
-                    { replacements: values }
-                );
-                inserted++;
+                const created = await Client.create(row);
+                succeeded.push(created.id);
             } catch (err) {
-                console.warn('Skipped client row', i, err.message);
+                errors.push({ row: i, name: c.name, error: err.message });
             }
         }
 
-        // Force return immediately
-        res.status(200).json({ inserted, total: clients.length });
+        res.status(errors.length > 0 ? 207 : 200).json({
+            inserted: succeeded.length,
+            total: clients.length,
+            failedCount: errors.length,
+            errors,
+        });
     } catch (e) {
         if (addError) addError(e, 'POST /api/clients/bulk');
         res.status(500).json({ error: e.message });
@@ -234,7 +228,10 @@ visitsRouter.post('/:id/checkout', async (req, res) => {
 // GET /api/visits/active/:salesmanId
 visitsRouter.get('/active/:salesmanId', async (req, res) => {
     try {
-        const visit = await ClientVisit.findOne({ where: { salesmanId: req.params.salesmanId, checkOutAt: null } });
+        // companyId scoped — prevents cross-tenant visit visibility
+        const where = { salesmanId: req.params.salesmanId, checkOutAt: null };
+        if (req.companyId) where.companyId = req.companyId;
+        const visit = await ClientVisit.findOne({ where });
         if (!visit) return res.json(null);
         const client = await Client.findByPk(visit.clientId);
         res.json({ visit, client });

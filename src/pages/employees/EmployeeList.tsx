@@ -8,7 +8,8 @@ import { useDataMask } from '@/hooks/useDataMask';
 import {
     Search, Plus, Eye, Edit, Trash2, XCircle, Key,
     Filter, ChevronDown, X, ArrowUpDown, SlidersHorizontal,
-    Users, UserCheck, UserX, Clock
+    Users, UserCheck, UserX, Clock, CalendarCheck, Receipt,
+    ShieldCheck, AlertTriangle,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { CredentialsModal } from '@/components/payroll/CredentialsModal';
@@ -27,6 +28,7 @@ const STATUS_CONFIG: Record<EmployeeStatus, { label: string; cls: string; icon: 
     INACTIVE: { label: 'Inactive', cls: 'text-danger bg-danger/10 border-danger/20', icon: <UserX className="w-3 h-3" /> },
     ON_LEAVE: { label: 'On Leave', cls: 'text-warning bg-warning/10 border-warning/20', icon: <Clock className="w-3 h-3" /> },
     SUSPENDED: { label: 'Suspended', cls: 'text-dark-muted bg-dark-border/20 border-dark-border', icon: <XCircle className="w-3 h-3" /> },
+    PENDING: { label: 'Pending Approval', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/30', icon: <AlertTriangle className="w-3 h-3" /> },
 };
 
 const SHIFTS = [
@@ -59,6 +61,9 @@ export const EmployeeList = () => {
     const { hasPermission } = useAuthStore();
     const [credentialEmployee, setCredentialEmployee] = useState<Employee | null>(null);
     const [deleteConfirmEmp, setDeleteConfirmEmp] = useState<Employee | null>(null);
+    const [approvingEmployee, setApprovingEmployee] = useState<Employee | null>(null);
+    const [approveCode, setApproveCode] = useState('');
+    const [approveLoading, setApproveLoading] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
 
     // ── Row-Level Security ───────────────────────────────────────────────
@@ -162,9 +167,24 @@ export const EmployeeList = () => {
     }, [employees, deptFilter, statusFilter, shiftFilter, salaryTypeFilter,
         salaryMin, salaryMax, designationFilter, sortKey, sortDir]);
 
-    // ── Stats strip ──────────────────────────────────────────────────────────
+    // ── Approve handler ───────────────────────────────────────────────────────
+    const { updateEmployee } = useEmployeeStore();
+    const handleApprove = async () => {
+        if (!approvingEmployee || !approveCode.trim()) return;
+        setApproveLoading(true);
+        await updateEmployee(approvingEmployee.id, {
+            status: EmployeeStatus.ACTIVE,
+            code: approveCode.trim().toUpperCase(),
+        });
+        setApproveLoading(false);
+        setApprovingEmployee(null);
+        setApproveCode('');
+    };
+
+    // ── Stats strip ───────────────────────────────────────────────────────────
     const totalActive = employees.filter(e => e.status === EmployeeStatus.ACTIVE).length;
     const totalInactive = employees.filter(e => e.status !== EmployeeStatus.ACTIVE).length;
+    const totalPending = employees.filter(e => e.status === EmployeeStatus.PENDING).length;
 
     const toggleSort = (key: SortKey) => {
         if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -185,6 +205,9 @@ export const EmployeeList = () => {
                         {employees.length} total &nbsp;·&nbsp;
                         <span className="text-success">{totalActive} active</span> &nbsp;·&nbsp;
                         <span className="text-danger">{totalInactive} inactive</span>
+                        {totalPending > 0 && (
+                            <> &nbsp;·&nbsp; <span className="text-amber-400 font-semibold">{totalPending} pending approval</span></>
+                        )}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -464,6 +487,22 @@ export const EmployeeList = () => {
                 </div>
             )}
 
+            {/* ── Pending Approval Banner ─────────────────────────── */}
+            {totalPending > 0 && hasPermission(PERMISSIONS.EDIT_EMPLOYEE) && (
+                <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 text-sm animate-in fade-in">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span className="text-amber-300 font-medium">
+                        {totalPending} employee{totalPending !== 1 ? 's' : ''} awaiting approval
+                    </span>
+                    <button
+                        onClick={() => setStatusFilter(EmployeeStatus.PENDING)}
+                        className="ml-auto text-xs bg-amber-500 hover:bg-amber-400 text-black font-bold px-3 py-1 rounded-lg transition-colors"
+                    >
+                        Review Now
+                    </button>
+                </div>
+            )}
+
             {/* ── Employee grid ────────────────────────────────────── */}
             {isLoading ? (
                 <SkeletonCardGrid cards={6} />
@@ -483,19 +522,28 @@ export const EmployeeList = () => {
                         return (
                             <div
                                 key={employee.id}
-                                className="glass group relative overflow-hidden rounded-2xl border border-dark-border/50 hover:border-primary-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary-500/10 hover:-translate-y-0.5 pb-14 md:pb-0"
+                                className={clsx(
+                                    "glass group relative overflow-hidden rounded-2xl border transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 pb-14 md:pb-0",
+                                    employee.status === EmployeeStatus.PENDING
+                                        ? "border-amber-500/40 hover:border-amber-400/70 hover:shadow-amber-500/10"
+                                        : "border-dark-border/50 hover:border-primary-500/50 hover:shadow-primary-500/10"
+                                )}
                             >
                                 {/* Status indicator strip */}
                                 <div className={clsx(
                                     "h-1 w-full",
                                     employee.status === EmployeeStatus.ACTIVE ? "bg-success" :
                                         employee.status === EmployeeStatus.INACTIVE ? "bg-danger" :
-                                            employee.status === EmployeeStatus.ON_LEAVE ? "bg-warning" : "bg-dark-border"
+                                            employee.status === EmployeeStatus.ON_LEAVE ? "bg-warning" :
+                                                employee.status === EmployeeStatus.PENDING ? "bg-amber-400" : "bg-dark-border"
                                 )} />
 
                                 <div className="p-5 flex flex-col items-center text-center">
                                     {/* Avatar */}
-                                    <div className="w-18 h-18 rounded-full p-0.5 bg-gradient-to-br from-primary-500/50 to-purple-600/50 mb-3">
+                                    <div
+                                        onClick={() => navigate(`/employees/${employee.id}`)}
+                                        className="w-18 h-18 rounded-full p-0.5 bg-gradient-to-br from-primary-500/50 to-purple-600/50 mb-3 cursor-pointer hover:scale-105 transition-transform"
+                                    >
                                         <img
                                             src={employee.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${employee.name}`}
                                             alt={employee.name}
@@ -504,7 +552,7 @@ export const EmployeeList = () => {
                                         />
                                     </div>
 
-                                    <h3 className="text-base font-bold text-dark-text mb-0.5 leading-tight">{employee.name}</h3>
+                                    <h3 onClick={() => navigate(`/employees/${employee.id}`)} className="text-base font-bold text-dark-text mb-0.5 leading-tight cursor-pointer hover:text-primary-400 transition-colors">{employee.name}</h3>
                                     <p className="text-primary-400 text-xs font-medium mb-1">{employee.designation}</p>
                                     <span className="px-2 py-0.5 rounded-md bg-dark-bg border border-dark-border text-xs text-dark-muted font-mono">
                                         {employee.code}
@@ -548,6 +596,16 @@ export const EmployeeList = () => {
                                     {/* Actions Footer — always visible on mobile, hover-reveal on desktop */}
                                     <div className="inset-x-0 bottom-0 p-3 bg-dark-card/95 backdrop-blur-sm flex items-center justify-center gap-2
                                         absolute translate-y-0 md:translate-y-full md:group-hover:translate-y-0 transition-transform duration-300">
+                                        {/* Approve button — only for PENDING employees */}
+                                        {employee.status === EmployeeStatus.PENDING && hasPermission(PERMISSIONS.EDIT_EMPLOYEE) && (
+                                            <button
+                                                onClick={() => { setApprovingEmployee(employee); setApproveCode(employee.code); }}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-colors"
+                                                title="Approve Employee"
+                                            >
+                                                <ShieldCheck className="w-3.5 h-3.5" /> Approve
+                                            </button>
+                                        )}
                                         {hasPermission(PERMISSIONS.EDIT_EMPLOYEE) && (
                                             <button
                                                 onClick={() => setCredentialEmployee(employee)}
@@ -555,6 +613,24 @@ export const EmployeeList = () => {
                                                 title="Credentials"
                                             >
                                                 <Key className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {hasPermission(PERMISSIONS.VIEW_ATTENDANCE) && (
+                                            <button
+                                                onClick={() => navigate(`/attendance`)}
+                                                className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors"
+                                                title="View Attendance"
+                                            >
+                                                <CalendarCheck className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {hasPermission(PERMISSIONS.VIEW_PAYROLL) && (
+                                            <button
+                                                onClick={() => navigate(`/payroll`)}
+                                                className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white transition-colors"
+                                                title="View Payroll"
+                                            >
+                                                <Receipt className="w-4 h-4" />
                                             </button>
                                         )}
                                         <button
@@ -609,6 +685,80 @@ export const EmployeeList = () => {
                     employee={credentialEmployee}
                     onClose={() => setCredentialEmployee(null)}
                 />
+            )}
+
+            {/* ── Approve Employee Modal ───────────────────────────── */}
+            {approvingEmployee && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-dark-card border border-amber-500/30 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95">
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                                <ShieldCheck className="w-5 h-5 text-amber-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-white font-bold text-lg">Approve Employee</h3>
+                                <p className="text-dark-muted text-sm">Assign permanent ID aur activate karein</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-dark-bg rounded-xl p-4 mb-4 space-y-2 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-dark-muted">Name</span>
+                                <span className="text-white font-medium">{approvingEmployee.name}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-dark-muted">Email</span>
+                                <span className="text-white">{approvingEmployee.email || '—'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-dark-muted">Phone</span>
+                                <span className="text-white">{approvingEmployee.phone || '—'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-dark-muted">Temp Code</span>
+                                <span className="text-amber-400 font-mono">{approvingEmployee.code}</span>
+                            </div>
+                        </div>
+
+                        <div className="mb-5">
+                            <label className="block text-xs font-medium text-dark-muted uppercase tracking-wider mb-2">
+                                Permanent Employee Code <span className="text-danger">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={approveCode}
+                                onChange={e => setApproveCode(e.target.value)}
+                                placeholder="e.g. AEROMEN-05"
+                                className="w-full bg-dark-bg border border-dark-border rounded-xl px-4 py-2.5 text-white uppercase font-mono placeholder-dark-muted focus:outline-none focus:border-amber-400 transition-colors"
+                                autoFocus
+                            />
+                            <p className="text-xs text-dark-muted mt-1.5">
+                                Yeh code employee ka permanent login ID banega. Temp code replace ho jaayega.
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => { setApprovingEmployee(null); setApproveCode(''); }}
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-dark-border text-dark-muted hover:text-white transition-colors text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleApprove}
+                                disabled={!approveCode.trim() || approveLoading}
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold text-sm flex items-center justify-center gap-2 transition-colors"
+                            >
+                                {approveLoading ? (
+                                    <span className="animate-spin border-2 border-black/30 border-t-black rounded-full w-4 h-4" />
+                                ) : (
+                                    <ShieldCheck className="w-4 h-4" />
+                                )}
+                                Approve & Activate
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <ReasonConfirmModal

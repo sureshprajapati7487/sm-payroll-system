@@ -337,22 +337,20 @@ export const calculateSalary = (
             // Manual override
             tdsDeduction = Math.round((grossSalary * sc.tdsPercentage) / 100);
         } else {
-            // Estimate annual income
+            // New Tax Regime FY2024-25 — no deductions (slab on gross)
             const annualGross = grossSalary * 12;
-            const invested80C = sc.tdsDeclaredInvestment ?? 0;
-            const standardDeduction = 50000;
-            const taxableIncome = Math.max(0, annualGross - standardDeduction - Math.min(invested80C, 150000));
-
-            // New Tax Regime slabs (FY 2024-25)
             let annualTax = 0;
-            if (taxableIncome <= 300000) annualTax = 0;
-            else if (taxableIncome <= 600000) annualTax = (taxableIncome - 300000) * 0.05;
-            else if (taxableIncome <= 900000) annualTax = 15000 + (taxableIncome - 600000) * 0.10;
-            else if (taxableIncome <= 1200000) annualTax = 45000 + (taxableIncome - 900000) * 0.15;
-            else if (taxableIncome <= 1500000) annualTax = 90000 + (taxableIncome - 1200000) * 0.20;
-            else annualTax = 150000 + (taxableIncome - 1500000) * 0.30;
+            if (annualGross <= 300000) annualTax = 0;
+            else if (annualGross <= 700000) annualTax = (annualGross - 300000) * 0.05;
+            else if (annualGross <= 1000000) annualTax = 20000 + (annualGross - 700000) * 0.10;
+            else if (annualGross <= 1200000) annualTax = 50000 + (annualGross - 1000000) * 0.15;
+            else if (annualGross <= 1500000) annualTax = 80000 + (annualGross - 1200000) * 0.20;
+            else annualTax = 140000 + (annualGross - 1500000) * 0.30;
 
-            // Add 4% health & education cess
+            // Rebate u/s 87A — zero tax if annual gross ≤ ₹7 lakh
+            if (annualGross <= 700000) annualTax = 0;
+
+            // 4% Health & Education Cess
             annualTax = annualTax * 1.04;
 
             // If PAN not linked, flat 20%

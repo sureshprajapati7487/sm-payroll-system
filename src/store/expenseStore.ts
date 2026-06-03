@@ -25,6 +25,24 @@ export interface Expense {
     addedBy: string;
     status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PAID';
     auditTrail: AuditLog[];
+    // S3 receipt: new uploads store the object key (e.g. "receipts/123.jpg");
+    // legacy records may store a full HTTP URL. Use getReceiptUrl() to resolve.
+    receiptUrl?: string;
+}
+
+/**
+ * Resolve a receipt reference to a viewable URL.
+ * - If value starts with 'http', it's a legacy public URL — return as-is.
+ * - Otherwise it's an S3 key — fetch a 15-minute signed URL from the server.
+ */
+export async function getReceiptUrl(keyOrUrl: string): Promise<string> {
+    if (!keyOrUrl) return '';
+    if (keyOrUrl.startsWith('http')) return keyOrUrl; // legacy public URL
+    // S3 private key → signed URL
+    const res = await apiFetch(`/upload/signed-url?key=${encodeURIComponent(keyOrUrl)}`);
+    if (!res.ok) throw new Error('Could not get receipt URL');
+    const { url } = await res.json();
+    return url;
 }
 
 interface ExpenseState {
@@ -56,7 +74,7 @@ export const useInternalExpenseStore = create<ExpenseState>((set, get) => ({
             if (res.ok) {
                 const data = await res.json();
                 // Parse auditTrail if stored as string
-                const parsed = data.map((e: any) => ({
+                const parsed = (data as any[]).map((e) => ({
                     ...e,
                     auditTrail: typeof e.auditTrail === 'string'
                         ? JSON.parse(e.auditTrail)
@@ -195,9 +213,9 @@ export const useExpenseStore = () => {
         if (scope === 'ALL') return true;
 
         if (scope === 'TEAM') {
-            const userEmp = employees.find((emp: any) => emp.id === user.id);
+            const userEmp = employees.find((emp) => emp.id === user.id);
             // Expense doesn't have employeeId, it has addedBy string name
-            const recordEmp = employees.find((emp: any) => emp.name === e.addedBy);
+            const recordEmp = employees.find((emp) => emp.name === e.addedBy);
             if (!userEmp?.department) return e.addedBy === user.name;
             return recordEmp?.department === userEmp.department;
         }

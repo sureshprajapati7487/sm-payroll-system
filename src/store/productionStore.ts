@@ -224,8 +224,8 @@ export const useProductionStore = () => {
         if (scope === 'ALL') return true;
 
         if (scope === 'TEAM') {
-            const userEmp = employees.find((emp: any) => emp.id === user.id);
-            const recordEmp = employees.find((emp: any) => emp.id === e.employeeId);
+            const userEmp = employees.find((emp) => emp.id === user.id);
+            const recordEmp = employees.find((emp) => emp.id === e.employeeId);
             if (!userEmp?.department) return e.employeeId === user.id; // Fallback to OWN
             return recordEmp?.department === userEmp.department;
         }

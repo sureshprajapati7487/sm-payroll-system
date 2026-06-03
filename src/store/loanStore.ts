@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { LoanRecord, LoanStatus, LoanTransaction, SettlementRequest } from '@/types';
+import { LoanRecord, LoanStatus, LoanTransaction, SettlementRequest, NotificationType } from '@/types';
 import { useNotificationStore } from './notificationStore';
 import { useEmployeeStore } from './employeeStore';
 import { useAuthStore } from './authStore';
@@ -12,6 +12,7 @@ import { useRolePermissionsStore } from './rolePermissionsStore';
 import { sendLoanApprovalNotification } from '@/utils/notificationService';
 import { audit } from '@/lib/auditLogger';
 import { useWorkflowStore } from './workflowStore';
+import { calculateSalary } from '@/utils/salaryCalculator';
 
 interface LoanState {
     loans: LoanRecord[];
@@ -100,25 +101,27 @@ const useInternalLoanStore = create<LoanState>()(
                     // Workflow initialisation
                     ...(() => {
                         const activeWorkflow = useWorkflowStore.getState().getWorkflowByModule('loan');
+                        let steps = activeWorkflow?.steps || [];
 
-                        let steps = activeWorkflow?.steps;
+                        // Validate that the roles referenced in the workflow actually exist in the system.
+                        // Roles must be one of the valid system roles — invalid roles are silently skipped.
+                        const VALID_ROLES = new Set(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER', 'EMPLOYEE']);
+                        const validSteps = steps.filter(s => s.roleId && VALID_ROLES.has(s.roleId));
 
-                        // 🛡️ Fallback to structural L1->L2 workflow if none exists
-                        if (!steps || steps.length === 0) {
-                            steps = [
-                                { id: 'l1', roleId: 'MANAGER', roleName: 'L1 Checker', stepOrder: 1 },
-                                { id: 'l2', roleId: 'ACCOUNT_ADMIN', roleName: 'L2 Approver', stepOrder: 2 },
-                            ];
+                        if (validSteps.length === 0 && steps.length > 0) {
+                            // All configured roles were invalid — fall back to ACCOUNT_ADMIN single-step
+                            console.warn('[LoanStore] Workflow has no valid roles — using ACCOUNT_ADMIN fallback');
+                            validSteps.push({ id: 'fallback', roleId: 'ACCOUNT_ADMIN', roleName: 'Account Admin', stepOrder: 1 });
                         }
 
                         return {
-                            workflowApprovals: steps.map(step => ({
+                            workflowApprovals: validSteps.map(step => ({
                                 stepId: step.id,
                                 roleId: step.roleId,
                                 roleName: step.roleName,
                                 status: 'PENDING' as const,
                             })),
-                            currentWorkflowStep: 0,
+                            currentWorkflowStep: validSteps.length > 0 ? 0 : undefined,
                         };
                     })()
                 };
@@ -154,8 +157,7 @@ const useInternalLoanStore = create<LoanState>()(
                     // So it accesses ALL employees. CORRECT.
 
                     if (employee) {
-                        // ✅ USE EXACT PAYROLL CALCULATION
-                        const { calculateSalary } = await import('@/utils/salaryCalculator');
+                        // ✅ USE EXACT PAYROLL CALCULATION (static import at top of file)
 
                         // Get current month
                         const now = new Date();
@@ -191,7 +193,7 @@ const useInternalLoanStore = create<LoanState>()(
 
                         const notifId = useNotificationStore.getState().addNotification({
                             // ── Routing ─────────────────────────────────────────
-                            type: (await import('@/types')).NotificationType.LOAN_APPROVAL,
+                            type: NotificationType.LOAN_APPROVAL,
                             targetUserIds: [newLoan.approverId as string],
                             // ── Display ─────────────────────────────────────────
                             title: `Loan Request — ${employee.name}`,
@@ -691,8 +693,8 @@ export const useLoanStore = () => {
         if (scope === 'ALL') return true;
 
         if (scope === 'TEAM') {
-            const userEmp = employees.find((emp: any) => emp.id === user.id);
-            const recordEmp = employees.find((emp: any) => emp.id === l.employeeId);
+            const userEmp = employees.find((emp) => emp.id === user.id);
+            const recordEmp = employees.find((emp) => emp.id === l.employeeId);
             if (!userEmp?.department) return l.employeeId === user.id; // Fallback to OWN
             return recordEmp?.department === userEmp.department;
         }

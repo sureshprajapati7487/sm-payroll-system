@@ -51,6 +51,8 @@ export const AttendanceDashboard = () => {
     const { employees } = useEmployeeStore();
     const { records, markCheckIn, markCheckOut, updateRecordStatus, removeRecord } = useAttendanceStore();
     const { isHoliday } = useHolidayStore();
+    const requests = useRegularizationStore(state => state.requests);
+    const pendingRequests = requests.filter(r => r.status === 'PENDING');
 
     // -- State --
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -103,7 +105,10 @@ export const AttendanceDashboard = () => {
     });
 
     const filteredEmployees = activeEmployees.filter(emp => {
-        const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch = emp.name.toLowerCase().includes(searchLower) ||
+            emp.code.toLowerCase().includes(searchLower) ||
+            (emp.department || '').toLowerCase().includes(searchLower);
         const matchesShift = shiftFilter === 'ALL' || emp.shift === shiftFilter;
 
         let matchesStatus = true;
@@ -502,12 +507,13 @@ export const AttendanceDashboard = () => {
 
                                     if (record) {
                                         statusLabel = record.status;
-                                        if (record.status === 'PRESENT') statusColor = "bg-success/10 text-success border border-success/20";
-                                        else if (record.status === 'LATE') statusColor = "bg-warning/10 text-warning border border-warning/20";
-                                        else if (record.status === 'ABSENT') statusColor = "bg-danger/10 text-danger border border-danger/20";
+                                        if (record.status === 'PRESENT') statusColor = "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)] ring-1 ring-emerald-500/20";
+                                        else if (record.status === 'LATE') statusColor = "bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/20";
+                                        else if (record.status === 'ABSENT') statusColor = "bg-red-500/15 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.15)] ring-1 ring-red-500/20";
+                                        else if (record.status === 'WORK_FROM_HOME') statusColor = "bg-blue-500/15 text-blue-400 border border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.15)] ring-1 ring-blue-500/20";
                                     } else {
-                                        if (holiday) { statusLabel = "HOLIDAY"; statusColor = "bg-blue-500/10 text-blue-400 border border-blue-500/20"; }
-                                        else if (isSunday) { statusLabel = "WEEKLY OFF"; statusColor = "bg-pink-500/10 text-pink-400 border border-pink-500/20"; }
+                                        if (holiday) { statusLabel = "HOLIDAY"; statusColor = "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_10px_rgba(99,102,241,0.15)]"; }
+                                        else if (isSunday) { statusLabel = "WEEKLY OFF"; statusColor = "bg-pink-500/15 text-pink-400 border border-pink-500/30 shadow-[0_0_10px_rgba(236,72,153,0.15)]"; }
                                     }
 
                                     return (
@@ -673,14 +679,14 @@ export const AttendanceDashboard = () => {
                                 <MessageSquarePlus className="w-5 h-5 text-warning" />
                                 Requests
                             </h3>
-                            {useRegularizationStore.getState().getPendingRequests().length === 0 ? (
+                            {pendingRequests.length === 0 ? (
                                 <div className="text-center py-6">
                                     <CheckCircle className="w-8 h-8 text-dark-muted mx-auto mb-2 opacity-50" />
                                     <p className="text-dark-muted text-sm">All caught up!</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                                    {useRegularizationStore.getState().getPendingRequests().map(req => {
+                                    {pendingRequests.map(req => {
                                         const emp = employees.find(e => e.id === req.employeeId);
                                         return (
                                             <div key={req.id} className="bg-dark-bg/50 p-3 rounded-lg border border-dark-border transform hover:scale-[1.02] transition-transform">

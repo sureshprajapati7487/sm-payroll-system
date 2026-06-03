@@ -187,7 +187,7 @@ export const useRolePermissionsStore = create<RolePermissionsState>()(
                     const res = await apiFetch(`/system-settings?companyId=${companyId}`);
                     if (!res.ok) return;
                     const data = await res.json();
-                    const roleSetting = data.find((s: any) => s.key === 'ROLE_PERMISSIONS_V2');
+                    const roleSetting = (data as { key: string; value: string }[]).find((s) => s.key === 'ROLE_PERMISSIONS_V2');
                     if (roleSetting?.value) {
                         const parsed = JSON.parse(roleSetting.value);
                         if (parsed.permissions && parsed.scopes) {

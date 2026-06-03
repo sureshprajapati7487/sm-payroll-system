@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
+const { requireRole } = require('../rbac');
 
 let Attendance, PunchLocation, addError, getErrorHint;
 
@@ -34,14 +35,33 @@ router.get('/', async (req, res) => {
         if (req.companyId) where.companyId = req.companyId;
         if (employeeId) where.employeeId = employeeId;
         if (date) where.date = date;
-        res.json(await Attendance.findAll({ where }));
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+        const offset = (page - 1) * limit;
+        const { count, rows } = await Attendance.findAndCountAll({
+            where,
+            order: [['date', 'DESC']],
+            limit,
+            offset,
+        });
+        res.json({ data: rows, total: count, page, limit, totalPages: Math.ceil(count / limit) });
     } catch (e) { addError(e, 'GET /api/attendance'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
 router.post('/', async (req, res) => {
     try {
-        const record = await Attendance.upsert(req.body);
-        res.json(record);
+        // Always inject companyId from JWT session (prevents cross-tenant records with missing companyId)
+        const body = { ...req.body };
+        if (req.companyId) body.companyId = req.companyId;
+        // Normalize: breaks must be a JSON string (SQLite stores as TEXT)
+        if (body.breaks !== undefined && typeof body.breaks !== 'string') {
+            body.breaks = JSON.stringify(body.breaks);
+        }
+        // Strip Sequelize auto-managed timestamps from upsert body
+        delete body.createdAt;
+        delete body.updatedAt;
+        const [instance] = await Attendance.upsert(body);
+        res.json(instance.toJSON());
     } catch (e) { addError(e, 'POST /api/attendance'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
@@ -54,7 +74,15 @@ router.put('/:id', async (req, res) => {
                 return res.status(403).json({ error: 'Forbidden — cannot modify another company\'s attendance record' });
             }
         }
-        await Attendance.update(req.body, { where: { id: req.params.id } });
+        // Normalize body: stringify arrays/objects for TEXT columns, strip Sequelize timestamps
+        const body = { ...req.body };
+        if (body.breaks !== undefined && typeof body.breaks !== 'string') {
+            body.breaks = JSON.stringify(body.breaks);
+        }
+        // Remove read-only fields that Sequelize manages
+        delete body.createdAt;
+        delete body.updatedAt;
+        await Attendance.update(body, { where: { id: req.params.id } });
         res.json({ success: true });
     }
     catch (e) { addError(e, 'PUT /api/attendance/:id'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
@@ -108,15 +136,16 @@ router.post('/:id/break', async (req, res) => {
     }
 });
 
-// POST /attendance/admin-punch
-router.post('/admin-punch', async (req, res) => {
+// POST /attendance/admin-punch — admin/manager only
+router.post('/admin-punch', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER']), async (req, res) => {
     try {
         const { employeeId, type, time, reason, adminName, shiftId } = req.body;
         if (!employeeId || !type || !time || !reason || !adminName) {
             return res.status(400).json({ error: 'employeeId, type, time, reason, adminName are required' });
         }
         const today = time.split('T')[0];
-        let record = await Attendance.findOne({ where: { employeeId, date: today } });
+        const companyWhere = req.companyId ? { employeeId, date: today, companyId: req.companyId } : { employeeId, date: today };
+        let record = await Attendance.findOne({ where: companyWhere });
 
         if (type === 'checkIn') {
             const payload = { checkIn: time, isManualPunch: true, manualPunchBy: adminName, manualPunchReason: reason, punchMode: 'admin' };
@@ -124,7 +153,7 @@ router.post('/admin-punch', async (req, res) => {
                 await Attendance.update(payload, { where: { id: record.id } });
                 res.json({ success: true, id: record.id, ...payload });
             } else {
-                const newRec = await Attendance.create({ id: `manual-${uuidv4()}`, employeeId, date: today, status: 'PRESENT', shiftId: shiftId || null, lateByMinutes: 0, overtimeHours: 0, breaks: '[]', ...payload });
+                const newRec = await Attendance.create({ id: `manual-${uuidv4()}`, employeeId, date: today, companyId: req.companyId || null, status: 'PRESENT', shiftId: shiftId || null, lateByMinutes: 0, overtimeHours: 0, breaks: '[]', ...payload });
                 res.json({ success: true, ...newRec.toJSON() });
             }
         } else if (type === 'checkOut' && record) {
@@ -152,12 +181,15 @@ router.post('/admin-punch', async (req, res) => {
     }
 });
 
-// POST /verify-location (Server-side GPS matching)
+// POST /verify-location (Server-side GPS matching) — authentication enforced globally
+// companyId comes from JWT (req.companyId) not from body — prevents cross-tenant location leaks
 router.post('/verify-location', async (req, res) => {
     try {
-        const { companyId, lat, lng } = req.body;
+        const { lat, lng } = req.body;
+        // companyId always from JWT session — never trust client-supplied value
+        const companyId = req.companyId;
         if (!companyId || lat === undefined || lng === undefined) {
-            return res.status(400).json({ error: 'companyId, lat, lng are required' });
+            return res.status(400).json({ error: 'lat and lng are required (companyId comes from session)' });
         }
 
         const locations = await PunchLocation.findAll({ where: { companyId, enabled: true } });

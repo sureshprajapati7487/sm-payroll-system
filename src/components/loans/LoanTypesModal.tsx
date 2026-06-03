@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSystemConfigStore } from '@/store/systemConfigStore';
 import { X, Plus, Edit2, Wallet, Trash2, ShieldAlert } from 'lucide-react';
 import { LoanType } from '@/types';
+import { apiFetch } from '@/lib/apiClient';
 
 interface Props {
     onClose: () => void;
@@ -46,13 +47,24 @@ export const LoanTypesModal = ({ onClose }: Props) => {
         return key === LoanType.PF_LOAN || key === LoanType.ADVANCE_CASH;
     };
 
-    const handleDelete = (id: string, key: string) => {
+    const handleDelete = async (id: string, key: string) => {
         if (isSystemType(key)) {
             alert('Cannot delete core system loan types.');
             return;
         }
+        // Check if any active loans are using this type before deleting
+        try {
+            const res = await apiFetch(`/loans?type=${encodeURIComponent(key)}&status=ACTIVE`);
+            if (res.ok) {
+                const active = await res.json();
+                if (Array.isArray(active) && active.length > 0) {
+                    alert(`Cannot delete — ${active.length} active loan(s) are using this type. Close those loans first.`);
+                    return;
+                }
+            }
+        } catch { /* ignore network error — proceed with local delete */ }
+
         if (window.confirm('Are you sure you want to delete this loan type?')) {
-            // TODO: Ensure no active loans are using this type before deleting (ideally backend check)
             config.deleteLoanType(id);
         }
     };

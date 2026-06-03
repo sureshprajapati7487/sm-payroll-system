@@ -11,7 +11,7 @@ export interface Company {
     panNumber?: string;
     employeeCount: number;
     isActive: boolean;
-    admin?: { name: string; loginId: string; password: string }; // Optional for creation
+    admin?: { name: string; loginId: string; password: string; email?: string; role?: string }; // Optional for creation
 }
 
 interface MultiCompanyState {
@@ -20,7 +20,7 @@ interface MultiCompanyState {
     addCompany: (company: Omit<Company, 'id'>) => Promise<Company | null>;
     updateCompany: (id: string, updates: Partial<Company>) => Promise<void>;
     deleteCompany: (id: string) => Promise<boolean>;
-    switchCompany: (id: string) => void;
+    switchCompany: (id: string) => Promise<void>;
     getCurrentCompany: () => Company | undefined;
     getAllCompanies: () => Company[];
     getActiveCompanies: () => Company[];
@@ -69,7 +69,7 @@ export const useMultiCompanyStore = create<MultiCompanyState>()(
 
                     const res = await apiFetch(`/companies`, {
                         method: 'POST',
-                        skipAuth: true,
+                        skipAuth: true, // setup wizard runs before any user exists — no JWT available yet
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(newCompany)
                     });
@@ -145,11 +145,39 @@ export const useMultiCompanyStore = create<MultiCompanyState>()(
                 }
             },
 
-            switchCompany: (id) => {
+            switchCompany: async (id) => {
                 const company = get().companies.find(c => c.id === id);
-                if (company) { // Removed isActive check for simplicity for now
-                    set({ currentCompanyId: id });
+                if (!company) return;
+                set({ currentCompanyId: id });
+
+                // Get the logged-in user's own companyId from persisted JWT payload
+                let userCompanyId: string | null = null;
+                try {
+                    const raw = localStorage.getItem('auth-storage');
+                    if (raw) userCompanyId = JSON.parse(raw)?.state?.user?.companyId ?? null;
+                } catch { /* ignore */ }
+
+                if (!userCompanyId || id === userCompanyId) {
+                    // Own company — no cross-company token needed
+                    localStorage.removeItem('cross-company-auth');
+                    return;
                 }
+
+                // Different company: request a daily HMAC token from server
+                try {
+                    const res = await apiFetch('/auth/cross-company-token', {
+                        method: 'POST',
+                        body: JSON.stringify({ targetCompanyId: id }),
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        localStorage.setItem('cross-company-auth', JSON.stringify({
+                            token: data.token,
+                            targetCompanyId: id,
+                            date: new Date().toISOString().slice(0, 10),
+                        }));
+                    }
+                } catch { /* silently fail — requests will get 403 in production */ }
             },
 
             getCurrentCompany: () => {

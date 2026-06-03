@@ -67,6 +67,6 @@ export const useSystemSettingStore = () => {
     return useInternalSystemSettingStore();
 };
 
-// Global accessor for salesmanConfig.ts (avoids circular import)
-// Returns the current settings object from the store
-(globalThis as any).__smSettingsStore = () => useInternalSystemSettingStore.getState().settings;
+// Named export for direct store access — use this instead of the removed globalThis escape hatch.
+// salesmanConfig.ts should import this function directly to avoid circular dependencies.
+export const getSystemSettings = () => useInternalSystemSettingStore.getState().settings;

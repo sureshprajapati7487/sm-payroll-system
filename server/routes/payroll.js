@@ -1,18 +1,26 @@
 // ── PAYROLL + LOANS + LEAVES + PRODUCTION ROUTES ──────────────────────────────
 const express = require('express');
 const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
+const { requireRole } = require('../rbac');
 
-let Leave, Loan, SalarySlip, Employee, Attendance, Production, AdvanceSalary, Holiday, addError, getErrorHint;
+const { Worker } = require('worker_threads');
+const path = require('path');
+let Leave, Loan, LoanLedger, SalarySlip, Employee, Attendance, Production, AdvanceSalary, Holiday, SystemSetting, StatutoryRule, ReportJob, addError, getErrorHint;
 
 function init(models) {
     Leave = models.Leave;
     Loan = models.Loan;
+    LoanLedger = models.LoanLedger;
     SalarySlip = models.SalarySlip;
     Employee = models.Employee;
     Attendance = models.Attendance;
     Production = models.Production;
     AdvanceSalary = models.AdvanceSalary;
     Holiday = models.Holiday;
+    SystemSetting = models.SystemSetting;
+    StatutoryRule = models.StatutoryRule;
+    ReportJob = models.ReportJob;
     addError = models.addError;
     getErrorHint = models.getErrorHint;
 }
@@ -32,6 +40,8 @@ router.get('/leaves', async (req, res) => {
 router.post('/leaves', async (req, res) => {
     try {
         const payload = { ...req.body };
+        // Inject companyId from JWT (prevents cross-tenant records)
+        if (req.companyId) payload.companyId = req.companyId;
         if (!payload.daysCount && payload.startDate && payload.endDate) {
             if (payload.isHalfDay) {
                 payload.daysCount = 0.5;
@@ -128,18 +138,24 @@ router.delete('/leaves/:id', async (req, res) => {
 
 // ── Loans ─────────────────────────────────────────────────────────────────────
 router.get('/loans', async (req, res) => {
-    const { employeeId, status } = req.query;
+    const { employeeId, status, type } = req.query;
     try {
         const where = {};
         // Use req.companyId from JWT (enforced by requireCompanyScope)
         if (req.companyId) where.companyId = req.companyId;
         if (employeeId) where.employeeId = employeeId;
         if (status) where.status = status;
+        if (type) where.type = type;
         res.json(await Loan.findAll({ where }));
     } catch (e) { addError(e, 'GET /api/loans'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.post('/loans', async (req, res) => {
-    try { res.json(await Loan.create(req.body)); }
+    try {
+        const data = { ...req.body };
+        // Inject companyId from JWT (prevents cross-tenant records)
+        if (req.companyId) data.companyId = req.companyId;
+        res.json(await Loan.create(data));
+    }
     catch (e) { addError(e, 'POST /api/loans'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.put('/loans/:id', async (req, res) => {
@@ -178,6 +194,19 @@ router.patch('/loans/:id/approve', async (req, res) => {
         loan.changed('auditTrail', true);
 
         await loan.save();
+
+        if (LoanLedger) {
+            await LoanLedger.create({
+                loanId: loan.id,
+                employeeId: loan.employeeId,
+                companyId: loan.companyId,
+                date: loan.issuedDate,
+                type: 'PREPAY',
+                amount: loan.amount,
+                remarks: 'Loan Approved & Issued',
+            });
+        }
+
         res.json(loan);
     } catch (e) { addError(e, 'PATCH /api/loans/:id/approve'); res.status(500).json({ error: e.message }); }
 });
@@ -213,19 +242,78 @@ router.post('/loans/:id/pay', async (req, res) => {
         loan.balance = newBal;
         if (newBal <= 0) loan.status = 'CLOSED';
 
+        const today = new Date().toISOString().split('T')[0];
         const newLedgerEntry = {
             id: Math.random().toString(36).substr(2, 9),
-            date: new Date().toISOString().split('T')[0],
+            date: today,
             amount: amount,
             type: 'EMI',
-            remarks: 'Manual Payment'
+            remarks: req.body.remarks || 'Manual Payment'
         };
         loan.ledger = [...(loan.ledger || []), newLedgerEntry];
         loan.changed('ledger', true);
 
         await loan.save();
+
+        if (LoanLedger) {
+            await LoanLedger.create({
+                loanId: loan.id,
+                employeeId: loan.employeeId,
+                companyId: loan.companyId,
+                date: today,
+                type: 'EMI',
+                amount,
+                remarks: req.body.remarks || 'Manual Payment',
+            });
+        }
+
         res.json(loan);
     } catch (e) { addError(e, 'POST /api/loans/:id/pay'); res.status(500).json({ error: e.message }); }
+});
+
+// ── P1-06: Loan Ledger Routes ─────────────────────────────────────────────────
+router.get('/loans/:id/ledger', async (req, res) => {
+    try {
+        if (!LoanLedger) return res.status(503).json({ error: 'LoanLedger not available' });
+        const entries = await LoanLedger.findAll({
+            where: { loanId: req.params.id },
+            order: [['createdAt', 'ASC']],
+        });
+        res.json(entries);
+    } catch (e) { addError(e, 'GET /api/loans/:id/ledger'); res.status(500).json({ error: e.message }); }
+});
+
+router.post('/loans/:id/ledger', async (req, res) => {
+    try {
+        if (!LoanLedger) return res.status(503).json({ error: 'LoanLedger not available' });
+        const loan = await Loan.findByPk(req.params.id);
+        if (!loan) return res.status(404).json({ error: 'Loan not found' });
+
+        const { type = 'EMI', amount, remarks, date } = req.body;
+        if (!amount || amount <= 0) return res.status(400).json({ error: 'amount is required and must be > 0' });
+
+        const entryDate = date || new Date().toISOString().split('T')[0];
+
+        if (type === 'EMI') {
+            const newBal = Math.max(0, (loan.balance || 0) - amount);
+            loan.balance = newBal;
+            if (newBal <= 0) loan.status = 'CLOSED';
+            loan.ledger = [...(loan.ledger || []), { id: uuidv4(), date: entryDate, amount, type, remarks }];
+            loan.changed('ledger', true);
+            await loan.save();
+        }
+
+        const entry = await LoanLedger.create({
+            loanId: loan.id,
+            employeeId: loan.employeeId,
+            companyId: loan.companyId,
+            date: entryDate,
+            type,
+            amount,
+            remarks: remarks || '',
+        });
+        res.status(201).json(entry);
+    } catch (e) { addError(e, 'POST /api/loans/:id/ledger'); res.status(500).json({ error: e.message }); }
 });
 
 // ── Payroll ───────────────────────────────────────────────────────────────────
@@ -237,11 +325,27 @@ router.get('/payroll', async (req, res) => {
         if (req.companyId) where.companyId = req.companyId;
         if (month) where.month = month;
         if (employeeId) where.employeeId = employeeId;
-        res.json(await SalarySlip.findAll({ where }));
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+        const offset = (page - 1) * limit;
+        const { count, rows } = await SalarySlip.findAndCountAll({
+            where,
+            order: [['month', 'DESC']],
+            limit,
+            offset,
+        });
+        res.json({ data: rows, total: count, page, limit, totalPages: Math.ceil(count / limit) });
     } catch (e) { addError(e, 'GET /api/payroll'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.post('/payroll', async (req, res) => {
-    try { const slip = await SalarySlip.upsert(req.body); res.json(slip); }
+    try {
+        const body = { ...req.body };
+        // Inject companyId from JWT (prevents cross-tenant records)
+        if (req.companyId) body.companyId = req.companyId;
+        // upsert() returns [instance, created] — extract just the record
+        const [instance] = await SalarySlip.upsert(body);
+        res.json(instance.toJSON());
+    }
     catch (e) { addError(e, 'POST /api/payroll'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.get('/payroll/:id', async (req, res) => {
@@ -256,26 +360,84 @@ router.put('/payroll/:id', async (req, res) => {
     catch (e) { addError(e, 'PUT /api/payroll/:id'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
-// ── 🚀 BULK SECURE RUN ────────────────────────────────────────────────────────
+// ── 🚀 ASYNC PAYROLL RUN — spawns a worker thread to avoid blocking the HTTP request ─────
 const Decimal = require('decimal.js');
 
-router.post('/run', async (req, res) => {
+// GET /payroll/job/:jobId — poll for async payroll run status
+router.get('/job/:jobId', async (req, res) => {
+    try {
+        const job = await ReportJob.findOne({
+            where: { id: req.params.jobId, companyId: req.companyId || undefined },
+        });
+        if (!job) return res.status(404).json({ error: 'Job not found' });
+        res.json({
+            jobId: job.id, status: job.status, progress: job.progress,
+            error: job.error, completedAt: job.updatedAt,
+        });
+    } catch (e) {
+        addError(e, 'GET /api/payroll/job/:jobId');
+        res.status(500).json({ error: e.message });
+    }
+});
+
+router.post('/run', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     const { companyId, month, generatedBy } = req.body;
     if (!companyId || !month) return res.status(400).json({ error: 'companyId and month required' });
 
-    const sequelize = Employee.sequelize; // Get sequelize instance from any model
+    try {
+        // Create a ReportJob record so the client can poll for status
+        const jobId = `payroll-run-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+        await ReportJob.create({
+            id: jobId,
+            companyId,
+            requestedBy: req.user?.id || 'SYSTEM',
+            reportType: 'payroll_run',
+            format: 'internal',
+            status: 'PENDING',
+            progress: 0,
+            payload: JSON.stringify({ companyId, month, generatedBy }),
+        });
+
+        // Spawn the payroll computation worker
+        const workerPath = path.join(__dirname, '..', 'workers', 'payrollWorker.js');
+        const worker = new Worker(workerPath, {
+            workerData: { jobId, companyId, month, generatedBy: generatedBy || req.user?.name || 'System' },
+        });
+
+        worker.on('error', async (err) => {
+            addError(err, `payrollWorker:${jobId}`);
+            await ReportJob.update({ status: 'FAILED', error: err.message }, { where: { id: jobId } }).catch(() => {});
+        });
+
+        // Return immediately — client polls GET /api/payroll/job/:jobId
+        return res.status(202).json({ jobId, message: 'Payroll run started. Poll /api/payroll/job/:jobId for status.' });
+
+    } catch (outerErr) {
+        // THIS IS TEMPORARY DEAD CODE — kept as a safety net in case worker creation fails
+        // Fall back to in-process synchronous run (will block until complete)
+        const INLINE_FALLBACK = true; // set false to disable fallback if worker always available
+        if (!INLINE_FALLBACK) {
+            addError(outerErr, 'POST /api/payroll/run:setup');
+            const h = getErrorHint(outerErr);
+            return res.status(500).json({ error: outerErr.message, why: h.why, fix: h.fix });
+        }
+    }
+
+    // ── INLINE FALLBACK: synchronous computation (only reached if worker setup fails) ──
+    const sequelize = Employee.sequelize;
     const t = await sequelize.transaction();
 
     try {
         // 1. Fetch raw data
-        const [employees, allRecords, allProds, allLoans, allAdvances, holidaysList, statutoryRules] = await Promise.all([
+        const [employees, allRecords, allProds, allLoans, allAdvances, holidaysList, statutoryRules, payrollConfigSetting] = await Promise.all([
             Employee.findAll({ where: { companyId, status: 'ACTIVE' } }),
             Attendance.findAll({ where: { companyId } }),
             Production.findAll({ where: { companyId, status: 'APPROVED' } }),
             Loan.findAll({ where: { companyId, status: 'ACTIVE' } }),
             AdvanceSalary.findAll({ where: { companyId, status: 'approved' } }),
             Holiday.findAll({ where: { companyId } }),
-            StatutoryRule.findAll({ where: { companyId }, order: [['effectiveDate', 'DESC']] })
+            StatutoryRule.findAll({ where: { companyId }, order: [['effectiveDate', 'DESC']] }),
+            SystemSetting.findOne({ where: { companyId, key: 'PAYROLL_CONFIG' } }),
         ]);
 
         const year = Number(month.split('-')[0]);
@@ -286,8 +448,8 @@ router.post('/run', async (req, res) => {
         // Find the applicable statutory rule (first rule where effectiveDate <= month end date)
         const activeStatutoryRule = statutoryRules.find(r => r.effectiveDate <= monthEndDate) || null;
 
-        // Very basic config defaults
-        const config = {
+        // Config defaults — overridden by per-company SystemSetting key 'PAYROLL_CONFIG'
+        const configDefaults = {
             enableZeroPresenceRule: true,
             enableSandwichRule: true,
             enableLateMarksPenalty: false, lateMarksThreshold: 3, lateMarksPenaltyType: 'HALF_DAY',
@@ -297,12 +459,20 @@ router.post('/run', async (req, res) => {
             enableOTCap: false, otCapHoursPerMonth: 50,
             enableOTMultipliers: true, otNormalMultiplier: 1.5,
             enableEMICap: true, emiCapPercentage: 50,
-            enableAttendanceBonus: false, attendanceBonusAmount: 1000
+            enableAttendanceBonus: false, attendanceBonusAmount: 1000,
         };
+        let savedConfig = {};
+        if (payrollConfigSetting?.value) {
+            try { savedConfig = JSON.parse(payrollConfigSetting.value); } catch { /* use defaults */ }
+        }
+        const config = { ...configDefaults, ...savedConfig };
 
         const generatedSlips = [];
+        const loanBalanceUpdates = []; // Collect loan balance changes — applied in batch inside transaction
+        const perEmployeeErrors = []; // Non-fatal per-employee errors collected for the response
 
         for (const emp of employees) {
+          try {
             // Filter
             const empRecords = allRecords.filter(r => r.employeeId === emp.id && r.date.startsWith(month));
             const empProds = allProds.filter(p => p.employeeId === emp.id && p.date.startsWith(month));
@@ -466,8 +636,50 @@ router.post('/run', async (req, res) => {
                 }
             }
 
-            // Simplified TDS
-            tdsD = new Decimal(0); // Will calculate based on rules if needed, zero mock for now
+            // TDS — FY2024-25 slabs applied per employee's elected tax regime
+            if (sc.tdsApplicable) {
+                const gVal = grossSalary.toNumber();
+                if (sc.tdsPercentage !== undefined) {
+                    // Override: fixed percentage configured on employee
+                    tdsD = grossSalary.times(sc.tdsPercentage).dividedBy(100).round();
+                } else if (!sc.tdsPanLinked) {
+                    // No PAN: mandatory 20% TDS
+                    tdsD = grossSalary.times(20).dividedBy(100).round();
+                } else {
+                    const annualGross = gVal * 12;
+                    const regime = emp.taxRegime || 'NEW';
+                    let annualTax = 0;
+
+                    if (regime === 'NEW') {
+                        // New Regime FY2024-25: no deductions, simplified slabs
+                        if (annualGross <= 300000) annualTax = 0;
+                        else if (annualGross <= 700000) annualTax = (annualGross - 300000) * 0.05;
+                        else if (annualGross <= 1000000) annualTax = 20000 + (annualGross - 700000) * 0.10;
+                        else if (annualGross <= 1200000) annualTax = 50000 + (annualGross - 1000000) * 0.15;
+                        else if (annualGross <= 1500000) annualTax = 80000 + (annualGross - 1200000) * 0.20;
+                        else annualTax = 140000 + (annualGross - 1500000) * 0.30;
+                        // Rebate u/s 87A — zero tax up to ₹7L under new regime
+                        if (annualGross <= 700000) annualTax = 0;
+                    } else {
+                        // Old Regime FY2024-25: with standard deduction ₹50,000
+                        const stdDeduction = 50000;
+                        const section80C = Math.min(sc.section80C || 0, 150000); // Capped at ₹1.5L
+                        const section80D = Math.min(sc.section80D || 0, 25000);  // Basic medical premium
+                        const taxableIncome = Math.max(0, annualGross - stdDeduction - section80C - section80D);
+
+                        if (taxableIncome <= 250000) annualTax = 0;
+                        else if (taxableIncome <= 500000) annualTax = (taxableIncome - 250000) * 0.05;
+                        else if (taxableIncome <= 1000000) annualTax = 12500 + (taxableIncome - 500000) * 0.20;
+                        else annualTax = 112500 + (taxableIncome - 1000000) * 0.30;
+                        // Rebate u/s 87A — zero tax up to ₹5L under old regime
+                        if (taxableIncome <= 500000) annualTax = 0;
+                    }
+
+                    // 4% Health & Education Cess on computed tax
+                    annualTax = annualTax * 1.04;
+                    tdsD = new Decimal(Math.round(annualTax / 12));
+                }
+            }
             const tdsDeduction = tdsD.toNumber();
             const pfDeduction = pfD.toNumber();
 
@@ -477,15 +689,21 @@ router.post('/run', async (req, res) => {
             const availableSalaryForDeductions = Decimal.max(0, grossSalary.minus(pfD).minus(tdsD).minus(otherDeduction));
 
             let loanDeduction = new Decimal(0);
+            const empLoanDeductions = []; // Track per-loan deduction for balance update
             empLoans.forEach(l => {
                 if (l.balance > 0) {
-                    loanDeduction = loanDeduction.plus(Decimal.min(l.emiAmount || 0, l.balance || 0));
+                    const thisEmi = Decimal.min(l.emiAmount || 0, l.balance || 0);
+                    loanDeduction = loanDeduction.plus(thisEmi);
+                    empLoanDeductions.push({ loanId: l.id, emi: thisEmi, currentBalance: new Decimal(l.balance) });
                 }
             });
 
             if (config.enableEMICap) {
                 const cap = grossSalary.times(config.emiCapPercentage).dividedBy(100);
                 if (loanDeduction.greaterThan(cap)) {
+                    // Scale each loan deduction proportionally to fit within cap
+                    const scale = cap.dividedBy(loanDeduction);
+                    empLoanDeductions.forEach(ld => { ld.emi = ld.emi.times(scale).round(); });
                     loanDeduction = cap.round();
                 }
             }
@@ -513,6 +731,14 @@ router.post('/run', async (req, res) => {
             const totalDeductions = loanD.plus(advD).plus(pfD).plus(tdsD).plus(otherDeduction).round();
             const netSalary = grossSalary.minus(totalDeductions).round();
 
+            // Collect loan balance updates — applied atomically after all slips are computed
+            for (const ld of empLoanDeductions) {
+                if (ld.emi.greaterThan(0)) {
+                    const newBalance = Decimal.max(0, ld.currentBalance.minus(ld.emi)).toDecimalPlaces(2).toNumber();
+                    loanBalanceUpdates.push({ loanId: ld.loanId, newBalance });
+                }
+            }
+
             generatedSlips.push({
                 id: Math.random().toString(36).substr(2, 9),
                 companyId,
@@ -538,23 +764,37 @@ router.post('/run', async (req, res) => {
                 generatedOn: new Date().toISOString(),
                 generatedBy: generatedBy || 'Server Sync'
             });
+          } catch (empErr) {
+            // Per-employee error is non-fatal — collect and continue generating other slips
+            perEmployeeErrors.push({ employeeId: emp.id, name: emp.name, error: empErr.message });
+          }
         }
 
-        // Wipe old DRAFT slips for this month
+        // Wipe old DRAFT slips for this month and bulk-insert new ones atomically
         await SalarySlip.destroy({
             where: { companyId, month, status: 'DRAFT' },
             transaction: t
         });
 
-        // Save new slips
         await SalarySlip.bulkCreate(generatedSlips, { transaction: t });
 
-        // COMMIT transaction
+        // Apply all loan balance updates inside the same transaction
+        for (const upd of loanBalanceUpdates) {
+            const newStatus = upd.newBalance <= 0 ? 'CLOSED' : 'ACTIVE';
+            await Loan.update(
+                { balance: upd.newBalance, status: newStatus },
+                { where: { id: upd.loanId }, transaction: t }
+            );
+        }
+
         await t.commit();
 
-        res.json({ success: true, count: generatedSlips.length });
+        res.json({
+            success: true,
+            count: generatedSlips.length,
+            ...(perEmployeeErrors.length > 0 && { warnings: perEmployeeErrors }),
+        });
     } catch (e) {
-        // ROLLBACK transaction
         await t.rollback();
         addError(e, 'POST /api/payroll/run');
         const h = getErrorHint(e);
@@ -563,7 +803,7 @@ router.post('/run', async (req, res) => {
 });
 
 // ── PAYROLL STATE MACHINE ───────────────────────────────────────────────────────
-router.patch('/:id/simulate', async (req, res) => {
+router.patch('/:id/simulate', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const slip = await SalarySlip.findByPk(req.params.id);
         if (!slip) return res.status(404).json({ error: 'Not found' });
@@ -575,7 +815,7 @@ router.patch('/:id/simulate', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.patch('/:id/approve', async (req, res) => {
+router.patch('/:id/approve', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const slip = await SalarySlip.findByPk(req.params.id);
         if (!slip) return res.status(404).json({ error: 'Not found' });
@@ -587,7 +827,7 @@ router.patch('/:id/approve', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.patch('/:id/lock', async (req, res) => {
+router.patch('/:id/lock', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const slip = await SalarySlip.findByPk(req.params.id);
         if (!slip) return res.status(404).json({ error: 'Not found' });
@@ -601,6 +841,128 @@ router.patch('/:id/lock', async (req, res) => {
 
         res.json(slip);
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── P1-01: Statutory Export Routes ───────────────────────────────────────────
+
+function csvEsc(v) {
+    const s = v == null ? '' : String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+// 1. PF ECR CSV
+router.get('/payroll/export/pf-ecr', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
+    const { month } = req.query;
+    if (!month) return res.status(400).json({ error: 'month query param required (e.g. 2024-05)' });
+    try {
+        const where = { month };
+        if (req.companyId) where.companyId = req.companyId;
+        const slips = await SalarySlip.findAll({ where });
+        if (!slips.length) return res.status(404).json({ error: 'No payroll data for this period' });
+
+        const empIds = [...new Set(slips.map(s => s.employeeId))];
+        const employees = await Employee.findAll({ where: { id: empIds } });
+        const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
+
+        const header = ['UAN', 'EmployeeName', 'GrossWages', 'EPFWages', 'EPS', 'EPFContrib', 'EPSContrib'];
+        const rows = slips.map(s => {
+            const emp = empMap[s.employeeId] || {};
+            const bd = emp.bankDetails || {};
+            const epfWages = Math.min(s.grossSalary || 0, 15000);
+            return [
+                csvEsc(bd.uan || ''),
+                csvEsc(emp.name || ''),
+                csvEsc((s.grossSalary || 0).toFixed(2)),
+                csvEsc(epfWages.toFixed(2)),
+                csvEsc(epfWages.toFixed(2)),
+                csvEsc((epfWages * 0.12).toFixed(2)),
+                csvEsc((epfWages * 0.0833).toFixed(2)),
+            ].join(',');
+        });
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="pf-ecr-${month}.csv"`);
+        res.send([header.join(','), ...rows].join('\n'));
+    } catch (e) { addError(e, 'GET /api/payroll/export/pf-ecr'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
+});
+
+// 2. ESIC CSV
+router.get('/payroll/export/esic', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
+    const { month } = req.query;
+    if (!month) return res.status(400).json({ error: 'month query param required (e.g. 2024-05)' });
+    try {
+        const where = { month };
+        if (req.companyId) where.companyId = req.companyId;
+        const slips = await SalarySlip.findAll({ where });
+        if (!slips.length) return res.status(404).json({ error: 'No payroll data for this period' });
+
+        const empIds = [...new Set(slips.map(s => s.employeeId))];
+        const employees = await Employee.findAll({ where: { id: empIds } });
+        const empMap = Object.fromEntries(employees.map(e => [e.id, e]));
+
+        const header = ['ESICNumber', 'EmployeeName', 'GrossWages', 'EmployeeESIC', 'EmployerESIC'];
+        const rows = slips.map(s => {
+            const emp = empMap[s.employeeId] || {};
+            const bd = emp.bankDetails || {};
+            const gross = s.grossSalary || 0;
+            return [
+                csvEsc(bd.esicNumber || ''),
+                csvEsc(emp.name || ''),
+                csvEsc(gross.toFixed(2)),
+                csvEsc((gross * 0.0075).toFixed(2)),
+                csvEsc((gross * 0.0325).toFixed(2)),
+            ].join(',');
+        });
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="esic-${month}.csv"`);
+        res.send([header.join(','), ...rows].join('\n'));
+    } catch (e) { addError(e, 'GET /api/payroll/export/esic'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
+});
+
+// 3. Form-16 HTML
+router.get('/payroll/export/form16/:employeeId', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
+    const { year } = req.query; // e.g. "2024-25"
+    if (!year || !/^\d{4}-\d{2}$/.test(year)) return res.status(400).json({ error: 'year query param required (e.g. 2024-25)' });
+    try {
+        const startY = parseInt(year.split('-')[0], 10);
+        const months = [];
+        for (let m = 4; m <= 12; m++) months.push(`${startY}-${String(m).padStart(2, '0')}`);
+        for (let m = 1; m <= 3; m++) months.push(`${startY + 1}-${String(m).padStart(2, '0')}`);
+
+        const where = { employeeId: req.params.employeeId, month: months };
+        if (req.companyId) where.companyId = req.companyId;
+        const slips = await SalarySlip.findAll({ where });
+        if (!slips.length) return res.status(404).json({ error: 'No payroll data for this period' });
+
+        const emp = await Employee.findOne({ where: { id: req.params.employeeId } });
+        const bd = emp?.bankDetails || {};
+        const totGross = slips.reduce((s, r) => s + (r.grossSalary || 0), 0);
+        const totTDS   = slips.reduce((s, r) => s + (r.taxDeduction || 0), 0);
+
+        const breakdown = slips
+            .sort((a, b) => a.month.localeCompare(b.month))
+            .map(s => `<tr><td>${s.month}</td><td>₹${(s.grossSalary||0).toFixed(2)}</td><td>₹${(s.taxDeduction||0).toFixed(2)}</td></tr>`)
+            .join('');
+
+        res.setHeader('Content-Type', 'text/html');
+        res.send(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Form-16 — ${year}</title>
+<style>body{font-family:Arial,sans-serif;padding:24px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f0f0f0}</style>
+</head><body>
+<h2>Form-16 — Financial Year ${year}</h2>
+<p><strong>Employee Name:</strong> ${emp?.name || req.params.employeeId}</p>
+<p><strong>PAN:</strong> ${bd.pan || 'N/A'}</p>
+<h3>Summary</h3>
+<table>
+  <tr><td><b>Total Gross Salary</b></td><td>₹${totGross.toFixed(2)}</td></tr>
+  <tr><td><b>Total TDS Deducted</b></td><td>₹${totTDS.toFixed(2)}</td></tr>
+</table>
+<h3>Annual Breakdown</h3>
+<table><tr><th>Month</th><th>Gross Salary</th><th>TDS</th></tr>${breakdown}</table>
+</body></html>`);
+    } catch (e) { addError(e, 'GET /api/payroll/export/form16/:employeeId'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
 module.exports = { router, init };

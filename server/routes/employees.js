@@ -2,8 +2,26 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { requireRole } = require('../rbac');
+const { formatError } = require('../middlewares/errorHandler');
 const BCRYPT_ROUNDS = 10;
+
+// ── Multer — local disk storage under server/uploads/{employeeId}/ ─────────────
+const docStorage = multer.diskStorage({
+    destination: (req, _file, cb) => {
+        const dir = path.join(__dirname, '..', 'uploads', req.params.id);
+        fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (_req, file, cb) => {
+        const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+        cb(null, `${Date.now()}_${safe}`);
+    },
+});
+const uploadDoc = multer({ storage: docStorage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 // These are injected from index.js via router setup
 let Employee, Biometric, addError, getErrorHint;
@@ -38,7 +56,7 @@ function validatePasswordStrength(password) {
 const { Op } = require('sequelize');
 
 router.get('/', async (req, res) => {
-    const { page, limit, search, status, department, shift } = req.query;
+    const { search, status, department, shift } = req.query;
     try {
         // req.companyId is set by requireCompanyScope middleware from JWT — tamper-proof
         const where = req.companyId ? { companyId: req.companyId } : {};
@@ -60,30 +78,24 @@ router.get('/', async (req, res) => {
         if (department && department !== 'All') where.department = department;
         if (shift && shift !== 'All') where.shift = shift;
 
-        // Check if pagination is requested
-        if (page && limit) {
-            const pageNum = parseInt(page) || 1;
-            const limitNum = parseInt(limit) || 50;
-            const offset = (pageNum - 1) * limitNum;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+        const offset = (page - 1) * limit;
 
-            const { count, rows } = await Employee.findAndCountAll({
-                where,
-                limit: limitNum,
-                offset,
-                order: [['createdAt', 'DESC']]
-            });
+        const { count, rows } = await Employee.findAndCountAll({
+            where,
+            order: [['createdAt', 'DESC']],
+            limit,
+            offset,
+        });
 
-            return res.json({
-                data: rows,
-                total: count,
-                page: pageNum,
-                limit: limitNum,
-                totalPages: Math.ceil(count / limitNum)
-            });
-        }
-
-        // Fallback to all
-        res.json(await Employee.findAll({ where, order: [['createdAt', 'DESC']] }));
+        res.json({
+            data: rows,
+            total: count,
+            page,
+            limit,
+            totalPages: Math.ceil(count / limit),
+        });
     } catch (e) { addError(e, 'GET /api/employees'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
@@ -91,13 +103,19 @@ router.post('/', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'
     try {
         const data = { ...req.body };
 
-        // RBAC: Strip financial info if user lacks VIEW_SALARY permission equivalent
+        // Always enforce companyId from JWT (prevents cross-tenant employee creation)
+        if (req.companyId) data.companyId = req.companyId;
+
+        // RBAC: Reject financial fields if user lacks salary management permission
         const canManageFinancials = req.user && ['SUPER_ADMIN', 'ACCOUNT_ADMIN'].includes(req.user.role);
-        if (!canManageFinancials) {
-            delete data.basicSalary;
-            delete data.salaryType;
-            delete data.bankDetails;
-            delete data.statutoryConfig;
+        const FINANCIAL_FIELDS = ['basicSalary', 'salaryType', 'bankDetails', 'statutoryConfig'];
+        const attemptedFinancialFields = FINANCIAL_FIELDS.filter(f => data[f] !== undefined);
+        if (!canManageFinancials && attemptedFinancialFields.length > 0) {
+            return res.status(403).json({
+                error: 'You do not have permission to set salary or bank details.',
+                fields: attemptedFinancialFields,
+                fix: 'Only SUPER_ADMIN or ACCOUNT_ADMIN can manage financial data.',
+            });
         }
 
         const pwdErr = validatePasswordStrength(data.password);
@@ -123,13 +141,16 @@ router.put('/:id', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGE
 
         const data = { ...req.body };
 
-        // RBAC: Strip financial info if user lacks VIEW_SALARY permission equivalent
+        // RBAC: Reject financial fields if user lacks salary management permission
         const canManageFinancials = req.user && ['SUPER_ADMIN', 'ACCOUNT_ADMIN'].includes(req.user.role);
-        if (!canManageFinancials) {
-            delete data.basicSalary;
-            delete data.salaryType;
-            delete data.bankDetails;
-            delete data.statutoryConfig;
+        const FINANCIAL_FIELDS = ['basicSalary', 'salaryType', 'bankDetails', 'statutoryConfig'];
+        const attemptedFinancialFields = FINANCIAL_FIELDS.filter(f => data[f] !== undefined);
+        if (!canManageFinancials && attemptedFinancialFields.length > 0) {
+            return res.status(403).json({
+                error: 'You do not have permission to modify salary or bank details.',
+                fields: attemptedFinancialFields,
+                fix: 'Only SUPER_ADMIN or ACCOUNT_ADMIN can manage financial data.',
+            });
         }
 
         const pwdErr = validatePasswordStrength(data.password);
@@ -144,14 +165,25 @@ router.put('/:id', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGE
 });
 
 // PATCH /employees/:id/change-password
+// Employees can only change their OWN password. ADMIN+ can change anyone's in their company.
 router.patch('/:id/change-password', async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body || {};
         if (!currentPassword || !newPassword) {
             return res.status(400).json({ error: 'currentPassword aur newPassword dono required hain' });
         }
+        const requestingUser = req.user;
+        const isAdminRole = requestingUser && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN'].includes(requestingUser.role);
+        const isSelf = requestingUser && requestingUser.id === req.params.id;
+        if (!isAdminRole && !isSelf) {
+            return res.status(403).json({ error: 'Forbidden — aap sirf apna password change kar sakte hain' });
+        }
         const emp = await Employee.findOne({ where: { id: req.params.id } });
         if (!emp) return res.status(404).json({ error: 'Employee not found' });
+        // Cross-tenant check
+        if (req.companyId && emp.companyId !== req.companyId) {
+            return res.status(403).json({ error: 'Forbidden — cannot modify another company\'s employee' });
+        }
 
         const stored = emp.password || '';
         let currentValid = false;
@@ -225,6 +257,55 @@ router.post('/verify-face', async (req, res) => {
         const h = getErrorHint(e);
         res.status(500).json({ error: e.message, why: h.why, fix: h.fix });
     }
+});
+
+// ── P2-03: Document upload / list ─────────────────────────────────────────────
+router.post('/:id/documents', uploadDoc.single('file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const emp = await Employee.findByPk(req.params.id);
+        if (!emp) return res.status(404).json({ error: 'Employee not found' });
+
+        const existing = Array.isArray(emp.documents) ? emp.documents : [];
+        const newDoc = {
+            filename: req.file.originalname,
+            storedAs: req.file.filename,
+            uploadedAt: new Date().toISOString(),
+            size: req.file.size,
+            url: `/api/employees/${req.params.id}/documents/${req.file.filename}`,
+        };
+        emp.documents = [...existing, newDoc];
+        emp.changed('documents', true);
+        await emp.save();
+        res.status(201).json(newDoc);
+    } catch (e) { addError(e, 'POST /api/employees/:id/documents'); res.status(500).json(formatError(e)); }
+});
+
+router.get('/:id/documents', async (req, res) => {
+    try {
+        const emp = await Employee.findByPk(req.params.id);
+        if (!emp) return res.status(404).json({ error: 'Employee not found' });
+        res.json(Array.isArray(emp.documents) ? emp.documents : []);
+    } catch (e) { addError(e, 'GET /api/employees/:id/documents'); res.status(500).json(formatError(e)); }
+});
+
+router.get('/:id/documents/:filename', async (req, res) => {
+    try {
+        // Look up the stored filename from DB — never trust the URL param directly
+        const emp = await Employee.findByPk(req.params.id);
+        if (!emp) return res.status(404).json({ error: 'Employee not found' });
+
+        const docs = Array.isArray(emp.documents) ? emp.documents : [];
+        // Match the requested filename against the storedAs field in DB records only
+        const doc = docs.find(d => d.storedAs === req.params.filename);
+        if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+        // Use path.basename as an extra guard — strips any remaining directory components
+        const safeFilename = path.basename(doc.storedAs);
+        const filePath = path.join(__dirname, '..', 'uploads', req.params.id, safeFilename);
+        if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' });
+        res.sendFile(filePath);
+    } catch (e) { addError(e, 'GET /api/employees/:id/documents/:filename'); res.status(500).json(formatError(e)); }
 });
 
 module.exports = { router, init };

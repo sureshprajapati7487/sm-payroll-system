@@ -12,15 +12,16 @@ function init(models) {
 
 // --- Custom Report Templates ---
 
-// Get all templates
+// Get all templates — scoped to current company
 router.get('/templates', async (req, res) => {
     try {
-        const templates = await CustomReportTemplate.findAll();
-        // Parse JSON strings back to objects
+        const where = {};
+        if (req.companyId) where.companyId = req.companyId;
+        const templates = await CustomReportTemplate.findAll({ where });
         const parsed = templates.map(t => {
             const data = t.toJSON();
-            try { data.columns = JSON.parse(data.columns); } catch (e) { data.columns = []; }
-            try { data.filters = JSON.parse(data.filters); } catch (e) { data.filters = []; }
+            try { data.columns = JSON.parse(data.columns); } catch { data.columns = []; }
+            try { data.filters = JSON.parse(data.filters); } catch { data.filters = []; }
             return data;
         });
         res.json(parsed);
@@ -34,8 +35,11 @@ router.get('/templates', async (req, res) => {
 router.post('/templates', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
     try {
         const { name, description, columns, filters } = req.body;
+        const companyId = req.companyId || req.body.companyId;
+        if (!companyId) return res.status(400).json({ error: 'companyId required' });
         const newTemplate = await CustomReportTemplate.create({
             id: `tpl-${Date.now()}`,
+            companyId,
             name,
             description,
             columns: JSON.stringify(columns || []),
@@ -53,10 +57,38 @@ router.post('/templates', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res
     }
 });
 
+// Update template
+router.patch('/templates/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
+    try {
+        const where = { id: req.params.id };
+        if (req.companyId) where.companyId = req.companyId;
+        const template = await CustomReportTemplate.findOne({ where });
+        if (!template) return res.status(404).json({ error: 'Template not found' });
+
+        const { name, description, columns, filters } = req.body;
+        await template.update({
+            ...(name !== undefined && { name }),
+            ...(description !== undefined && { description }),
+            ...(columns !== undefined && { columns: JSON.stringify(columns) }),
+            ...(filters !== undefined && { filters: JSON.stringify(filters) }),
+        });
+
+        const data = template.toJSON();
+        try { data.columns = JSON.parse(data.columns); } catch { data.columns = []; }
+        try { data.filters = JSON.parse(data.filters); } catch { data.filters = []; }
+        res.json(data);
+    } catch (error) {
+        console.error('Error updating template:', error);
+        res.status(500).json({ error: 'Failed to update template' });
+    }
+});
+
 // Delete template
 router.delete('/templates/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
     try {
-        await CustomReportTemplate.destroy({ where: { id: req.params.id } });
+        const where = { id: req.params.id };
+        if (req.companyId) where.companyId = req.companyId;
+        await CustomReportTemplate.destroy({ where });
         res.json({ message: 'Template deleted' });
     } catch (error) {
         console.error('Error deleting template:', error);
@@ -66,13 +98,15 @@ router.delete('/templates/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), async (re
 
 // --- Scheduled Reports ---
 
-// Get all schedules
+// Get all schedules — scoped to current company
 router.get('/schedules', async (req, res) => {
     try {
-        const schedules = await ScheduledReport.findAll();
+        const where = {};
+        if (req.companyId) where.companyId = req.companyId;
+        const schedules = await ScheduledReport.findAll({ where });
         const parsed = schedules.map(s => {
             const data = s.toJSON();
-            try { data.recipients = JSON.parse(data.recipients); } catch (e) { data.recipients = []; }
+            try { data.recipients = JSON.parse(data.recipients); } catch { data.recipients = []; }
             return data;
         });
         res.json(parsed);
@@ -86,9 +120,12 @@ router.get('/schedules', async (req, res) => {
 router.post('/schedules', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
     try {
         const { name, reportType, frequency, dayOfWeek, dayOfMonth, recipients, enabled, nextRun, createdBy } = req.body;
+        const companyId = req.companyId || req.body.companyId;
+        if (!companyId) return res.status(400).json({ error: 'companyId required' });
 
         const newSchedule = await ScheduledReport.create({
             id: `sched-${Date.now()}`,
+            companyId,
             name,
             reportType,
             frequency,
@@ -97,7 +134,7 @@ router.post('/schedules', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res
             recipients: JSON.stringify(recipients || []),
             enabled: enabled !== undefined ? enabled : true,
             nextRun,
-            createdBy
+            createdBy,
         });
 
         const data = newSchedule.toJSON();
@@ -109,10 +146,41 @@ router.post('/schedules', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res
     }
 });
 
-// Toggle schedule status
+// Update schedule fields
+router.patch('/schedules/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
+    try {
+        const where = { id: req.params.id };
+        if (req.companyId) where.companyId = req.companyId;
+        const schedule = await ScheduledReport.findOne({ where });
+        if (!schedule) return res.status(404).json({ error: 'Schedule not found' });
+
+        const { name, reportType, frequency, dayOfWeek, dayOfMonth, recipients, enabled, nextRun } = req.body;
+        await schedule.update({
+            ...(name !== undefined && { name }),
+            ...(reportType !== undefined && { reportType }),
+            ...(frequency !== undefined && { frequency }),
+            ...(dayOfWeek !== undefined && { dayOfWeek }),
+            ...(dayOfMonth !== undefined && { dayOfMonth }),
+            ...(recipients !== undefined && { recipients: JSON.stringify(recipients) }),
+            ...(enabled !== undefined && { enabled }),
+            ...(nextRun !== undefined && { nextRun }),
+        });
+
+        const data = schedule.toJSON();
+        try { data.recipients = JSON.parse(data.recipients); } catch { data.recipients = []; }
+        res.json(data);
+    } catch (error) {
+        console.error('Error updating schedule:', error);
+        res.status(500).json({ error: 'Failed to update schedule' });
+    }
+});
+
+// Toggle schedule enabled/disabled
 router.patch('/schedules/:id/toggle', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
     try {
-        const schedule = await ScheduledReport.findByPk(req.params.id);
+        const where = { id: req.params.id };
+        if (req.companyId) where.companyId = req.companyId;
+        const schedule = await ScheduledReport.findOne({ where });
         if (!schedule) return res.status(404).json({ error: 'Schedule not found' });
 
         schedule.enabled = !schedule.enabled;
@@ -127,7 +195,9 @@ router.patch('/schedules/:id/toggle', requireRole(['SUPER_ADMIN', 'ADMIN']), asy
 // Delete schedule
 router.delete('/schedules/:id', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
     try {
-        await ScheduledReport.destroy({ where: { id: req.params.id } });
+        const where = { id: req.params.id };
+        if (req.companyId) where.companyId = req.companyId;
+        await ScheduledReport.destroy({ where });
         res.json({ message: 'Schedule deleted' });
     } catch (error) {
         console.error('Error deleting schedule:', error);
@@ -144,7 +214,7 @@ let ReportJob; // Will be initialized from models
 router.post('/generate', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
     try {
         const { columns, format } = req.body;
-        const companyId = req.user.companyId;
+        const companyId = req.companyId || req.user.companyId;
 
         if (!ReportJob) ReportJob = require('../database').ReportJob; // Lazy load if init not grabbed it
 

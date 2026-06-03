@@ -2,36 +2,54 @@
  * apiConfig.ts — Central API URL resolver
  *
  * ═══════════════════════════════════════════════════════════════
- *  ENVIRONMENT MODES  (controlled via .env.local)
+ *  HOW URL IS RESOLVED (priority order)
  * ═══════════════════════════════════════════════════════════════
  *
- *  MODE A — Production Server (ALL devices sync to same DB) ✅ ACTIVE
- *  ─ Set VITE_API_URL=https://sm-payroll-system.onrender.com in .env.local
- *  ─ Local Web  → Render (production)
- *  ─ Website    → Render (production)
- *  ─ Android    → Render (production)
- *  ─ Result: Permissions, data — sab ek hi DB mein ✅
+ *  1. Native Android/iOS (Capacitor)   → ALWAYS Render public URL
+ *  2. VITE_API_URL env var is set      → use that URL
+ *     ⚠️  MUST be the web-service URL, e.g. https://sm-payroll-system.onrender.com
+ *     ⚠️  NEVER set to a postgres:// or internal dpg-... hostname
+ *  3. Production build (PROD = true)   → Render public URL (safe default)
+ *  4. Local dev (npm run dev, no env)  → '/api' (Vite proxy → localhost:3000)
  *
- *  MODE B — Local Server (offline / local dev)
- *  ─ Comment out VITE_API_URL in .env.local (or delete it)
- *  ─ Also run: cd server && npm start
- *  ─ Local Web → localhost:3000 (Vite proxy)
- *  ─ Android   → still uses Render (native always uses PROD_API)
+ * ═══════════════════════════════════════════════════════════════
+ *  VERCEL DASHBOARD → Settings → Environment Variables:
+ *  Key:   VITE_API_URL
+ *  Value: https://sm-payroll-system.onrender.com   ← web service URL only
  *
+ *  RENDER DASHBOARD → sm-payroll-system → Environment:
+ *  DATABASE_URL = postgres://user:pass@dpg-xxx.oregon-postgres.render.com:5432/db
+ *                 ← External Database URL (full hostname with region + port)
  * ═══════════════════════════════════════════════════════════════
  */
 
 import { Capacitor } from '@capacitor/core';
 
-// ── Detect if running inside native Android/iOS app ──────────────────────────
+// Detect native Android/iOS
 const isNative = Capacitor.isNativePlatform();
 
+// ── Validate and sanitize VITE_API_URL ────────────────────────────────────────
+// Guard: if someone accidentally set VITE_API_URL to a postgres:// or internal
+// dpg-... hostname, fall back to the safe default to avoid ENOTFOUND errors.
+const rawViteUrl = import.meta.env.VITE_API_URL as string | undefined;
+const isValidHttpUrl = rawViteUrl
+    ? rawViteUrl.startsWith('https://') || rawViteUrl.startsWith('http://')
+    : false;
+const effectiveEnvUrl = isValidHttpUrl ? rawViteUrl! : undefined;
+
 // ── Production base URL (from .env.local or default Render URL) ──────────────
-const rawEnv = (import.meta.env.VITE_API_URL || 'https://sm-payroll-system.onrender.com')
+const defaultProdUrl = 'https://sm-payroll-system.onrender.com';
+const rawEnv = (import.meta.env.VITE_API_URL || defaultProdUrl)
     .replace(/\/api\/?$/, '')  // trailing /api remove
     .replace(/\/$/, '');       // trailing slash remove
 
-const PROD_API = `${rawEnv}/api`;
+// 🚨 SAFETY CHECK: If the URL is a Render internal hostname (starts with dpg-), 
+// it won't be reachable from the public internet (Vercel/Browser).
+// We force the public URL in this case.
+const isInternalHost = rawEnv.includes('dpg-') && !rawEnv.startsWith('https://');
+const safeRawEnv = isInternalHost ? defaultProdUrl : rawEnv;
+
+const PROD_API = `${safeRawEnv}/api`;
 
 // ── API URL Resolution ────────────────────────────────────────────────────────
 // Android (native)     → always production (Render)
@@ -39,18 +57,12 @@ const PROD_API = `${rawEnv}/api`;
 // Web without VITE_API_URL → '/api' (Vite proxy → localhost:3000)
 export const API_URL: string = isNative
     ? PROD_API
-    : (import.meta.env.VITE_API_URL ? PROD_API : '/api');
+    : (import.meta.env.VITE_API_URL && !isInternalHost ? PROD_API : '/api');
 
 export const getApiUrl = () => API_URL;
 
-// ── Current Mode (for debugging in Server Status page) ───────────────────────
-export const getEnvironmentMode = (): 'production' | 'local' => {
-    if (isNative || import.meta.env.VITE_API_URL) return 'production';
-    return 'local';
-};
+export const getEnvironmentMode = (): 'production' | 'local' =>
+    (isNative || !!effectiveEnvUrl || import.meta.env.PROD === true) ? 'production' : 'local';
 
-// ── Helper: base URL (without /api) for direct fetch calls ───────────────────
-export const getServerBaseUrl = (): string => {
-    if (isNative || import.meta.env.VITE_API_URL) return rawEnv;
-    return 'http://localhost:3000';
-};
+export const getServerBaseUrl = (): string =>
+    (isNative || !!effectiveEnvUrl || import.meta.env.PROD === true) ? rawEnv : 'http://localhost:3000';
