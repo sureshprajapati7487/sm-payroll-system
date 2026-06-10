@@ -105,11 +105,9 @@ const useInternalPayrollStore = create<PayrollState>((set, get) => ({
             await get().fetchPayroll(month);
 
             // Invalidate dependent stores — loan balances and advances changed during run
-            const { useLoanStore } = await import('./loanStore');
-            const { useAdvanceSalaryStore } = await import('./advanceSalaryStore');
             const { useAttendanceStore } = await import('./attendanceStore');
             await Promise.allSettled([
-                useLoanStore.getState().fetchLoans(),
+                useLoanStore.getState().fetchLoans?.(),
                 useAdvanceSalaryStore.getState().fetchAdvances?.(),
                 useAttendanceStore.getState().fetchAttendance(),
             ]);

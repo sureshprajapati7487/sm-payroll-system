@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
 const { AdvanceSalary } = require('../database');
 const { requireRole } = require('../rbac');
 
@@ -29,7 +30,7 @@ router.get('/advances', async (req, res) => {
 router.post('/advances', async (req, res) => {
     try {
         // Validate
-        const { id, employeeId, employeeName, amount, reason, requestDate, installments } = req.body;
+        const { employeeId, employeeName, amount, reason, requestDate, installments } = req.body;
         if (!employeeId || !amount) {
             return res.status(400).json({ error: 'employeeId and amount are required' });
         }
@@ -38,7 +39,7 @@ router.post('/advances', async (req, res) => {
         const companyId = req.companyId || req.body.companyId;
 
         const advance = await AdvanceSalary.create({
-            id: id || Math.random().toString(36).substr(2, 9),
+            id: `adv-${uuidv4()}`,
             companyId,
             employeeId,
             employeeName,
@@ -59,7 +60,7 @@ router.post('/advances', async (req, res) => {
 });
 
 // PATCH /api/finance/advances/:id/approve
-router.patch('/advances/:id/approve', requireRole(['SUPER_ADMIN', 'ADMIN', 'HR']), async (req, res) => {
+router.patch('/advances/:id/approve', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'HR']), async (req, res) => {
     try {
         const { approvedBy } = req.body;
         const advance = await AdvanceSalary.findOne({ where: { id: req.params.id } });
@@ -87,7 +88,7 @@ router.patch('/advances/:id/approve', requireRole(['SUPER_ADMIN', 'ADMIN', 'HR']
 });
 
 // PATCH /api/finance/advances/:id/reject
-router.patch('/advances/:id/reject', requireRole(['SUPER_ADMIN', 'ADMIN', 'HR']), async (req, res) => {
+router.patch('/advances/:id/reject', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'HR']), async (req, res) => {
     try {
         const advance = await AdvanceSalary.findOne({ where: { id: req.params.id } });
         if (!advance) return res.status(404).json({ error: 'Advance request not found' });

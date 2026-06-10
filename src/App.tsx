@@ -44,91 +44,92 @@ function lazyLoad<T extends Record<string, any>>(importer: () => Promise<T>, nam
 }
 
 // ── Lazy Page Imports ─────────────────────────────────────────────────────────
-const LoginPage         = lazyLoad(() => import('@/pages/LoginPage'), 'LoginPage');
-const SignupPage          = lazyLoad(() => import('@/pages/SignupPage'), 'SignupPage');
-const ForgotPasswordPage  = lazyLoad(() => import('@/pages/ForgotPasswordPage'), 'ForgotPasswordPage');
-const UnauthorizedPage  = lazyLoad(() => import('@/pages/UnauthorizedPage'), 'UnauthorizedPage');
-const Dashboard         = lazyLoad(() => import('@/pages/Dashboard'), 'Dashboard');
-const QuickActionPage   = lazyLoad(() => import('@/pages/QuickActionPage'), 'QuickActionPage');
-const CompanySetup      = lazyLoad(() => import('@/pages/company/CompanySetup'), 'CompanySetup');
-const NotFound          = lazyLoad(() => import('@/pages/NotFound'), 'NotFound');
+const LoginPage = lazyLoad(() => import('@/pages/LoginPage'), 'LoginPage');
+const SignupPage = lazyLoad(() => import('@/pages/SignupPage'), 'SignupPage');
+const ForgotPasswordPage = lazyLoad(() => import('@/pages/ForgotPasswordPage'), 'ForgotPasswordPage');
+const UnauthorizedPage = lazyLoad(() => import('@/pages/UnauthorizedPage'), 'UnauthorizedPage');
+const Dashboard = lazyLoad(() => import('@/pages/Dashboard'), 'Dashboard');
+const QuickActionPage = lazyLoad(() => import('@/pages/QuickActionPage'), 'QuickActionPage');
+const CompanySetup = lazyLoad(() => import('@/pages/company/CompanySetup'), 'CompanySetup');
+const NotFound = lazyLoad(() => import('@/pages/NotFound'), 'NotFound');
 
 // Employees
-const EmployeeList      = lazyLoad(() => import('@/pages/employees/EmployeeList'), 'EmployeeList');
-const EmployeeProfile   = lazyLoad(() => import('@/pages/employees/EmployeeProfile'), 'EmployeeProfile');
-const EmployeeForm      = lazyLoad(() => import('@/pages/employees/EmployeeForm'), 'EmployeeForm');
+const EmployeeList = lazyLoad(() => import('@/pages/employees/EmployeeList'), 'EmployeeList');
+const EmployeeProfile = lazyLoad(() => import('@/pages/employees/EmployeeProfile'), 'EmployeeProfile');
+const EmployeeForm = lazyLoad(() => import('@/pages/employees/EmployeeForm'), 'EmployeeForm');
 
 // Attendance
 const AttendanceDashboard = lazyLoad(() => import('./pages/attendance/AttendanceDashboard'), 'AttendanceDashboard');
-const HolidayManager      = lazyLoad(() => import('./pages/attendance/HolidayManager'), 'HolidayManager');
-const FaceKioskPage       = lazyLoad(() => import('./pages/attendance/FaceKioskPage'), 'FaceKioskPage');
+const HolidayManager = lazyLoad(() => import('./pages/attendance/HolidayManager'), 'HolidayManager');
+const FaceKioskPage = lazyLoad(() => import('./pages/attendance/FaceKioskPage'), 'FaceKioskPage');
+const PinKioskPage  = lazyLoad(() => import('./pages/attendance/PinKioskPage'),  'PinKioskPage');
 
 // Production
 const ProductionDashboard = lazyLoad(() => import('./pages/production/ProductionDashboard'), 'ProductionDashboard');
-const RateManager         = lazyLoad(() => import('./pages/production/RateManager'), 'RateManager');
-const WorkGroupManager    = lazyLoad(() => import('./pages/production/WorkGroupManager'), 'WorkGroupManager');
-const BulkEntryForm       = lazyLoad(() => import('./pages/production/BulkEntryForm'), 'BulkEntryForm');
+const RateManager = lazyLoad(() => import('./pages/production/RateManager'), 'RateManager');
+const WorkGroupManager = lazyLoad(() => import('./pages/production/WorkGroupManager'), 'WorkGroupManager');
+const BulkEntryForm = lazyLoad(() => import('./pages/production/BulkEntryForm'), 'BulkEntryForm');
 
 // Leaves / Loans / Approvals / Expenses
-const LeaveDashboard    = lazyLoad(() => import('@/pages/leaves/LeaveDashboard'), 'LeaveDashboard');
-const LoanDashboard     = lazyLoad(() => import('@/pages/loans/LoanDashboard'), 'LoanDashboard');
-const ApprovalCenter    = lazyLoad(() => import('@/pages/approvals/ApprovalCenter'), 'ApprovalCenter');
+const LeaveDashboard = lazyLoad(() => import('@/pages/leaves/LeaveDashboard'), 'LeaveDashboard');
+const LoanDashboard = lazyLoad(() => import('@/pages/loans/LoanDashboard'), 'LoanDashboard');
+const ApprovalCenter = lazyLoad(() => import('@/pages/approvals/ApprovalCenter'), 'ApprovalCenter');
 const ExpensesDashboard = lazyLoad(() => import('@/pages/expenses/ExpensesDashboard'), 'ExpensesDashboard');
 
 // Payroll
-const PayrollDashboard  = lazyLoad(() => import('@/pages/payroll/PayrollDashboard'), 'PayrollDashboard');
-const PayrollHistory    = lazyLoad(() => import('@/pages/payroll/PayrollHistory'), 'PayrollHistory');
+const PayrollDashboard = lazyLoad(() => import('@/pages/payroll/PayrollDashboard'), 'PayrollDashboard');
+const PayrollHistory = lazyLoad(() => import('@/pages/payroll/PayrollHistory'), 'PayrollHistory');
 const PayrollSimulation = lazyLoad(() => import('@/pages/payroll/PayrollSimulation'), 'PayrollSimulation');
-const PayslipView       = lazyLoad(() => import('@/pages/payroll/PayslipView'), 'PayslipView');
+const PayslipView = lazyLoad(() => import('@/pages/payroll/PayslipView'), 'PayslipView');
 
 // Calculators
-const CTCCalculator   = lazyLoad(() => import('@/pages/calculators/CTCCalculator'), 'CTCCalculator');
-const TDSCalculator   = lazyLoad(() => import('@/pages/calculators/TDSCalculator'), 'TDSCalculator');
+const CTCCalculator = lazyLoad(() => import('@/pages/calculators/CTCCalculator'), 'CTCCalculator');
+const TDSCalculator = lazyLoad(() => import('@/pages/calculators/TDSCalculator'), 'TDSCalculator');
 const PFESICalculator = lazyLoad(() => import('@/pages/calculators/PFESICalculator'), 'PFESICalculator');
 
 // Admin Tools
-const BulkImport             = lazyLoad(() => import('@/pages/admin/BulkImport'), 'BulkImport');
-const AuditLogs              = lazyLoad(() => import('@/pages/admin/AuditLogs'), 'AuditLogs');
-const TrashManagement        = lazyLoad(() => import('@/pages/admin/TrashManagement'), 'TrashManagement');
-const DraftManager           = lazyLoad(() => import('@/pages/admin/DraftManager'), 'DraftManager');
+const BulkImport = lazyLoad(() => import('@/pages/admin/BulkImport'), 'BulkImport');
+const AuditLogs = lazyLoad(() => import('@/pages/admin/AuditLogs'), 'AuditLogs');
+const TrashManagement = lazyLoad(() => import('@/pages/admin/TrashManagement'), 'TrashManagement');
+const DraftManager = lazyLoad(() => import('@/pages/admin/DraftManager'), 'DraftManager');
 const DataConsistencyChecker = lazyLoad(() => import('@/pages/admin/DataConsistencyChecker'), 'DataConsistencyChecker');
-const DataSeeding            = lazyLoad(() => import('@/pages/admin/DataSeeding'), 'DataSeeding');
-const DatabaseBackup         = lazyLoad(() => import('@/pages/admin/DatabaseBackup'), 'DatabaseBackup');
+const DataSeeding = lazyLoad(() => import('@/pages/admin/DataSeeding'), 'DataSeeding');
+const DatabaseBackup = lazyLoad(() => import('@/pages/admin/DatabaseBackup'), 'DatabaseBackup');
 
 // Settings
-const GeneralSettings       = lazyLoad(() => import('@/pages/settings/GeneralSettings'), 'GeneralSettings');
-const SecuritySettings      = lazyLoad(() => import('@/pages/settings/SecuritySettings'), 'SecuritySettings');
-const ThemeCustomizer       = lazyLoad(() => import('@/pages/settings/ThemeCustomizer'), 'ThemeCustomizer');
-const ConfigurationPage     = lazyLoad(() => import('@/pages/settings/ConfigurationPage'), 'ConfigurationPage');
+const GeneralSettings = lazyLoad(() => import('@/pages/settings/GeneralSettings'), 'GeneralSettings');
+const SecuritySettings = lazyLoad(() => import('@/pages/settings/SecuritySettings'), 'SecuritySettings');
+const ThemeCustomizer = lazyLoad(() => import('@/pages/settings/ThemeCustomizer'), 'ThemeCustomizer');
+const ConfigurationPage = lazyLoad(() => import('@/pages/settings/ConfigurationPage'), 'ConfigurationPage');
 const ServerStatusDashboard = lazyLoad(() => import('@/pages/settings/ServerStatusDashboard'), 'ServerStatusDashboard');
-const NotificationSettings  = lazyLoad(() => import('@/pages/settings/NotificationSettings'), 'NotificationSettings');
-const LanguageSettings      = lazyLoad(() => import('@/pages/settings/LanguageSettings'), 'LanguageSettings');
-const UserProfile           = lazyLoad(() => import('@/pages/settings/UserProfile'), 'UserProfile');
+const NotificationSettings = lazyLoad(() => import('@/pages/settings/NotificationSettings'), 'NotificationSettings');
+const LanguageSettings = lazyLoad(() => import('@/pages/settings/LanguageSettings'), 'LanguageSettings');
+const UserProfile = lazyLoad(() => import('@/pages/settings/UserProfile'), 'UserProfile');
 
 // Statutory
-const Form16Generator  = lazyLoad(() => import('@/pages/statutory/Form16Generator'), 'Form16Generator');
+const Form16Generator = lazyLoad(() => import('@/pages/statutory/Form16Generator'), 'Form16Generator');
 const StatutoryReports = lazyLoad(() => import('@/pages/statutory/StatutoryReports'), 'StatutoryReports');
 
 // Security / Company / Sales / Mobile / Support
-const SecurityAlerts         = lazyLoad(() => import('@/pages/security/SecurityAlerts'), 'SecurityAlerts');
-const CompanySwitcher        = lazyLoad(() => import('@/pages/company/CompanySwitcher'), 'CompanySwitcher');
-const SalesmanDashboard      = lazyLoad(() => import('@/pages/sales/SalesmanDashboard'), 'SalesmanDashboard');
-const ClientListPage         = lazyLoad(() => import('@/pages/sales/ClientListPage'), 'ClientListPage');
-const QuickCheckIn           = lazyLoad(() => import('@/pages/mobile/QuickCheckIn'), 'QuickCheckIn');
-const MobileDashboard        = lazyLoad(() => import('@/pages/mobile/MobileDashboard'), 'MobileDashboard');
-const HelpCenter             = lazyLoad(() => import('@/pages/support/HelpCenter'), 'HelpCenter');
+const SecurityAlerts = lazyLoad(() => import('@/pages/security/SecurityAlerts'), 'SecurityAlerts');
+const CompanySwitcher = lazyLoad(() => import('@/pages/company/CompanySwitcher'), 'CompanySwitcher');
+const SalesmanDashboard = lazyLoad(() => import('@/pages/sales/SalesmanDashboard'), 'SalesmanDashboard');
+const ClientListPage = lazyLoad(() => import('@/pages/sales/ClientListPage'), 'ClientListPage');
+const QuickCheckIn = lazyLoad(() => import('@/pages/mobile/QuickCheckIn'), 'QuickCheckIn');
+const MobileDashboard = lazyLoad(() => import('@/pages/mobile/MobileDashboard'), 'MobileDashboard');
+const HelpCenter = lazyLoad(() => import('@/pages/support/HelpCenter'), 'HelpCenter');
 
 // Reports / Finance
-const ReportBuilder            = lazyLoad(() => import('@/pages/reports/ReportBuilder'), 'ReportBuilder');
-const ScheduledReports         = lazyLoad(() => import('@/pages/reports/ScheduledReports'), 'ScheduledReports');
-const CustomReportBuilder      = lazyLoad(() => import('@/pages/reports/CustomReportBuilder'), 'CustomReportBuilder');
-const FinanceDashboard         = lazyLoad(() => import('@/pages/finance/FinanceDashboard'), 'FinanceDashboard');
-const DepartmentFinanceReport  = lazyLoad(() => import('@/pages/finance/DepartmentFinanceReport'), 'DepartmentFinanceReport');
-const CostCenterMapping        = lazyLoad(() => import('@/pages/finance/CostCenterMapping'), 'CostCenterMapping');
-const AdvanceSalaryManagement  = lazyLoad(() => import('@/pages/finance/AdvanceSalaryManagement'), 'AdvanceSalaryManagement');
-const FnFSettlement            = lazyLoad(() => import('@/pages/finance/FnFSettlement'), 'FnFSettlement');
-const OvertimePolicySettings   = lazyLoad(() => import('@/pages/settings/OvertimePolicySettings'), 'OvertimePolicySettings');
-const ESSDashboard             = lazyLoad(() => import('@/pages/ess/ESSDashboard'), 'ESSDashboard');
+const ReportBuilder = lazyLoad(() => import('@/pages/reports/ReportBuilder'), 'ReportBuilder');
+const ScheduledReports = lazyLoad(() => import('@/pages/reports/ScheduledReports'), 'ScheduledReports');
+const CustomReportBuilder = lazyLoad(() => import('@/pages/reports/CustomReportBuilder'), 'CustomReportBuilder');
+const FinanceDashboard = lazyLoad(() => import('@/pages/finance/FinanceDashboard'), 'FinanceDashboard');
+const DepartmentFinanceReport = lazyLoad(() => import('@/pages/finance/DepartmentFinanceReport'), 'DepartmentFinanceReport');
+const CostCenterMapping = lazyLoad(() => import('@/pages/finance/CostCenterMapping'), 'CostCenterMapping');
+const AdvanceSalaryManagement = lazyLoad(() => import('@/pages/finance/AdvanceSalaryManagement'), 'AdvanceSalaryManagement');
+const FnFSettlement = lazyLoad(() => import('@/pages/finance/FnFSettlement'), 'FnFSettlement');
+const OvertimePolicySettings = lazyLoad(() => import('@/pages/settings/OvertimePolicySettings'), 'OvertimePolicySettings');
+const ESSDashboard = lazyLoad(() => import('@/pages/ess/ESSDashboard'), 'ESSDashboard');
 
 // ── Helper component for Company Check ───────────────────────────────────────
 const CompanyGuard = ({ children }: { children: JSX.Element }) => {
@@ -172,7 +173,7 @@ function App() {
     // Smart Auto-Sync: every 30s, only when tab is visible
     useDataSync(30000);
 
-    const { isAuthenticated, logout } = useAuthStore();
+    const { isAuthenticated, isHydrated, logout } = useAuthStore();
 
     // ── Global GPS: App Load request, Always active ──
     useGlobalGPS();
@@ -191,7 +192,7 @@ function App() {
 
     useEffect(() => {
         // Fetch data on login OR when the active company changes
-        if (!isAuthenticated) return;
+        if (!isHydrated || !isAuthenticated) return;
         fetchCompanies();
         fetchEmployees();
         fetchAttendance();
@@ -204,9 +205,7 @@ function App() {
             fetchGroups(currentCompanyId);
             fetchRolePermissions(currentCompanyId); // Load saved permissions from DB
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        // Zustand store functions are stable references — safe to omit from deps
-    }, [isAuthenticated, currentCompanyId]); // eslint-disable-line
+    }, [isHydrated, isAuthenticated, currentCompanyId]); // eslint-disable-line
 
     return (
         <ErrorBoundary>
@@ -255,6 +254,7 @@ function App() {
                                         <Route path="/attendance" element={<PageErrorBoundary pageName="Attendance"><AttendanceDashboard /></PageErrorBoundary>} />
                                         <Route path="/attendance/holidays" element={<PageErrorBoundary pageName="Holiday Manager"><HolidayManager /></PageErrorBoundary>} />
                                         <Route path="/attendance/kiosk" element={<PageErrorBoundary pageName="Face Kiosk"><FaceKioskPage /></PageErrorBoundary>} />
+                                        <Route path="/attendance/pin-kiosk" element={<PageErrorBoundary pageName="PIN Kiosk"><PinKioskPage /></PageErrorBoundary>} />
                                     </Route>
 
                                     {/* Salesman Dashboard (Optional depending on usage context, but View Salesman applies) */}
@@ -357,7 +357,9 @@ function App() {
                                     <Route path="/settings/server-status" element={<ServerStatusDashboard />} />
                                     <Route path="/settings/notifications" element={<NotificationSettings />} />
                                     <Route path="/configuration" element={<ConfigurationPage />} />
-                                    <Route path="/security/alerts" element={<SecurityAlerts />} />
+                                    <Route element={<ProtectedRoute requiredPermission={PERMISSIONS.VIEW_SECURITY_ALERTS} />}>
+                                        <Route path="/security/alerts" element={<SecurityAlerts />} />
+                                    </Route>
 
                                     {/* Company Management */}
                                     <Route path="/company/switcher" element={<CompanySwitcher />} />

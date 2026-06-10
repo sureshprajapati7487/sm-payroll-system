@@ -39,15 +39,15 @@ const TaskModal = ({
     const handleSave = () => {
         if (!form.title?.trim()) return;
         onSave({
-            id: form.id || `task-${Date.now()}`,
+            ...(form.id ? { id: form.id } : {}), // only send id when editing existing task
             title: form.title!,
             description: form.description,
             salesmanId: form.salesmanId,
             priority: (form.priority as TaskPriority) || 'medium',
             status: form.status ?? 'todo',
             dueDate: form.dueDate,
-            createdAt: form.createdAt || new Date().toISOString(),
             completedAt: form.completedAt,
+            // id and createdAt generated server-side for new tasks
         });
     };
 

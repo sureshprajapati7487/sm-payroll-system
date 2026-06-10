@@ -18,8 +18,7 @@ import {
     Download,
     Mail,
 } from 'lucide-react';
-import { API_URL } from '@/lib/apiConfig';
-import { authHeader as getAuthHeader } from '@/lib/authHeader';
+import { apiFetch } from '@/lib/apiClient';
 import { clsx } from 'clsx';
 import { LoanSummaryModal } from '@/components/loans/LoanSummaryModal';
 import { useDialog } from '@/components/DialogProvider';
@@ -37,8 +36,12 @@ export const PayrollDashboard = () => {
     const { currentIp, allowedIps } = useSecurityStore();
     const isIpAllowed = user?.role === 'SUPER_ADMIN' || (currentIp && allowedIps.includes(currentIp));
 
-    // Default to current month YYYY-MM
-    const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+    // Local month (not UTC) — prevents month mismatch near month-end in IST
+    const getLocalMonth = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+    const [selectedMonth, setSelectedMonth] = useState(getLocalMonth);
     const [searchTerm, setSearchTerm] = useState('');
     const canGenerate = hasPermission(PERMISSIONS.GENERATE_PAYROLL);
     const canSimulate = hasPermission(PERMISSIONS.RUN_PAYROLL_SIMULATION) || canGenerate;
@@ -55,7 +58,7 @@ export const PayrollDashboard = () => {
     const [lockConfirmId, setLockConfirmId] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isBulkLoading, setIsBulkLoading] = useState(false);
-    const { confirm } = useDialog();
+    const { confirm, toast } = useDialog();
 
     // Fetch payroll data from server when month changes
     useEffect(() => {
@@ -84,7 +87,9 @@ export const PayrollDashboard = () => {
 
         return monthMatch && searchMatch && statusMatch && deptMatch && accessOk;
     });
-    const totalPayout = filteredSlips.reduce((sum, s) => sum + s.netSalary, 0);
+    const totalPayout = filteredSlips
+        .filter(s => s.status === 'LOCKED' || s.status === 'PAID')
+        .reduce((sum, s) => sum + s.netSalary, 0);
 
     const handleGenerate = async () => {
         const ok = await confirm({
@@ -105,12 +110,10 @@ export const PayrollDashboard = () => {
     const toggleSelect = (id: string) =>
         setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-    const authHeader = getAuthHeader;
-
     const handleBulkAction = async (action: 'simulate' | 'approve' | 'lock') => {
         const statusMap = { simulate: 'DRAFT', approve: 'SIMULATION', lock: 'FINAL_APPROVED' } as const;
         const eligible = filteredSlips.filter(s => selectedIds.includes(s.id) && s.status === statusMap[action]);
-        if (eligible.length === 0) { alert(`No eligible slips for bulk ${action}.`); return; }
+        if (eligible.length === 0) { toast(`No eligible slips for bulk ${action}.`, 'warning'); return; }
         const ok = await confirm({
             title: `Bulk ${action.charAt(0).toUpperCase() + action.slice(1)}`,
             message: `${eligible.length} slip(s) ko ${action} karna chahte hain?`,
@@ -127,20 +130,20 @@ export const PayrollDashboard = () => {
 
     const handleExport = async (type: 'pf-ecr' | 'esic') => {
         try {
-            const res = await fetch(`${API_URL}/payroll/export/${type}?month=${selectedMonth}`, { headers: authHeader() });
-            if (!res.ok) { alert(`Export failed: ${res.statusText}`); return; }
+            const res = await apiFetch(`/payroll/export/${type}?month=${selectedMonth}`);
+            if (!res.ok) { toast(`Export failed: ${res.statusText}`, 'error'); return; }
             const blob = await res.blob();
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = `${type}-${selectedMonth}.csv`;
             a.click();
             URL.revokeObjectURL(a.href);
-        } catch (e: any) { alert(`Export error: ${e.message}`); }
+        } catch (e: any) { toast(`Export error: ${e.message}`, 'error'); }
     };
 
     const handleEmailAll = async () => {
         const slipsToEmail = filteredSlips.filter(s => s.status !== 'DRAFT');
-        if (slipsToEmail.length === 0) { alert('No finalized slips to email.'); return; }
+        if (slipsToEmail.length === 0) { toast('No finalized slips to email.', 'warning'); return; }
         const ok = await confirm({
             title: 'Email All Payslips',
             message: `${slipsToEmail.length} employees ko payslip email bhejein?`,
@@ -153,16 +156,15 @@ export const PayrollDashboard = () => {
         let sent = 0, failed = 0;
         for (const slip of slipsToEmail) {
             try {
-                const res = await fetch(`${API_URL}/notifications/send-payslip`, {
+                const res = await apiFetch(`/notifications/send-payslip`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...authHeader() },
                     body: JSON.stringify({ employeeId: slip.employeeId, month: selectedMonth }),
                 });
                 if (res.ok) sent++; else failed++;
             } catch { failed++; }
         }
         setIsBulkLoading(false);
-        alert(`Done: ${sent} sent, ${failed} failed.`);
+        toast(`Done: ${sent} sent, ${failed} failed.`, failed === 0 ? 'success' : 'warning');
     };
 
     const handleActionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -339,7 +341,7 @@ export const PayrollDashboard = () => {
                 <div className="glass p-5 rounded-xl border border-dark-border">
                     <p className="text-dark-muted text-xs uppercase tracking-wider mb-1">Pending Payment</p>
                     <p className="text-2xl font-bold text-warning">
-                        {filteredSlips.filter(s => s.status !== 'LOCKED').length}
+                        {filteredSlips.filter(s => s.status !== 'LOCKED' && s.status !== 'PAID').length}
                     </p>
                 </div>
             </div>

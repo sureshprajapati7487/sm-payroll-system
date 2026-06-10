@@ -49,7 +49,7 @@ const useInternalProductionStore = create<ProductionState>((set, get) => ({
 
         const newEntry: ProductionEntry = {
             ...entry,
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             totalAmount: entry.qty * entry.rate,
             status: isHuge ? ProductionStatus.PENDING : ProductionStatus.APPROVED, // Huge entries must be approved
             workflowApprovals,

@@ -8,6 +8,7 @@ import { PERMISSIONS } from '@/config/permissions';
 export const ScheduledReports = () => {
     const { reports, createScheduledReport, deleteScheduledReport, toggleReportStatus } = useScheduledReportStore();
     const [showForm, setShowForm] = useState(false);
+    const { hasPermission, user } = useAuthStore();
     const [formData, setFormData] = useState({
         name: '',
         reportType: 'payslip' as const,
@@ -16,10 +17,8 @@ export const ScheduledReports = () => {
         dayOfMonth: 1,
         recipients: '',
         enabled: true,
-        createdBy: 'Admin'
     });
 
-    const { hasPermission } = useAuthStore();
     const canSchedule = hasPermission(PERMISSIONS.SCHEDULE_REPORTS);
 
     // Manual "Run Now" — fetch CSV from backend
@@ -32,7 +31,9 @@ export const ScheduledReports = () => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${reportName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+            const d = new Date();
+            const localDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            a.download = `${reportName.replace(/\s+/g, '_')}_${localDate}.csv`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -55,7 +56,7 @@ export const ScheduledReports = () => {
             dayOfMonth: formData.frequency === 'monthly' ? formData.dayOfMonth : undefined,
             recipients: recipientList,
             enabled: formData.enabled,
-            createdBy: formData.createdBy
+            createdBy: user?.name || user?.id || 'System',
         });
 
         setFormData({ name: '', reportType: 'payslip', frequency: 'monthly', dayOfWeek: 1, dayOfMonth: 1, recipients: '', enabled: true, createdBy: 'Admin' });

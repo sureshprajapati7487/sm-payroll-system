@@ -62,7 +62,7 @@ export const BulkImport = () => {
                     department: row.department || '',
                     designation: row.designation || '',
                     basicSalary: row.basicSalary || 0,
-                    joiningDate: row.joiningDate || new Date().toISOString().split('T')[0],
+                    joiningDate: row.joiningDate || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })(),
                     status: 'ACTIVE' as EmployeeStatus,
                     role: 'EMPLOYEE',
                     shift: 'GENERAL' as ShiftType,

@@ -4,13 +4,28 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { requireRole } = require('../rbac');
 
-let Attendance, PunchLocation, addError, getErrorHint;
+let Attendance, PunchLocation, SystemSetting, Shift, addError, getErrorHint;
 
 function init(models) {
     Attendance = models.Attendance;
     PunchLocation = models.PunchLocation;
+    SystemSetting = models.SystemSetting;
+    Shift = models.Shift;
     addError = models.addError;
     getErrorHint = models.getErrorHint;
+}
+
+// Late minutes = how many minutes past shift start (accounting for grace), 0 if on time
+function calcLateMinutes(checkInISO, startTime, graceMinutes) {
+    try {
+        const checkIn = new Date(checkInISO);
+        const [h, m] = startTime.split(':').map(Number);
+        const shiftStart = new Date(checkIn);
+        shiftStart.setHours(h, m, 0, 0);
+        const graceEnd = new Date(shiftStart.getTime() + (graceMinutes || 15) * 60000);
+        if (checkIn > graceEnd) return Math.floor((checkIn.getTime() - shiftStart.getTime()) / 60000);
+    } catch { /* ignore */ }
+    return 0;
 }
 
 // ── Haversine Distance Calculator ─────────────────────────────────────────────
@@ -28,15 +43,23 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 router.get('/', async (req, res) => {
-    const { employeeId, date } = req.query;
+    const { employeeId, date, startDate, endDate } = req.query;
     try {
+        const { Op } = require('sequelize');
         const where = {};
         // req.companyId enforced by requireCompanyScope middleware (JWT-verified)
         if (req.companyId) where.companyId = req.companyId;
         if (employeeId) where.employeeId = employeeId;
-        if (date) where.date = date;
+        if (date) {
+            where.date = date;
+        } else if (startDate || endDate) {
+            const dateFilter = {};
+            if (startDate) dateFilter[Op.gte] = startDate;
+            if (endDate) dateFilter[Op.lte] = endDate;
+            where.date = dateFilter;
+        }
         const page = Math.max(1, parseInt(req.query.page) || 1);
-        const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+        const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit) || 50));
         const offset = (page - 1) * limit;
         const { count, rows } = await Attendance.findAndCountAll({
             where,
@@ -50,9 +73,20 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
     try {
-        // Always inject companyId from JWT session (prevents cross-tenant records with missing companyId)
         const body = { ...req.body };
         if (req.companyId) body.companyId = req.companyId;
+
+        if (!body.employeeId || !body.date) {
+            return res.status(400).json({ error: 'employeeId and date are required' });
+        }
+
+        // Regular employees can only create/update their own records
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        if (!isPrivileged && body.employeeId && body.employeeId !== req.user?.id) {
+            return res.status(403).json({ error: 'Forbidden — you can only manage your own attendance records' });
+        }
+        // Generate server-side ID if client didn't provide one
+        if (!body.id) body.id = `att-${Date.now()}-${uuidv4().substring(0, 8)}`;
         // Normalize: breaks must be a JSON string (SQLite stores as TEXT)
         if (body.breaks !== undefined && typeof body.breaks !== 'string') {
             body.breaks = JSON.stringify(body.breaks);
@@ -148,18 +182,39 @@ router.post('/admin-punch', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN'
         let record = await Attendance.findOne({ where: companyWhere });
 
         if (type === 'checkIn') {
-            const payload = { checkIn: time, isManualPunch: true, manualPunchBy: adminName, manualPunchReason: reason, punchMode: 'admin' };
+            // Resolve shift for late calculation: use shiftId from request body, or existing record
+            const resolvedShiftId = shiftId || record?.shiftId;
+            let lateByMinutes = 0;
+            let checkInStatus = 'PRESENT';
+            if (resolvedShiftId) {
+                try {
+                    const shift = await Shift.findOne({ where: { id: resolvedShiftId } });
+                    if (shift) {
+                        lateByMinutes = calcLateMinutes(time, shift.startTime, shift.graceTimeMinutes);
+                        checkInStatus = lateByMinutes > 0 ? 'LATE' : 'PRESENT';
+                    }
+                } catch { /* keep defaults */ }
+            }
+            const payload = {
+                checkIn: time, lateByMinutes, status: checkInStatus,
+                isManualPunch: true, manualPunchBy: adminName, manualPunchReason: reason, punchMode: 'admin',
+            };
             if (record) {
                 await Attendance.update(payload, { where: { id: record.id } });
                 res.json({ success: true, id: record.id, ...payload });
             } else {
-                const newRec = await Attendance.create({ id: `manual-${uuidv4()}`, employeeId, date: today, companyId: req.companyId || null, status: 'PRESENT', shiftId: shiftId || null, lateByMinutes: 0, overtimeHours: 0, breaks: '[]', ...payload });
+                const newRec = await Attendance.create({ id: `manual-${uuidv4()}`, employeeId, date: today, companyId: req.companyId || null, overtimeHours: 0, breaks: '[]', shiftId: resolvedShiftId || null, ...payload });
                 res.json({ success: true, ...newRec.toJSON() });
             }
         } else if (type === 'checkOut' && record) {
             const checkIn = record.checkIn ? new Date(record.checkIn) : new Date(time);
             const diffH = (new Date(time).getTime() - checkIn.getTime()) / 3600000;
-            const overtimeHours = parseFloat((diffH > 9 ? diffH - 9 : 0).toFixed(2));
+            let stdHours = 9;
+            try {
+                const cfg = await SystemSetting.findOne({ where: { companyId: req.companyId, key: 'PAYROLL_CONFIG' } });
+                if (cfg?.value) stdHours = JSON.parse(cfg.value).standardWorkHours || 9;
+            } catch { /* use default 9 */ }
+            const overtimeHours = parseFloat((diffH > stdHours ? diffH - stdHours : 0).toFixed(2));
             const payload = { checkOut: time, overtimeHours, isManualPunch: true, manualPunchBy: adminName, manualPunchReason: reason };
             await Attendance.update(payload, { where: { id: record.id } });
             res.json({ success: true, id: record.id, ...payload });

@@ -6,6 +6,7 @@ const { requireRole } = require('../rbac');
 
 const { Worker } = require('worker_threads');
 const path = require('path');
+const { pathToFileURL } = require('url');
 let Leave, Loan, LoanLedger, SalarySlip, Employee, Attendance, Production, AdvanceSalary, Holiday, SystemSetting, StatutoryRule, ReportJob, addError, getErrorHint;
 
 function init(models) {
@@ -40,14 +41,24 @@ router.get('/leaves', async (req, res) => {
 router.post('/leaves', async (req, res) => {
     try {
         const payload = { ...req.body };
-        // Inject companyId from JWT (prevents cross-tenant records)
         if (req.companyId) payload.companyId = req.companyId;
+
+        // Generate server-side ID if client didn't provide one
+        if (!payload.id) payload.id = `leave-${Date.now()}-${uuidv4().substring(0, 8)}`;
+
+        // Regular employees can only submit leaves for themselves
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        if (!isPrivileged) {
+            payload.employeeId = req.user?.id; // override — ignore any client-sent employeeId
+        }
+
         if (!payload.daysCount && payload.startDate && payload.endDate) {
             if (payload.isHalfDay) {
                 payload.daysCount = 0.5;
             } else {
                 const s = new Date(payload.startDate);
                 const e = new Date(payload.endDate);
+                if (e < s) return res.status(400).json({ error: 'End date cannot be before start date' });
                 payload.daysCount = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24)) + 1;
             }
         }
@@ -58,6 +69,9 @@ router.post('/leaves', async (req, res) => {
 
 router.patch('/leaves/:id/approve', async (req, res) => {
     try {
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        if (!isPrivileged) return res.status(403).json({ error: 'Only MANAGER or ADMIN can approve leave requests' });
+
         const leave = await Leave.findByPk(req.params.id);
         if (!leave) return res.status(404).json({ error: 'Leave not found' });
         if (leave.status === 'APPROVED') return res.json(leave);
@@ -68,7 +82,8 @@ router.patch('/leaves/:id/approve', async (req, res) => {
         if (leave.type !== 'UNPAID') {
             const emp = await Employee.findByPk(leave.employeeId);
             if (emp && emp.leaveBalance && emp.leaveBalance[leave.type] !== undefined) {
-                emp.leaveBalance[leave.type] -= (leave.daysCount || 1);
+                // Clamp at 0 — never allow negative balance
+                emp.leaveBalance[leave.type] = Math.max(0, emp.leaveBalance[leave.type] - (leave.daysCount || 1));
                 emp.changed('leaveBalance', true);
                 await emp.save();
             }
@@ -110,6 +125,8 @@ router.patch('/leaves/:id/reject', async (req, res) => {
 
 router.put('/leaves/:id', async (req, res) => {
     try {
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        if (!isPrivileged) return res.status(403).json({ error: 'Only MANAGER or ADMIN can update leave records' });
         await Leave.update(req.body, { where: { id: req.params.id } });
         res.json(await Leave.findByPk(req.params.id));
     } catch (e) {
@@ -120,9 +137,33 @@ router.put('/leaves/:id', async (req, res) => {
     }
 });
 
+// PATCH /leaves/:id — partial update for workflow step progress (manager+ only)
+router.patch('/leaves/:id', async (req, res) => {
+    try {
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        if (!isPrivileged) return res.status(403).json({ error: 'Only MANAGER or ADMIN can update leave records' });
+        await Leave.update(req.body, { where: { id: req.params.id } });
+        res.json(await Leave.findByPk(req.params.id));
+    } catch (e) {
+        addError(e, 'PATCH /api/leaves/:id'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix });
+    }
+});
+
 router.delete('/leaves/:id', async (req, res) => {
     try {
         const leave = await Leave.findByPk(req.params.id);
+        if (!leave) return res.status(404).json({ error: 'Leave not found' });
+
+        // Cross-company check
+        if (req.companyId && leave.companyId && leave.companyId !== req.companyId) {
+            return res.status(403).json({ error: 'Forbidden — cross-company access denied' });
+        }
+        // Ownership: regular employees can only cancel their own pending leaves
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        if (!isPrivileged && leave.employeeId !== req.user?.id) {
+            return res.status(403).json({ error: 'Forbidden — you can only cancel your own leave requests' });
+        }
+
         if (leave && leave.status === 'APPROVED' && leave.type !== 'UNPAID') {
             const emp = await Employee.findByPk(leave.employeeId);
             if (emp && emp.leaveBalance && emp.leaveBalance[leave.type] !== undefined) {
@@ -152,19 +193,29 @@ router.get('/loans', async (req, res) => {
 router.post('/loans', async (req, res) => {
     try {
         const data = { ...req.body };
-        // Inject companyId from JWT (prevents cross-tenant records)
         if (req.companyId) data.companyId = req.companyId;
+        // Regular employees can only request loans for themselves
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        if (!isPrivileged) data.employeeId = req.user?.id;
         res.json(await Loan.create(data));
     }
     catch (e) { addError(e, 'POST /api/loans'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.put('/loans/:id', async (req, res) => {
-    try { await Loan.update(req.body, { where: { id: req.params.id } }); res.json({ success: true }); }
+    try {
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN'].includes(req.user.role);
+        if (!isPrivileged) return res.status(403).json({ error: 'Only ADMIN or ACCOUNT_ADMIN can modify loan records' });
+        await Loan.update(req.body, { where: { id: req.params.id } });
+        res.json({ success: true });
+    }
     catch (e) { addError(e, 'PUT /api/loans/:id'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
 router.patch('/loans/:id/approve', async (req, res) => {
     try {
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        if (!isPrivileged) return res.status(403).json({ error: 'Only MANAGER or ADMIN can approve loan requests' });
+
         const loan = await Loan.findByPk(req.params.id);
         if (!loan) return res.status(404).json({ error: 'Not found' });
         if (loan.status === 'ACTIVE') return res.json(loan);
@@ -173,7 +224,7 @@ router.patch('/loans/:id/approve', async (req, res) => {
         loan.issuedDate = req.body.issuedDate || new Date().toISOString().split('T')[0];
 
         const newLedgerEntry = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: uuidv4(),
             date: loan.issuedDate,
             amount: loan.amount,
             type: 'ADVANCE_PAYMENT',
@@ -182,9 +233,8 @@ router.patch('/loans/:id/approve', async (req, res) => {
         loan.ledger = [...(loan.ledger || []), newLedgerEntry];
         loan.changed('ledger', true);
 
-        // Push Audit Trail
         const auditEntry = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: uuidv4(),
             date: new Date().toISOString(),
             action: 'APPROVED',
             performedBy: req.body.performedBy || 'System',
@@ -199,7 +249,7 @@ router.patch('/loans/:id/approve', async (req, res) => {
             await LoanLedger.create({
                 loanId: loan.id,
                 employeeId: loan.employeeId,
-                companyId: loan.companyId,
+                companyId: loan.companyId || req.companyId,
                 date: loan.issuedDate,
                 type: 'PREPAY',
                 amount: loan.amount,
@@ -213,12 +263,15 @@ router.patch('/loans/:id/approve', async (req, res) => {
 
 router.patch('/loans/:id/reject', async (req, res) => {
     try {
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        if (!isPrivileged) return res.status(403).json({ error: 'Only MANAGER or ADMIN can reject loan requests' });
+
         const loan = await Loan.findByPk(req.params.id);
         if (!loan) return res.status(404).json({ error: 'Not found' });
         loan.status = 'REJECTED';
 
         const auditEntry = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: uuidv4(),
             date: new Date().toISOString(),
             action: 'REJECTED',
             performedBy: req.body.performedBy || 'System',
@@ -234,6 +287,9 @@ router.patch('/loans/:id/reject', async (req, res) => {
 
 router.post('/loans/:id/pay', async (req, res) => {
     try {
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        if (!isPrivileged) return res.status(403).json({ error: 'Only MANAGER or ADMIN can record loan payments' });
+
         const { amount } = req.body;
         const loan = await Loan.findByPk(req.params.id);
         if (!loan) return res.status(404).json({ error: 'Not found' });
@@ -244,7 +300,7 @@ router.post('/loans/:id/pay', async (req, res) => {
 
         const today = new Date().toISOString().split('T')[0];
         const newLedgerEntry = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: uuidv4(),
             date: today,
             amount: amount,
             type: 'EMI',
@@ -259,7 +315,7 @@ router.post('/loans/:id/pay', async (req, res) => {
             await LoanLedger.create({
                 loanId: loan.id,
                 employeeId: loan.employeeId,
-                companyId: loan.companyId,
+                companyId: loan.companyId || req.companyId,
                 date: today,
                 type: 'EMI',
                 amount,
@@ -306,7 +362,7 @@ router.post('/loans/:id/ledger', async (req, res) => {
         const entry = await LoanLedger.create({
             loanId: loan.id,
             employeeId: loan.employeeId,
-            companyId: loan.companyId,
+            companyId: loan.companyId || req.companyId,
             date: entryDate,
             type,
             amount,
@@ -352,11 +408,25 @@ router.get('/payroll/:id', async (req, res) => {
     try {
         const slip = await SalarySlip.findOne({ where: { id: req.params.id } });
         if (!slip) return res.status(404).json({ error: 'Salary slip not found' });
+        // Cross-company check
+        if (req.companyId && slip.companyId && slip.companyId !== req.companyId) {
+            return res.status(403).json({ error: 'Forbidden — cross-company access denied' });
+        }
+        // Ownership: regular employees can only view their own slips
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        if (!isPrivileged && slip.employeeId !== req.user?.id) {
+            return res.status(403).json({ error: 'Forbidden — you can only view your own payslips' });
+        }
         res.json(slip);
     } catch (e) { addError(e, 'GET /api/payroll/:id'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.put('/payroll/:id', async (req, res) => {
-    try { await SalarySlip.update(req.body, { where: { id: req.params.id } }); res.json({ success: true }); }
+    try {
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN'].includes(req.user.role);
+        if (!isPrivileged) return res.status(403).json({ error: 'Only SUPER_ADMIN, ADMIN, or ACCOUNT_ADMIN can modify salary slips' });
+        await SalarySlip.update(req.body, { where: { id: req.params.id } });
+        res.json({ success: true });
+    }
     catch (e) { addError(e, 'PUT /api/payroll/:id'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
@@ -364,11 +434,11 @@ router.put('/payroll/:id', async (req, res) => {
 const Decimal = require('decimal.js');
 
 // GET /payroll/job/:jobId — poll for async payroll run status
-router.get('/job/:jobId', async (req, res) => {
+router.get('/payroll/job/:jobId', async (req, res) => {
     try {
-        const job = await ReportJob.findOne({
-            where: { id: req.params.jobId, companyId: req.companyId || undefined },
-        });
+        const where = { id: req.params.jobId };
+        if (req.companyId) where.companyId = req.companyId;
+        const job = await ReportJob.findOne({ where });
         if (!job) return res.status(404).json({ error: 'Job not found' });
         res.json({
             jobId: job.id, status: job.status, progress: job.progress,
@@ -380,13 +450,14 @@ router.get('/job/:jobId', async (req, res) => {
     }
 });
 
-router.post('/run', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
+router.post('/payroll/run', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     const { companyId, month, generatedBy } = req.body;
     if (!companyId || !month) return res.status(400).json({ error: 'companyId and month required' });
 
+    let jobId;
     try {
         // Create a ReportJob record so the client can poll for status
-        const jobId = `payroll-run-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+        jobId = `payroll-run-${uuidv4()}`;
         await ReportJob.create({
             id: jobId,
             companyId,
@@ -398,15 +469,15 @@ router.post('/run', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), asyn
             payload: JSON.stringify({ companyId, month, generatedBy }),
         });
 
-        // Spawn the payroll computation worker
-        const workerPath = path.join(__dirname, '..', 'workers', 'payrollWorker.js');
+        // Spawn the payroll computation worker (pathToFileURL handles Windows backslash paths)
+        const workerPath = pathToFileURL(path.join(__dirname, '..', 'workers', 'payrollWorker.js'));
         const worker = new Worker(workerPath, {
             workerData: { jobId, companyId, month, generatedBy: generatedBy || req.user?.name || 'System' },
         });
 
         worker.on('error', async (err) => {
             addError(err, `payrollWorker:${jobId}`);
-            await ReportJob.update({ status: 'FAILED', error: err.message }, { where: { id: jobId } }).catch(() => {});
+            await ReportJob.update({ status: 'FAILED', error: err.message }, { where: { id: jobId } }).catch(() => { });
         });
 
         // Return immediately — client polls GET /api/payroll/job/:jobId
@@ -460,6 +531,7 @@ router.post('/run', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), asyn
             enableOTMultipliers: true, otNormalMultiplier: 1.5,
             enableEMICap: true, emiCapPercentage: 50,
             enableAttendanceBonus: false, attendanceBonusAmount: 1000,
+            standardWorkHours: 9,
         };
         let savedConfig = {};
         if (payrollConfigSetting?.value) {
@@ -472,302 +544,302 @@ router.post('/run', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), asyn
         const perEmployeeErrors = []; // Non-fatal per-employee errors collected for the response
 
         for (const emp of employees) {
-          try {
-            // Filter
-            const empRecords = allRecords.filter(r => r.employeeId === emp.id && r.date.startsWith(month));
-            const empProds = allProds.filter(p => p.employeeId === emp.id && p.date.startsWith(month));
-            const empLoans = allLoans.filter(l => l.employeeId === emp.id);
-            const empAdvances = allAdvances.filter(a => a.employeeId === emp.id && a.remainingBalance > 0);
+            try {
+                // Filter
+                const empRecords = allRecords.filter(r => r.employeeId === emp.id && r.date.startsWith(month));
+                const empProds = allProds.filter(p => p.employeeId === emp.id && p.date.startsWith(month));
+                const empLoans = allLoans.filter(l => l.employeeId === emp.id);
+                const empAdvances = allAdvances.filter(a => a.employeeId === emp.id && a.remainingBalance > 0);
 
-            let normalWorkedDays = 0, normalHalfDays = 0;
-            let holidayBaseDays = 0, offDayWorkedDays = 0, offDayHalfDays = 0;
-            let presentDaysForStats = 0, overtimeHours = 0, totalWorkedDaysForRule = 0;
-            let lateMarksCount = 0, earlyGoCount = 0, nightShiftDays = 0;
-            let isPerfectAttendance = true;
+                let normalWorkedDays = 0, normalHalfDays = 0;
+                let holidayBaseDays = 0, offDayWorkedDays = 0, offDayHalfDays = 0;
+                let presentDaysForStats = 0, overtimeHours = 0, totalWorkedDaysForRule = 0;
+                let lateMarksCount = 0, earlyGoCount = 0, nightShiftDays = 0;
+                let isPerfectAttendance = true;
 
-            const checkIsOffDay = (dateStr) => {
-                const dObj = new Date(dateStr + 'T12:00:00Z');
-                return dObj.getUTCDay() === 0 || holidaysList.some(h => h.date === dateStr);
-            };
-            const checkIsPresent = (dateStr) => empRecords.some(r => r.date === dateStr && ['PRESENT', 'LATE', 'HALF_DAY'].includes(r.status));
+                const checkIsOffDay = (dateStr) => {
+                    const dObj = new Date(dateStr + 'T12:00:00Z');
+                    return dObj.getUTCDay() === 0 || holidaysList.some(h => h.date === dateStr);
+                };
+                const checkIsPresent = (dateStr) => empRecords.some(r => r.date === dateStr && ['PRESENT', 'LATE', 'HALF_DAY'].includes(r.status));
 
-            // Loop Days
-            for (let i = 1; i <= daysInMonth; i++) {
-                const date = `${month}-${String(i).padStart(2, '0')}`;
-                const record = empRecords.find(r => r.date === date);
-                const isOffDay = checkIsOffDay(date);
+                // Loop Days
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const date = `${month}-${String(i).padStart(2, '0')}`;
+                    const record = empRecords.find(r => r.date === date);
+                    const isOffDay = checkIsOffDay(date);
 
-                if (record) {
-                    if (['PRESENT', 'LATE', 'HALF_DAY'].includes(record.status)) {
-                        if (record.status === 'HALF_DAY') presentDaysForStats += 0.5; else presentDaysForStats += 1;
-                    }
+                    if (record) {
+                        if (['PRESENT', 'LATE', 'HALF_DAY'].includes(record.status)) {
+                            if (record.status === 'HALF_DAY') presentDaysForStats += 0.5; else presentDaysForStats += 1;
+                        }
 
-                    if (['PRESENT', 'LATE'].includes(record.status)) {
-                        if (!isOffDay) normalWorkedDays++; else offDayWorkedDays++;
-                        totalWorkedDaysForRule++;
-                        if (record.status === 'LATE') lateMarksCount++;
-                    } else if (record.status === 'HALF_DAY') {
-                        if (!isOffDay) normalHalfDays++; else offDayHalfDays++;
-                        totalWorkedDaysForRule += 0.5;
+                        if (['PRESENT', 'LATE'].includes(record.status)) {
+                            if (!isOffDay) normalWorkedDays++; else offDayWorkedDays++;
+                            totalWorkedDaysForRule++;
+                            if (record.status === 'LATE') lateMarksCount++;
+                        } else if (record.status === 'HALF_DAY') {
+                            if (!isOffDay) normalHalfDays++; else offDayHalfDays++;
+                            totalWorkedDaysForRule += 0.5;
+                            isPerfectAttendance = false;
+                        } else if (record.status === 'ABSENT') {
+                            isPerfectAttendance = false;
+                        }
+
+                        if (record.checkIn && config.enableNightShiftAllowance) {
+                            const hr = new Date(record.checkIn).getHours();
+                            if (hr >= config.nightShiftStartHour || hr < config.nightShiftEndHour) nightShiftDays++;
+                        }
+                        overtimeHours += record.overtimeHours || 0;
+                    } else if (!isOffDay) {
                         isPerfectAttendance = false;
-                    } else if (record.status === 'ABSENT') {
-                        isPerfectAttendance = false;
                     }
 
-                    if (record.checkIn && config.enableNightShiftAllowance) {
-                        const hr = new Date(record.checkIn).getHours();
-                        if (hr >= config.nightShiftStartHour || hr < config.nightShiftEndHour) nightShiftDays++;
+                    if (emp.salaryType === 'MONTHLY' && isOffDay) {
+                        let isPaid = true;
+                        if (config.enableSandwichRule) {
+                            let prevStr = '', nextStr = '';
+                            for (let d = i - 1; d >= 1; d--) { const td = `${month}-${String(d).padStart(2, '0')}`; if (!checkIsOffDay(td)) { prevStr = td; break; } }
+                            for (let d = i + 1; d <= daysInMonth; d++) { const td = `${month}-${String(d).padStart(2, '0')}`; if (!checkIsOffDay(td)) { nextStr = td; break; } }
+                            const pOk = prevStr ? checkIsPresent(prevStr) : true;
+                            const nOk = nextStr ? checkIsPresent(nextStr) : true;
+
+                            if (pOk && nOk) isPaid = true;
+                            else if (!pOk && !nOk) isPaid = false;
+                            else {
+                                let anyOk = false, daysChkd = 0, scan = i - 1;
+                                while (daysChkd < 6 && scan >= 1) {
+                                    const dStr = `${month}-${String(scan).padStart(2, '0')}`;
+                                    if (!checkIsOffDay(dStr)) { if (checkIsPresent(dStr)) { anyOk = true; break; } daysChkd++; }
+                                    scan--;
+                                }
+                                isPaid = anyOk;
+                            }
+                        }
+                        if (isPaid) holidayBaseDays++;
                     }
-                    overtimeHours += record.overtimeHours || 0;
-                } else if (!isOffDay) {
-                    isPerfectAttendance = false;
                 }
 
-                if (emp.salaryType === 'MONTHLY' && isOffDay) {
-                    let isPaid = true;
-                    if (config.enableSandwichRule) {
-                        let prevStr = '', nextStr = '';
-                        for (let d = i - 1; d >= 1; d--) { const td = `${month}-${String(d).padStart(2, '0')}`; if (!checkIsOffDay(td)) { prevStr = td; break; } }
-                        for (let d = i + 1; d <= daysInMonth; d++) { const td = `${month}-${String(d).padStart(2, '0')}`; if (!checkIsOffDay(td)) { nextStr = td; break; } }
-                        const pOk = prevStr ? checkIsPresent(prevStr) : true;
-                        const nOk = nextStr ? checkIsPresent(nextStr) : true;
+                if (config.enableZeroPresenceRule && totalWorkedDaysForRule === 0) {
+                    holidayBaseDays = 0; presentDaysForStats = 0;
+                }
 
-                        if (pOk && nOk) isPaid = true;
-                        else if (!pOk && !nOk) isPaid = false;
-                        else {
-                            let anyOk = false, daysChkd = 0, scan = i - 1;
-                            while (daysChkd < 6 && scan >= 1) {
-                                const dStr = `${month}-${String(scan).padStart(2, '0')}`;
-                                if (!checkIsOffDay(dStr)) { if (checkIsPresent(dStr)) { anyOk = true; break; } daysChkd++; }
-                                scan--;
-                            }
-                            isPaid = anyOk;
+                const basePaidDaysD = new Decimal(normalWorkedDays).plus(new Decimal(normalHalfDays).times(0.5)).plus(holidayBaseDays);
+                const basePaidDays = Math.max(0, basePaidDaysD.toNumber());
+
+                const otBonusDaysD = new Decimal(offDayWorkedDays).plus(new Decimal(offDayHalfDays).times(0.5));
+                const otBonusDays = otBonusDaysD.toNumber();
+
+                let basicEarnings = new Decimal(0);
+                let overtimeEarnings = new Decimal(0);
+
+                if (emp.salaryType === 'MONTHLY') {
+                    const basicSalaryD = new Decimal(emp.basicSalary || 0);
+                    const pdr = basicSalaryD.dividedBy(daysInMonth);
+
+                    basicEarnings = pdr.times(new Decimal(basePaidDays).plus(otBonusDays)).round();
+
+                    let effOT = new Decimal(overtimeHours);
+                    if (config.enableOTCap && effOT.greaterThan(config.otCapHoursPerMonth)) {
+                        effOT = new Decimal(config.otCapHoursPerMonth);
+                    }
+                    const hrRate = basicSalaryD.dividedBy(30).dividedBy(config.standardWorkHours);
+                    overtimeEarnings = hrRate.times(effOT).times(config.otNormalMultiplier).round();
+
+                } else if (emp.salaryType === 'DAILY') {
+                    const rt = new Decimal(emp.paymentRate || 0);
+                    basicEarnings = rt.times(new Decimal(basePaidDays).plus(otBonusDays)).round();
+                    overtimeEarnings = rt.dividedBy(config.standardWorkHours).times(overtimeHours).round();
+
+                } else if (emp.salaryType === 'HOURLY') {
+                    const rt = new Decimal(emp.paymentRate || 0);
+                    basicEarnings = rt.times(new Decimal(basePaidDays).plus(otBonusDays)).times(config.standardWorkHours).round();
+                    overtimeEarnings = rt.times(overtimeHours).round();
+                }
+
+                const productionEarnings = empProds.reduce((sum, p) => sum.plus(p.totalAmount || 0), new Decimal(0)).round();
+
+                const nightAllow = config.enableNightShiftAllowance ? new Decimal(nightShiftDays).times(config.nightShiftAllowanceAmount) : new Decimal(0);
+                const attBonus = (config.enableAttendanceBonus && isPerfectAttendance && totalWorkedDaysForRule > 0) ? new Decimal(config.attendanceBonusAmount) : new Decimal(0);
+                const totalAllowances = nightAllow.plus(attBonus).round();
+
+                const grossSalary = basicEarnings.plus(productionEarnings).plus(overtimeEarnings).plus(totalAllowances).round();
+
+                // Statutory Calc
+                const sc = emp.statutoryConfig || {};
+                let pfD = new Decimal(0);
+                let esicD = new Decimal(0);
+                let ptD = new Decimal(0);
+                let tdsD = new Decimal(0);
+
+                // Inherit dynamic rates based on active rule or defaults
+                const dynPfRate = activeStatutoryRule ? activeStatutoryRule.pfRate : (sc.pfRate || 12);
+                const dynPfCap = activeStatutoryRule ? activeStatutoryRule.pfCappedAmount : 1800;
+                const dynEsicRate = activeStatutoryRule ? activeStatutoryRule.esicRate : (sc.esicRate || 0.75);
+                const dynEsicThreshold = activeStatutoryRule ? activeStatutoryRule.esicThreshold : 21000;
+
+                if (sc.pfApplicable) {
+                    const b = new Decimal(emp.basicSalary || 0);
+                    const r = b.times(new Decimal(dynPfRate).dividedBy(100)).round();
+                    if (sc.pfCapped ?? true) {
+                        pfD = Decimal.min(r, dynPfCap);
+                    } else {
+                        pfD = r;
+                    }
+                }
+                if (sc.esicApplicable && grossSalary.lessThanOrEqualTo(dynEsicThreshold)) {
+                    esicD = grossSalary.times(new Decimal(dynEsicRate).dividedBy(100)).round();
+                }
+                if (sc.ptApplicable) {
+                    if (sc.ptAmount !== undefined) {
+                        ptD = new Decimal(sc.ptAmount);
+                    } else {
+                        const gVal = grossSalary.toNumber();
+                        // Resolve PT slabs dynamic or fallback to simple hardcoded structure
+                        if (activeStatutoryRule && activeStatutoryRule.ptSlabs && activeStatutoryRule.ptSlabs.length > 0) {
+                            const slabs = [...activeStatutoryRule.ptSlabs].sort((a, b) => b.min - a.min);
+                            const matchedSlab = slabs.find(s => gVal >= s.min && (s.max === null || gVal <= s.max));
+                            if (matchedSlab) ptD = new Decimal(matchedSlab.tax);
+                        } else {
+                            if (gVal > 15000) ptD = new Decimal(200);
+                            else if (gVal > 10000) ptD = new Decimal(150);
+                            else if (gVal > 7500) ptD = new Decimal(100);
                         }
                     }
-                    if (isPaid) holidayBaseDays++;
                 }
-            }
 
-            if (config.enableZeroPresenceRule && totalWorkedDaysForRule === 0) {
-                holidayBaseDays = 0; presentDaysForStats = 0;
-            }
-
-            const basePaidDaysD = new Decimal(normalWorkedDays).plus(new Decimal(normalHalfDays).times(0.5)).plus(holidayBaseDays);
-            const basePaidDays = Math.max(0, basePaidDaysD.toNumber());
-
-            const otBonusDaysD = new Decimal(offDayWorkedDays).plus(new Decimal(offDayHalfDays).times(0.5));
-            const otBonusDays = otBonusDaysD.toNumber();
-
-            let basicEarnings = new Decimal(0);
-            let overtimeEarnings = new Decimal(0);
-
-            if (emp.salaryType === 'MONTHLY') {
-                const basicSalaryD = new Decimal(emp.basicSalary || 0);
-                const pdr = basicSalaryD.dividedBy(daysInMonth);
-
-                basicEarnings = pdr.times(new Decimal(basePaidDays).plus(otBonusDays)).round();
-
-                let effOT = new Decimal(overtimeHours);
-                if (config.enableOTCap && effOT.greaterThan(config.otCapHoursPerMonth)) {
-                    effOT = new Decimal(config.otCapHoursPerMonth);
-                }
-                const hrRate = basicSalaryD.dividedBy(30).dividedBy(9);
-                overtimeEarnings = hrRate.times(effOT).times(config.otNormalMultiplier).round();
-
-            } else if (emp.salaryType === 'DAILY') {
-                const rt = new Decimal(emp.paymentRate || 0);
-                basicEarnings = rt.times(new Decimal(basePaidDays).plus(otBonusDays)).round();
-                overtimeEarnings = rt.dividedBy(9).times(overtimeHours).round();
-
-            } else if (emp.salaryType === 'HOURLY') {
-                const rt = new Decimal(emp.paymentRate || 0);
-                basicEarnings = rt.times(new Decimal(basePaidDays).plus(otBonusDays)).times(9).round();
-                overtimeEarnings = rt.times(overtimeHours).round();
-            }
-
-            const productionEarnings = empProds.reduce((sum, p) => sum.plus(p.totalAmount || 0), new Decimal(0)).round();
-
-            const nightAllow = config.enableNightShiftAllowance ? new Decimal(nightShiftDays).times(config.nightShiftAllowanceAmount) : new Decimal(0);
-            const attBonus = (config.enableAttendanceBonus && isPerfectAttendance && totalWorkedDaysForRule > 0) ? new Decimal(config.attendanceBonusAmount) : new Decimal(0);
-            const totalAllowances = nightAllow.plus(attBonus).round();
-
-            const grossSalary = basicEarnings.plus(productionEarnings).plus(overtimeEarnings).plus(totalAllowances).round();
-
-            // Statutory Calc
-            const sc = emp.statutoryConfig || {};
-            let pfD = new Decimal(0);
-            let esicD = new Decimal(0);
-            let ptD = new Decimal(0);
-            let tdsD = new Decimal(0);
-
-            // Inherit dynamic rates based on active rule or defaults
-            const dynPfRate = activeStatutoryRule ? activeStatutoryRule.pfRate : (sc.pfRate || 12);
-            const dynPfCap = activeStatutoryRule ? activeStatutoryRule.pfCappedAmount : 1800;
-            const dynEsicRate = activeStatutoryRule ? activeStatutoryRule.esicRate : (sc.esicRate || 0.75);
-            const dynEsicThreshold = activeStatutoryRule ? activeStatutoryRule.esicThreshold : 21000;
-
-            if (sc.pfApplicable) {
-                const b = new Decimal(emp.basicSalary || 0);
-                const r = b.times(new Decimal(dynPfRate).dividedBy(100)).round();
-                if (sc.pfCapped ?? true) {
-                    pfD = Decimal.min(r, dynPfCap);
-                } else {
-                    pfD = r;
-                }
-            }
-            if (sc.esicApplicable && grossSalary.lessThanOrEqualTo(dynEsicThreshold)) {
-                esicD = grossSalary.times(new Decimal(dynEsicRate).dividedBy(100)).round();
-            }
-            if (sc.ptApplicable) {
-                if (sc.ptAmount !== undefined) {
-                    ptD = new Decimal(sc.ptAmount);
-                } else {
+                // TDS — FY2024-25 slabs applied per employee's elected tax regime
+                if (sc.tdsApplicable) {
                     const gVal = grossSalary.toNumber();
-                    // Resolve PT slabs dynamic or fallback to simple hardcoded structure
-                    if (activeStatutoryRule && activeStatutoryRule.ptSlabs && activeStatutoryRule.ptSlabs.length > 0) {
-                        const slabs = [...activeStatutoryRule.ptSlabs].sort((a, b) => b.min - a.min);
-                        const matchedSlab = slabs.find(s => gVal >= s.min && (s.max === null || gVal <= s.max));
-                        if (matchedSlab) ptD = new Decimal(matchedSlab.tax);
+                    if (sc.tdsPercentage !== undefined) {
+                        // Override: fixed percentage configured on employee
+                        tdsD = grossSalary.times(sc.tdsPercentage).dividedBy(100).round();
+                    } else if (!sc.tdsPanLinked) {
+                        // No PAN: mandatory 20% TDS
+                        tdsD = grossSalary.times(20).dividedBy(100).round();
                     } else {
-                        if (gVal > 15000) ptD = new Decimal(200);
-                        else if (gVal > 10000) ptD = new Decimal(150);
-                        else if (gVal > 7500) ptD = new Decimal(100);
+                        const annualGross = gVal * 12;
+                        const regime = emp.taxRegime || 'NEW';
+                        let annualTax = 0;
+
+                        if (regime === 'NEW') {
+                            // New Regime FY2024-25: no deductions, simplified slabs
+                            if (annualGross <= 300000) annualTax = 0;
+                            else if (annualGross <= 700000) annualTax = (annualGross - 300000) * 0.05;
+                            else if (annualGross <= 1000000) annualTax = 20000 + (annualGross - 700000) * 0.10;
+                            else if (annualGross <= 1200000) annualTax = 50000 + (annualGross - 1000000) * 0.15;
+                            else if (annualGross <= 1500000) annualTax = 80000 + (annualGross - 1200000) * 0.20;
+                            else annualTax = 140000 + (annualGross - 1500000) * 0.30;
+                            // Rebate u/s 87A — zero tax up to ₹7L under new regime
+                            if (annualGross <= 700000) annualTax = 0;
+                        } else {
+                            // Old Regime FY2024-25: with standard deduction ₹50,000
+                            const stdDeduction = 50000;
+                            const section80C = Math.min(sc.section80C || 0, 150000); // Capped at ₹1.5L
+                            const section80D = Math.min(sc.section80D || 0, 25000);  // Basic medical premium
+                            const taxableIncome = Math.max(0, annualGross - stdDeduction - section80C - section80D);
+
+                            if (taxableIncome <= 250000) annualTax = 0;
+                            else if (taxableIncome <= 500000) annualTax = (taxableIncome - 250000) * 0.05;
+                            else if (taxableIncome <= 1000000) annualTax = 12500 + (taxableIncome - 500000) * 0.20;
+                            else annualTax = 112500 + (taxableIncome - 1000000) * 0.30;
+                            // Rebate u/s 87A — zero tax up to ₹5L under old regime
+                            if (taxableIncome <= 500000) annualTax = 0;
+                        }
+
+                        // 4% Health & Education Cess on computed tax
+                        annualTax = annualTax * 1.04;
+                        tdsD = new Decimal(Math.round(annualTax / 12));
                     }
                 }
-            }
+                const tdsDeduction = tdsD.toNumber();
+                const pfDeduction = pfD.toNumber();
 
-            // TDS — FY2024-25 slabs applied per employee's elected tax regime
-            if (sc.tdsApplicable) {
-                const gVal = grossSalary.toNumber();
-                if (sc.tdsPercentage !== undefined) {
-                    // Override: fixed percentage configured on employee
-                    tdsD = grossSalary.times(sc.tdsPercentage).dividedBy(100).round();
-                } else if (!sc.tdsPanLinked) {
-                    // No PAN: mandatory 20% TDS
-                    tdsD = grossSalary.times(20).dividedBy(100).round();
-                } else {
-                    const annualGross = gVal * 12;
-                    const regime = emp.taxRegime || 'NEW';
-                    let annualTax = 0;
+                const otherDeduction = ptD.plus(esicD).round();
 
-                    if (regime === 'NEW') {
-                        // New Regime FY2024-25: no deductions, simplified slabs
-                        if (annualGross <= 300000) annualTax = 0;
-                        else if (annualGross <= 700000) annualTax = (annualGross - 300000) * 0.05;
-                        else if (annualGross <= 1000000) annualTax = 20000 + (annualGross - 700000) * 0.10;
-                        else if (annualGross <= 1200000) annualTax = 50000 + (annualGross - 1000000) * 0.15;
-                        else if (annualGross <= 1500000) annualTax = 80000 + (annualGross - 1200000) * 0.20;
-                        else annualTax = 140000 + (annualGross - 1500000) * 0.30;
-                        // Rebate u/s 87A — zero tax up to ₹7L under new regime
-                        if (annualGross <= 700000) annualTax = 0;
-                    } else {
-                        // Old Regime FY2024-25: with standard deduction ₹50,000
-                        const stdDeduction = 50000;
-                        const section80C = Math.min(sc.section80C || 0, 150000); // Capped at ₹1.5L
-                        const section80D = Math.min(sc.section80D || 0, 25000);  // Basic medical premium
-                        const taxableIncome = Math.max(0, annualGross - stdDeduction - section80C - section80D);
+                // ── EMI CARRY FORWARD CAP ────────────────────────────────────────────────
+                const availableSalaryForDeductions = Decimal.max(0, grossSalary.minus(pfD).minus(tdsD).minus(otherDeduction));
 
-                        if (taxableIncome <= 250000) annualTax = 0;
-                        else if (taxableIncome <= 500000) annualTax = (taxableIncome - 250000) * 0.05;
-                        else if (taxableIncome <= 1000000) annualTax = 12500 + (taxableIncome - 500000) * 0.20;
-                        else annualTax = 112500 + (taxableIncome - 1000000) * 0.30;
-                        // Rebate u/s 87A — zero tax up to ₹5L under old regime
-                        if (taxableIncome <= 500000) annualTax = 0;
+                let loanDeduction = new Decimal(0);
+                const empLoanDeductions = []; // Track per-loan deduction for balance update
+                empLoans.forEach(l => {
+                    if (l.balance > 0) {
+                        const thisEmi = Decimal.min(l.emiAmount || 0, l.balance || 0);
+                        loanDeduction = loanDeduction.plus(thisEmi);
+                        empLoanDeductions.push({ loanId: l.id, emi: thisEmi, currentBalance: new Decimal(l.balance) });
                     }
+                });
 
-                    // 4% Health & Education Cess on computed tax
-                    annualTax = annualTax * 1.04;
-                    tdsD = new Decimal(Math.round(annualTax / 12));
+                if (config.enableEMICap) {
+                    const cap = grossSalary.times(config.emiCapPercentage).dividedBy(100);
+                    if (loanDeduction.greaterThan(cap)) {
+                        // Scale each loan deduction proportionally to fit within cap
+                        const scale = cap.dividedBy(loanDeduction);
+                        empLoanDeductions.forEach(ld => { ld.emi = ld.emi.times(scale).round(); });
+                        loanDeduction = cap.round();
+                    }
                 }
-            }
-            const tdsDeduction = tdsD.toNumber();
-            const pfDeduction = pfD.toNumber();
 
-            const otherDeduction = ptD.plus(esicD).round();
-
-            // ── EMI CARRY FORWARD CAP ────────────────────────────────────────────────
-            const availableSalaryForDeductions = Decimal.max(0, grossSalary.minus(pfD).minus(tdsD).minus(otherDeduction));
-
-            let loanDeduction = new Decimal(0);
-            const empLoanDeductions = []; // Track per-loan deduction for balance update
-            empLoans.forEach(l => {
-                if (l.balance > 0) {
-                    const thisEmi = Decimal.min(l.emiAmount || 0, l.balance || 0);
-                    loanDeduction = loanDeduction.plus(thisEmi);
-                    empLoanDeductions.push({ loanId: l.id, emi: thisEmi, currentBalance: new Decimal(l.balance) });
+                if (loanDeduction.greaterThan(availableSalaryForDeductions)) {
+                    loanDeduction = availableSalaryForDeductions;
                 }
-            });
+                const remainingSalaryForAdvance = Decimal.max(0, availableSalaryForDeductions.minus(loanDeduction));
 
-            if (config.enableEMICap) {
-                const cap = grossSalary.times(config.emiCapPercentage).dividedBy(100);
-                if (loanDeduction.greaterThan(cap)) {
-                    // Scale each loan deduction proportionally to fit within cap
-                    const scale = cap.dividedBy(loanDeduction);
-                    empLoanDeductions.forEach(ld => { ld.emi = ld.emi.times(scale).round(); });
-                    loanDeduction = cap.round();
+                let advanceDeduction = empAdvances.reduce((sum, a) => sum.plus(Decimal.min(a.monthlyDeduction || 0, a.remainingBalance || 0)), new Decimal(0));
+
+                if (config.enableEMICap) {
+                    const cap = grossSalary.times(config.emiCapPercentage).dividedBy(100);
+                    if (loanDeduction.plus(advanceDeduction).greaterThan(cap)) {
+                        advanceDeduction = Decimal.max(0, cap.minus(loanDeduction)).round();
+                    }
                 }
-            }
 
-            if (loanDeduction.greaterThan(availableSalaryForDeductions)) {
-                loanDeduction = availableSalaryForDeductions;
-            }
-            const remainingSalaryForAdvance = Decimal.max(0, availableSalaryForDeductions.minus(loanDeduction));
-
-            let advanceDeduction = empAdvances.reduce((sum, a) => sum.plus(Decimal.min(a.monthlyDeduction || 0, a.remainingBalance || 0)), new Decimal(0));
-
-            if (config.enableEMICap) {
-                const cap = grossSalary.times(config.emiCapPercentage).dividedBy(100);
-                if (loanDeduction.plus(advanceDeduction).greaterThan(cap)) {
-                    advanceDeduction = Decimal.max(0, cap.minus(loanDeduction)).round();
+                if (advanceDeduction.greaterThan(remainingSalaryForAdvance)) {
+                    advanceDeduction = remainingSalaryForAdvance;
                 }
-            }
 
-            if (advanceDeduction.greaterThan(remainingSalaryForAdvance)) {
-                advanceDeduction = remainingSalaryForAdvance;
-            }
+                const loanD = loanDeduction.round();
+                const advD = advanceDeduction.round();
+                const totalDeductions = loanD.plus(advD).plus(pfD).plus(tdsD).plus(otherDeduction).round();
+                const netSalary = grossSalary.minus(totalDeductions).round();
 
-            const loanD = loanDeduction.round();
-            const advD = advanceDeduction.round();
-            const totalDeductions = loanD.plus(advD).plus(pfD).plus(tdsD).plus(otherDeduction).round();
-            const netSalary = grossSalary.minus(totalDeductions).round();
-
-            // Collect loan balance updates — applied atomically after all slips are computed
-            for (const ld of empLoanDeductions) {
-                if (ld.emi.greaterThan(0)) {
-                    const newBalance = Decimal.max(0, ld.currentBalance.minus(ld.emi)).toDecimalPlaces(2).toNumber();
-                    loanBalanceUpdates.push({ loanId: ld.loanId, newBalance });
+                // Collect loan balance updates — applied atomically after all slips are computed
+                for (const ld of empLoanDeductions) {
+                    if (ld.emi.greaterThan(0)) {
+                        const newBalance = Decimal.max(0, ld.currentBalance.minus(ld.emi)).toDecimalPlaces(2).toNumber();
+                        loanBalanceUpdates.push({ loanId: ld.loanId, newBalance });
+                    }
                 }
-            }
 
-            generatedSlips.push({
-                id: Math.random().toString(36).substr(2, 9),
-                companyId,
-                employeeId: emp.id,
-                month,
-                totalDays: daysInMonth,
-                presentDays: presentDaysForStats,
-                paidLeaveDays: 0,
-                absentDays: daysInMonth - presentDaysForStats,
-                basicSalary: basicEarnings.toNumber(),
-                productionAmount: productionEarnings.toNumber(),
-                overtimeAmount: overtimeEarnings.toNumber(),
-                allowances: totalAllowances.toNumber(),
-                grossSalary: grossSalary.toNumber(),
-                loanDeduction: loanD.toNumber(),
-                advanceDeduction: advD.toNumber(),
-                pfDeduction: pfD.toNumber(),
-                taxDeduction: tdsD.toNumber(),
-                otherDeduction: otherDeduction.toNumber(),
-                totalDeductions: totalDeductions.toNumber(),
-                netSalary: netSalary.toNumber(),
-                status: 'DRAFT', // NEW STATE MACHINE START
-                generatedOn: new Date().toISOString(),
-                generatedBy: generatedBy || 'Server Sync'
-            });
-          } catch (empErr) {
-            // Per-employee error is non-fatal — collect and continue generating other slips
-            perEmployeeErrors.push({ employeeId: emp.id, name: emp.name, error: empErr.message });
-          }
+                generatedSlips.push({
+                    id: `slip-${uuidv4()}`,
+                    companyId,
+                    employeeId: emp.id,
+                    month,
+                    totalDays: daysInMonth,
+                    presentDays: presentDaysForStats,
+                    paidLeaveDays: 0,
+                    absentDays: daysInMonth - presentDaysForStats,
+                    basicSalary: basicEarnings.toNumber(),
+                    productionAmount: productionEarnings.toNumber(),
+                    overtimeAmount: overtimeEarnings.toNumber(),
+                    allowances: totalAllowances.toNumber(),
+                    grossSalary: grossSalary.toNumber(),
+                    loanDeduction: loanD.toNumber(),
+                    advanceDeduction: advD.toNumber(),
+                    pfDeduction: pfD.toNumber(),
+                    taxDeduction: tdsD.toNumber(),
+                    otherDeduction: otherDeduction.toNumber(),
+                    totalDeductions: totalDeductions.toNumber(),
+                    netSalary: netSalary.toNumber(),
+                    status: 'DRAFT', // NEW STATE MACHINE START
+                    generatedOn: new Date().toISOString(),
+                    generatedBy: generatedBy || 'Server Sync'
+                });
+            } catch (empErr) {
+                // Per-employee error is non-fatal — collect and continue generating other slips
+                perEmployeeErrors.push({ employeeId: emp.id, name: emp.name, error: empErr.message });
+            }
         }
 
         // Wipe old DRAFT slips for this month and bulk-insert new ones atomically
@@ -789,13 +861,22 @@ router.post('/run', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), asyn
 
         await t.commit();
 
-        res.json({
-            success: true,
+        // Update the ReportJob so client polling returns COMPLETED immediately
+        if (jobId) {
+            await ReportJob.update({ status: 'COMPLETED', progress: 100 }, { where: { id: jobId } }).catch(() => { });
+        }
+
+        res.status(202).json({
+            jobId,
             count: generatedSlips.length,
+            message: 'Payroll run complete.',
             ...(perEmployeeErrors.length > 0 && { warnings: perEmployeeErrors }),
         });
     } catch (e) {
-        await t.rollback();
+        await t.rollback().catch(() => { });
+        if (jobId) {
+            await ReportJob.update({ status: 'FAILED', error: e.message }, { where: { id: jobId } }).catch(() => { });
+        }
         addError(e, 'POST /api/payroll/run');
         const h = getErrorHint(e);
         res.status(500).json({ error: e.message, why: h.why, fix: h.fix });
@@ -803,7 +884,7 @@ router.post('/run', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), asyn
 });
 
 // ── PAYROLL STATE MACHINE ───────────────────────────────────────────────────────
-router.patch('/:id/simulate', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
+router.patch('/payroll/:id/simulate', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const slip = await SalarySlip.findByPk(req.params.id);
         if (!slip) return res.status(404).json({ error: 'Not found' });
@@ -815,7 +896,7 @@ router.patch('/:id/simulate', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMI
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.patch('/:id/approve', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
+router.patch('/payroll/:id/approve', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const slip = await SalarySlip.findByPk(req.params.id);
         if (!slip) return res.status(404).json({ error: 'Not found' });
@@ -827,7 +908,7 @@ router.patch('/:id/approve', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.patch('/:id/lock', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
+router.patch('/payroll/:id/lock', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const slip = await SalarySlip.findByPk(req.params.id);
         if (!slip) return res.status(404).json({ error: 'Not found' });
@@ -939,11 +1020,11 @@ router.get('/payroll/export/form16/:employeeId', requireRole(['SUPER_ADMIN', 'AD
         const emp = await Employee.findOne({ where: { id: req.params.employeeId } });
         const bd = emp?.bankDetails || {};
         const totGross = slips.reduce((s, r) => s + (r.grossSalary || 0), 0);
-        const totTDS   = slips.reduce((s, r) => s + (r.taxDeduction || 0), 0);
+        const totTDS = slips.reduce((s, r) => s + (r.taxDeduction || 0), 0);
 
         const breakdown = slips
             .sort((a, b) => a.month.localeCompare(b.month))
-            .map(s => `<tr><td>${s.month}</td><td>₹${(s.grossSalary||0).toFixed(2)}</td><td>₹${(s.taxDeduction||0).toFixed(2)}</td></tr>`)
+            .map(s => `<tr><td>${s.month}</td><td>₹${(s.grossSalary || 0).toFixed(2)}</td><td>₹${(s.taxDeduction || 0).toFixed(2)}</td></tr>`)
             .join('');
 
         res.setHeader('Content-Type', 'text/html');

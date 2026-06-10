@@ -90,6 +90,7 @@ export const useCustomReportStore = create<CustomReportState>()(
                 }));
             } catch (error) {
                 console.error('Failed to save template:', error);
+                throw error;
             }
         },
 
@@ -113,6 +114,7 @@ export const useCustomReportStore = create<CustomReportState>()(
                 }));
             } catch (error) {
                 console.error('Failed to delete template:', error);
+                throw error;
             }
         },
 

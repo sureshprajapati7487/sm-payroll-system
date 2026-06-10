@@ -60,7 +60,7 @@ const useInternalLeaveStore = create<LeaveState>((set, get) => ({
 
         const newRequest: LeaveRequest = {
             ...req,
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             companyId: companyId || undefined,
             status: LeaveStatus.PENDING,
             appliedOn: new Date().toISOString().split('T')[0],
@@ -79,26 +79,27 @@ const useInternalLeaveStore = create<LeaveState>((set, get) => ({
             });
             if (res.ok) {
                 const saved = await res.json();
-                // Replace optimistic with server response
                 set(state => ({
                     requests: state.requests.map(r => r.id === newRequest.id ? saved : r)
                 }));
+                // Notify only after server confirms — prevents ghost notifications on failure
+                const applicant = useEmployeeStore.getState()._rawEmployees.find(e => e.id === newRequest.employeeId);
+                useNotificationStore.getState().addNotification({
+                    type: NotificationType.LEAVE_REQUEST,
+                    targetRoles: ['MANAGER', 'ADMIN', 'SUPER_ADMIN'],
+                    title: `Leave Request — ${applicant?.name ?? newRequest.employeeId}`,
+                    message: `${newRequest.type} leave requested from ${newRequest.startDate} to ${newRequest.endDate}${newRequest.reason ? ': ' + newRequest.reason : ''}.`,
+                    employeeId: newRequest.employeeId,
+                });
+            } else {
+                set(state => ({ requests: state.requests.filter(r => r.id !== newRequest.id) }));
+                throw new Error('Server rejected leave request');
             }
         } catch (e) {
             console.error('[LeaveStore] requestLeave failed:', e);
-            // Rollback on failure
             set(state => ({ requests: state.requests.filter(r => r.id !== newRequest.id) }));
+            throw e; // Re-throw so UI can show error
         }
-
-        // ── Notify Managers/Admins about new leave request ────────────────────
-        const applicant = useEmployeeStore.getState()._rawEmployees.find(e => e.id === newRequest.employeeId);
-        useNotificationStore.getState().addNotification({
-            type: NotificationType.LEAVE_REQUEST,
-            targetRoles: ['MANAGER', 'ADMIN', 'SUPER_ADMIN'],
-            title: `Leave Request — ${applicant?.name ?? newRequest.employeeId}`,
-            message: `${newRequest.type} leave requested from ${newRequest.startDate} to ${newRequest.endDate}${newRequest.reason ? ': ' + newRequest.reason : ''}.`,
-            employeeId: newRequest.employeeId,
-        });
     },
 
     // ── Approve → PATCH /api/leaves/:id/approve ──────────────────────────────

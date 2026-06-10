@@ -7,7 +7,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LogOut, Eye, EyeOff, ShieldAlert, X, Lock } from 'lucide-react';
-import { API_URL } from '@/lib/apiConfig';
+import { apiFetch } from '@/lib/apiClient';
 
 interface Props {
     isOpen: boolean;
@@ -43,10 +43,8 @@ export function LogoutConfirmModal({ isOpen, onConfirmed, onCancel }: Props) {
         try {
             // Verify by attempting a login with SUPER_ADMIN credentials
             // We send the stored user's ID + the typed password to verify
-            const res = await fetch(`${API_URL}/auth/verify-password`, {
+            const res = await apiFetch('/auth/verify-password', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
                 body: JSON.stringify({ password: password.trim() }),
             });
             const data = await res.json();

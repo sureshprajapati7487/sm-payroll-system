@@ -8,7 +8,7 @@ import {
     Camera, UserX, CheckCircle, AlertCircle,
     Loader2, RefreshCw, LogIn, LogOut, Users,
     ScanFace, ArrowLeft, Wifi, WifiOff,
-    Maximize2, Minimize2, Search, X
+    Maximize2, Minimize2, Search, X, Trash2, SwitchCamera, FileDown
 } from 'lucide-react';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { useAttendanceStore } from '@/store/attendanceStore';
@@ -16,7 +16,6 @@ import { useAuthStore } from '@/store/authStore';
 import { useFaceRecognition } from '@/hooks/useFaceRecognition';
 import { biometricStore } from '@/store/biometricStore';
 import { PERMISSIONS } from '@/config/permissions';
-import { useDeviceType } from '@/hooks/useDeviceType';
 import { useSecurityStore } from '@/store/securityStore';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -79,19 +78,30 @@ export const FaceKioskPage = () => {
     } = useFaceRecognition();
 
     const isAdmin = hasPermission(PERMISSIONS.USE_FACE_KIOSK);
-    const { isDesktop } = useDeviceType();
 
     const { kioskDevices, registerKioskDevice } = useSecurityStore();
     const [deviceId, setDeviceId] = useState(() => localStorage.getItem('kiosk_device_id'));
     const isDeviceRegistered = deviceId && kioskDevices.some(d => d.id === deviceId);
     const [deviceNameInput, setDeviceNameInput] = useState('');
+    // Soft banner: show only if not registered, dismissible
+    const [showRegisterBanner, setShowRegisterBanner] = useState(!isDeviceRegistered);
 
     const handleRegisterDevice = () => {
-        if (!deviceNameInput.trim()) return alert('Device name likhiye');
+        if (!deviceNameInput.trim()) return;
         const newId = registerKioskDevice(deviceNameInput, user?.name || 'Admin');
         localStorage.setItem('kiosk_device_id', newId);
         setDeviceId(newId);
+        setShowRegisterBanner(false);
     };
+
+    // ── Manual ID Fallback — state only (callbacks defined after all deps below) ─
+    const [showManualPanel, setShowManualPanel] = useState(false);
+    const [manualCode, setManualCode] = useState('');
+    const [manualStep, setManualStep] = useState<'input' | 'confirm' | 'success' | 'error'>('input');
+    const [manualEmp, setManualEmp] = useState<typeof employees[0] | null>(null);
+    const [manualPunchType, setManualPunchType] = useState<'IN' | 'OUT' | 'DONE'>('IN');
+    const [manualMsg, setManualMsg] = useState('');
+    const [manualLoading, setManualLoading] = useState(false);
 
     // ── Mode ──────────────────────────────────────────────────────────────────
     const [mode, setMode] = useState<KioskMode>('live');
@@ -100,6 +110,8 @@ export const FaceKioskPage = () => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const [cameraError, setCameraError] = useState<'denied' | 'notfound' | null>(null);
+    const facingModeRef = useRef<'user' | 'environment'>('user');
+    const [isFrontCamera, setIsFrontCamera] = useState(true);
 
     // ── Enroll ────────────────────────────────────────────────────────────────
     const [enrollingId, setEnrollingId] = useState<string | null>(null);
@@ -109,15 +121,56 @@ export const FaceKioskPage = () => {
     const [enrollSearch, setEnrollSearch] = useState('');
     const enrollDescriptors = useRef<Float32Array[]>([]);
     const enrollLoopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [enrollToast, setEnrollToast] = useState<string | null>(null);
+    const enrollToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // ── Match threshold (admin adjustable) ────────────────────────────────────
+    const THRESHOLD_KEY = 'face_kiosk_match_threshold';
+    const [matchThreshold, setMatchThreshold] = useState<number>(() => {
+        const saved = localStorage.getItem(THRESHOLD_KEY);
+        return saved ? parseFloat(saved) : 0.45;
+    });
+    const matchThresholdRef = useRef(matchThreshold);
+    const updateMatchThreshold = (v: number) => {
+        matchThresholdRef.current = v;
+        setMatchThreshold(v);
+        localStorage.setItem(THRESHOLD_KEY, String(v));
+    };
+
+    // ── Delete enrollment ─────────────────────────────────────────────────────
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    const handleDeleteEnrollment = useCallback(async (empId: string) => {
+        setDeletingId(empId);
+        try {
+            await biometricStore.clearFaceDescriptor(empId);
+        } finally {
+            setDeletingId(null);
+            setDeleteConfirmId(null);
+        }
+    }, []);
 
     // ── Fullscreen ────────────────────────────────────────────────────────────
+    const isFullscreenSupported = typeof document !== 'undefined' && !!document.documentElement.requestFullscreen;
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showIOSHint, setShowIOSHint] = useState(false);
+    const iosHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     useEffect(() => {
+        if (!isFullscreenSupported) return;
         const h = () => setIsFullscreen(!!document.fullscreenElement);
         document.addEventListener('fullscreenchange', h);
         return () => document.removeEventListener('fullscreenchange', h);
-    }, []);
+    }, [isFullscreenSupported]);
+
     const toggleFullscreen = () => {
+        if (!isFullscreenSupported) {
+            setShowIOSHint(true);
+            if (iosHintTimerRef.current) clearTimeout(iosHintTimerRef.current);
+            iosHintTimerRef.current = setTimeout(() => setShowIOSHint(false), 4000);
+            return;
+        }
         if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => { });
         else document.exitFullscreen().catch(() => { });
     };
@@ -148,7 +201,7 @@ export const FaceKioskPage = () => {
         setCameraError(null);
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+                video: { facingMode: facingModeRef.current, width: { ideal: 640 }, height: { ideal: 480 } }
             });
             streamRef.current = stream;
             if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
@@ -163,6 +216,16 @@ export const FaceKioskPage = () => {
         streamRef.current = null;
         if (videoRef.current) videoRef.current.srcObject = null;
     }, []);
+
+    const switchCamera = useCallback(async () => {
+        const next = facingModeRef.current === 'user' ? 'environment' : 'user';
+        facingModeRef.current = next;
+        setIsFrontCamera(next === 'user');
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+        if (videoRef.current) videoRef.current.srcObject = null;
+        await startCamera();
+    }, [startCamera]);
 
     // Start camera when models are loaded
     useEffect(() => { if (modelsLoaded) startCamera(); return () => stopCamera(); }, [modelsLoaded]);
@@ -236,6 +299,9 @@ export const FaceKioskPage = () => {
             setEnrollStatus('done'); setEnrollMsg('Face enrolled! ✅');
             const empName = activeEmployees.find(e => e.id === empId)?.name || 'Employee';
             speak(`${empName} ka face successfully enrolled ho gaya.`);
+            if (enrollToastTimer.current) clearTimeout(enrollToastTimer.current);
+            setEnrollToast(empName);
+            enrollToastTimer.current = setTimeout(() => setEnrollToast(null), 4000);
             setTimeout(() => { setEnrollingId(null); setEnrollStatus('idle'); setEnrollMsg(''); setMode('live'); }, 1500);
         };
         // Small delay to allow camera stream to initialize before first capture
@@ -253,8 +319,21 @@ export const FaceKioskPage = () => {
         if (!modelsLoaded) return;
         setLiveState('scanning'); setScanMsg('Camera ke samne aao...');
 
-        let recentBoxes: { x: number, y: number }[] = [];
-        const LIVENESS_FRAMES = 3;
+        // ── Liveness buffer: track position + faceSize across recent frames ──
+        let livenessFrames: { x: number; y: number; size: number }[] = [];
+        const LIVENESS_FRAMES = 5;
+        const MIN_MOTION_PX = 2.5;   // min positional movement across frames
+        const MIN_SIZE_CHANGE = 3;   // min face-size change across frames
+
+        const isLive = (): boolean => {
+            if (livenessFrames.length < LIVENESS_FRAMES) return false;
+            const xs = livenessFrames.map(f => f.x);
+            const ys = livenessFrames.map(f => f.y);
+            const ss = livenessFrames.map(f => f.size);
+            const posVariance = Math.max(...xs) - Math.min(...xs) + (Math.max(...ys) - Math.min(...ys));
+            const sizeVariance = Math.max(...ss) - Math.min(...ss);
+            return posVariance >= MIN_MOTION_PX || sizeVariance >= MIN_SIZE_CHANGE;
+        };
 
         const loop = async () => {
             if (!videoRef.current || videoRef.current.readyState < 2) {
@@ -264,10 +343,19 @@ export const FaceKioskPage = () => {
             if (!result) { setScanMsg('Camera ke samne aao...'); liveLoopRef.current = setTimeout(loop, SCAN_INTERVAL_MS); return; }
             if (result.faceSize < 80) { setScanMsg('Thoda paas aao...'); liveLoopRef.current = setTimeout(loop, SCAN_INTERVAL_MS); return; }
 
-            // ── LIVENESS CHECK (Motion Variance) ──
-            const box = result.box || result;
-            recentBoxes.push({ x: box.x, y: box.y });
-            if (recentBoxes.length > LIVENESS_FRAMES) recentBoxes.shift();
+            // ── LIVENESS BUFFER ──
+            const box = result.box;
+            livenessFrames.push({ x: box?.x ?? 0, y: box?.y ?? 0, size: result.faceSize });
+            if (livenessFrames.length > LIVENESS_FRAMES) livenessFrames.shift();
+
+            if (livenessFrames.length < LIVENESS_FRAMES) {
+                setScanMsg(`Scanning... (${livenessFrames.length}/${LIVENESS_FRAMES})`);
+                liveLoopRef.current = setTimeout(loop, SCAN_INTERVAL_MS); return;
+            }
+            if (!isLive()) {
+                setScanMsg('Thoda hiliye... (photo detected?)');
+                liveLoopRef.current = setTimeout(loop, SCAN_INTERVAL_MS); return;
+            }
 
             setScanMsg('Checking Face...');
 
@@ -275,7 +363,7 @@ export const FaceKioskPage = () => {
             try {
                 let bestMatchId: string | null = null;
                 let minDistance = Infinity;
-                const MATCH_THRESHOLD = 0.45; // Stricter threshold to prevent false matches
+                const MATCH_THRESHOLD = matchThresholdRef.current;
 
                 // Match against all cached descriptors
                 for (const emp of activeEmployees) {
@@ -364,6 +452,56 @@ export const FaceKioskPage = () => {
         setScanMsg('Camera ke samne aao...'); startLiveLoop();
     }, [stopAllLoops, startLiveLoop]);
 
+    // ── Manual ID Fallback — callbacks (all deps now in scope) ────────────────
+    const openManualPanel = useCallback(() => {
+        stopAllLoops();
+        setManualCode(''); setManualStep('input'); setManualEmp(null); setManualMsg('');
+        setShowManualPanel(true);
+    }, [stopAllLoops]);
+
+    const closeManualPanel = useCallback(() => {
+        setShowManualPanel(false);
+        setManualCode(''); setManualStep('input'); setManualEmp(null); setManualMsg('');
+        if (mode === 'live' && modelsLoaded) startLiveLoop();
+    }, [mode, modelsLoaded, startLiveLoop]);
+
+    const handleManualLookup = useCallback(() => {
+        const emp = activeEmployees.find(e =>
+            e.code.toLowerCase() === manualCode.trim().toLowerCase()
+        );
+        if (!emp) { setManualMsg('Employee ID nahi mila. Sahi code daalo.'); setManualStep('error'); return; }
+        const rec = records.find(r => r.employeeId === emp.id && r.date === new Date().toISOString().split('T')[0]);
+        const pt: 'IN' | 'OUT' | 'DONE' = !rec?.checkIn ? 'IN' : !rec.checkOut ? 'OUT' : 'DONE';
+        setManualEmp(emp); setManualPunchType(pt); setManualStep('confirm'); setManualMsg('');
+    }, [activeEmployees, manualCode, records]);
+
+    const handleManualPunch = useCallback(async () => {
+        if (!manualEmp) return;
+        if (manualPunchType === 'DONE') {
+            setManualMsg(`${manualEmp.name} — Aaj ki shift already complete hai.`);
+            setManualStep('success');
+            setTimeout(closeManualPanel, 3500);
+            return;
+        }
+        setManualLoading(true);
+        try {
+            if (manualPunchType === 'IN') {
+                await markCheckIn(manualEmp.id, (manualEmp as any).shift || 'GENERAL', undefined, { punchMode: 'admin', isManualPunch: true });
+                speak(`Punch In. ${manualEmp.name}. Welcome!`);
+                setManualMsg(`Welcome, ${manualEmp.name}!\nPunch In recorded ✓`);
+            } else {
+                await markCheckOut(manualEmp.id, { punchMode: 'admin', isManualPunch: true } as any);
+                speak(`Punch Out. ${manualEmp.name}. Have a good day!`);
+                setManualMsg(`Good bye, ${manualEmp.name}!\nPunch Out recorded ✓`);
+            }
+            setManualStep('success');
+            setTimeout(closeManualPanel, 3500);
+        } catch {
+            setManualMsg('Punch save nahi hua. Dobara try karein.');
+            setManualStep('error');
+        } finally { setManualLoading(false); }
+    }, [manualEmp, manualPunchType, markCheckIn, markCheckOut, closeManualPanel]);
+
     // ── Mode switch effect ────────────────────────────────────────────────────
     useEffect(() => {
         stopAllLoops();
@@ -400,6 +538,8 @@ export const FaceKioskPage = () => {
         ? activeEmployees.filter(e => e.name.toLowerCase().includes(enrollQ) || e.code.toLowerCase().includes(enrollQ))
         : activeEmployees;
 
+    const unenrolledEmployees = activeEmployees.filter(e => !biometricStore.isFaceRegistered(e.id));
+
     // Today's events for Recent Punches panel
     const todayEvents: { emp: typeof activeEmployees[0]; time: string; type: 'IN' | 'OUT' }[] = [];
     for (const emp of activeEmployees) {
@@ -412,6 +552,33 @@ export const FaceKioskPage = () => {
     const insideCount = activeEmployees.filter(e => { const r = records.find(r => r.employeeId === e.id && r.date === today); return r?.checkIn && !r.checkOut; }).length;
     const leftCount = activeEmployees.filter(e => { const r = records.find(r => r.employeeId === e.id && r.date === today); return r?.checkIn && r.checkOut; }).length;
     const punchedInCount = activeEmployees.filter(e => records.find(r => r.employeeId === e.id && r.date === today)?.checkIn).length;
+    const lateCount = activeEmployees.filter(e => { const r = records.find(r => r.employeeId === e.id && r.date === today); return r?.status === 'LATE'; }).length;
+    const pendingCount = activeEmployees.length - punchedInCount;
+
+    // ── Punch export ─────────────────────────────────────────────────────────
+    const handleExportPunches = async () => {
+        const XLSX = await import('xlsx');
+        const headers = ['Name', 'Code', 'Department', 'Punch In', 'Punch Out', 'Hours', 'Status'];
+        const rows = activeEmployees.map(emp => {
+            const rec = records.find(r => r.employeeId === emp.id && r.date === today);
+            const punchIn = rec?.checkIn ? fmtTime(rec.checkIn) : '-';
+            const punchOut = rec?.checkOut ? fmtTime(rec.checkOut) : '-';
+            let hours = '-';
+            if (rec?.checkIn && rec?.checkOut) {
+                const diff = (new Date(rec.checkOut).getTime() - new Date(rec.checkIn).getTime()) / 3600000;
+                if (diff > 0) hours = `${diff.toFixed(1)}h`;
+            }
+            const status = !rec?.checkIn ? 'Absent'
+                : rec.status === 'LATE' ? 'Late'
+                : rec.checkOut ? 'Present (Left)'
+                : 'Present (Inside)';
+            return [emp.name, (emp as any).code || '-', (emp as any).department || '-', punchIn, punchOut, hours, status];
+        });
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, `Attendance ${today}`);
+        XLSX.writeFile(wb, `Face_Kiosk_${today}.xlsx`);
+    };
 
     // ── SVG ring circumference ────────────────────────────────────────────────
     const RING_R = 34;
@@ -420,79 +587,41 @@ export const FaceKioskPage = () => {
     // ══════════════════════════════════════════════════════════════════════════
     // RENDER
     // ══════════════════════════════════════════════════════════════════════════
-    if (isDesktop) {
-        return (
-            <div className="fixed inset-0 bg-[#060a0f] flex flex-col items-center justify-center text-center p-6 z-[100]">
-                <div className="max-w-md w-full flex flex-col items-center">
-                    <div className="w-24 h-24 rounded-full bg-violet-600/10 border-2 border-violet-500/30 flex items-center justify-center mb-6 relative">
-                        <ScanFace className="w-12 h-12 text-violet-400 opacity-60" />
-                        <span className="absolute -bottom-2 -right-2 bg-dark-bg rounded-full p-1 border border-dark-bg">
-                            <Maximize2 className="w-6 h-6 text-red-400" />
-                        </span>
-                    </div>
-                    <h1 className="text-3xl font-extrabold text-white mb-3">Mobile & Tablet Only</h1>
-                    <p className="text-slate-400 leading-relaxed mb-8">
-                        The Face Recognition Kiosk is designed exclusively for front-facing devices mounted at terminal entrances. It is natively blocked on Desktop environments.
-                    </p>
-                    <button
-                        onClick={() => navigate('/attendance')}
-                        className="flex items-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all border border-slate-700"
-                    >
-                        <ArrowLeft className="w-5 h-5" /> Go Back to Attendance
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
-    if (!isDeviceRegistered) {
-        return (
-            <div className="fixed inset-0 bg-[#060a0f] flex flex-col items-center justify-center text-center p-6 z-[100]">
-                <div className="max-w-md w-full flex flex-col items-center gap-4 bg-slate-900/80 p-8 rounded-3xl border border-slate-800 shadow-2xl">
-                    <div className="w-20 h-20 rounded-full bg-blue-600/10 border-2 border-blue-500/30 flex items-center justify-center mb-2">
-                        <ScanFace className="w-10 h-10 text-blue-400 opacity-80" />
-                    </div>
-                    <h1 className="text-2xl font-extrabold text-white">Unregistered Device</h1>
-                    <p className="text-slate-400 text-sm leading-relaxed mb-4">
-                        Yeh device Kiosk ke liye registered nahi hai. Face recognition chalu karne ke liye pehle is tablet/phone ko register karein.
-                    </p>
-
-                    {isAdmin ? (
-                        <div className="w-full space-y-3 mt-2">
-                            <input
-                                type="text"
-                                placeholder="Device Name (e.g. Front Gate Tablet)"
-                                value={deviceNameInput}
-                                onChange={e => setDeviceNameInput(e.target.value)}
-                                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none"
-                            />
-                            <button
-                                onClick={handleRegisterDevice}
-                                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg text-sm"
-                            >
-                                Register Device
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 w-full">
-                            <p className="text-red-400 text-sm font-bold">Admin Login Required</p>
-                            <p className="text-slate-400 text-xs mt-1">Sirf admin is device ko register kar sakte hain.</p>
-                        </div>
-                    )}
-
-                    <button
-                        onClick={() => navigate('/attendance')}
-                        className="mt-4 flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all border border-slate-700 w-full text-sm"
-                    >
-                        <ArrowLeft className="w-4 h-4" /> Go Back
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="fixed inset-0 bg-[#060a0f] flex flex-col overflow-hidden z-[100] w-full h-[100dvh]">
+
+            {/* ── Device Registration Banner (soft, dismissible) ───────────── */}
+            {showRegisterBanner && !isDeviceRegistered && isAdmin && (
+                <div className="shrink-0 bg-blue-950/80 border-b border-blue-700/40 px-4 py-2 flex items-center gap-3 flex-wrap z-30">
+                    <ScanFace className="w-4 h-4 text-blue-400 shrink-0" />
+                    <span className="text-blue-300 text-xs font-medium flex-1 min-w-0">
+                        Yeh device registered nahi hai. Optional: register karein taaki audit trail mein device naam dikh sake.
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <input
+                            value={deviceNameInput}
+                            onChange={e => setDeviceNameInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleRegisterDevice()}
+                            placeholder="Device name..."
+                            className="bg-blue-900/50 border border-blue-700/50 rounded-lg px-3 py-1.5 text-white text-xs w-40 outline-none focus:border-blue-400"
+                        />
+                        <button
+                            onClick={handleRegisterDevice}
+                            disabled={!deviceNameInput.trim()}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-lg text-xs font-bold transition-colors"
+                        >
+                            Register
+                        </button>
+                        <button
+                            onClick={() => setShowRegisterBanner(false)}
+                            className="p-1.5 text-blue-400 hover:text-white transition-colors"
+                            title="Dismiss"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* ── Header ───────────────────────────────────────────────────── */}
             <div className="flex flex-col lg:flex-row items-center justify-between gap-3 px-3 md:px-6 py-3 border-b border-slate-800/70 bg-[#0a0f1a] shrink-0 w-full z-20">
@@ -516,8 +645,11 @@ export const FaceKioskPage = () => {
                     {/* Right Controls (Mobile Only) */}
                     <div className="flex items-center gap-2 lg:hidden">
                         <LiveClock />
-                        <button onClick={toggleFullscreen}
-                            className="p-2 rounded-xl text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition-all">
+                        <button
+                            onClick={toggleFullscreen}
+                            title={!isFullscreenSupported ? 'Add to Home Screen for fullscreen' : isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                            className={`p-2 rounded-xl transition-all ${isFullscreenSupported ? 'text-slate-300 bg-slate-800/80 hover:bg-slate-700' : 'text-slate-500 bg-slate-800/50'}`}
+                        >
                             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                         </button>
                     </div>
@@ -525,7 +657,7 @@ export const FaceKioskPage = () => {
 
                 {/* Center Tabs */}
                 <div className="flex items-center w-full lg:w-auto bg-slate-800/80 rounded-xl p-1 gap-1 shadow-inner overflow-x-auto min-w-0">
-                    <button onClick={() => setMode('live')}
+                    <button onClick={() => { stopAllLoops(); setMode('live'); }}
                         className={`flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${mode === 'live' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}>
                         <Camera className="w-4 h-4" /> Live Detect
                     </button>
@@ -548,11 +680,26 @@ export const FaceKioskPage = () => {
                             : <span className="flex items-center gap-1.5 text-amber-400"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading {loadProgress}%</span>}
                     </div>
                     <LiveClock />
-                    <button onClick={toggleFullscreen}
-                        title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen (F11)'}
-                        className="p-2.5 rounded-xl text-slate-300 bg-slate-800/80 hover:bg-slate-700 transition-all">
-                        {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={toggleFullscreen}
+                            title={!isFullscreenSupported ? 'Add to Home Screen for fullscreen' : isFullscreen ? 'Exit Fullscreen' : 'Fullscreen (F11)'}
+                            className={`p-2.5 rounded-xl transition-all ${isFullscreenSupported ? 'text-slate-300 bg-slate-800/80 hover:bg-slate-700' : 'text-slate-500 bg-slate-800/50'}`}
+                        >
+                            {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+                        </button>
+                        {showIOSHint && (
+                            <div className="absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-600 rounded-xl p-3 shadow-xl z-50 text-left">
+                                <p className="text-white text-xs font-bold mb-1">iOS Fullscreen</p>
+                                <p className="text-slate-400 text-[11px] leading-relaxed">
+                                    Safari mein fullscreen API nahi hai.<br />
+                                    True fullscreen ke liye:<br />
+                                    <span className="text-violet-300 font-medium">Share → Add to Home Screen</span>
+                                </p>
+                                <div className="absolute -top-1.5 right-3 w-3 h-3 bg-slate-800 border-t border-l border-slate-600 rotate-45" />
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -569,7 +716,7 @@ export const FaceKioskPage = () => {
                             {/* Camera box */}
                             <div className="relative w-full max-w-xl aspect-video rounded-3xl overflow-hidden border-2 border-slate-700/60 shadow-2xl shadow-black">
                                 <video ref={videoRef} autoPlay playsInline muted
-                                    className="w-full h-full object-cover scale-x-[-1]" />
+                                    className={`w-full h-full object-cover ${isFrontCamera ? 'scale-x-[-1]' : ''}`} />
 
                                 {/* Scanning frame */}
                                 {liveState === 'scanning' && (
@@ -624,15 +771,66 @@ export const FaceKioskPage = () => {
                                     </div>
                                 )}
 
+                                {/* Camera switch button */}
+                                {modelsLoaded && !cameraError && liveState !== 'confirm' && (
+                                    <button
+                                        onClick={switchCamera}
+                                        title={isFrontCamera ? 'Back camera pe switch karo' : 'Front camera pe switch karo'}
+                                        className="absolute top-3 right-3 z-20 w-9 h-9 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 border border-white/10 hover:border-white/20 text-white/70 hover:text-white transition-all backdrop-blur-sm"
+                                    >
+                                        <SwitchCamera className="w-4 h-4" />
+                                    </button>
+                                )}
+
                                 {/* No models overlay */}
                                 {!modelsLoaded && (
-                                    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-3">
+                                    <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center gap-4 p-6 text-center">
                                         {modelError ? (
                                             <>
-                                                <WifiOff className="w-10 h-10 text-red-400" />
-                                                <p className="text-red-300 text-sm font-bold">{modelError}</p>
-                                                <button onClick={retryLoadModels} className="flex items-center gap-2 px-4 py-2 bg-red-600/20 border border-red-500/30 text-red-300 rounded-xl text-sm font-bold hover:bg-red-600/30 transition-all">
-                                                    <RefreshCw className="w-4 h-4" /> Retry
+                                                {/* Error icon */}
+                                                <div className="relative">
+                                                    <div className="w-16 h-16 rounded-full bg-red-500/10 border-2 border-red-500/30 flex items-center justify-center">
+                                                        <WifiOff className="w-7 h-7 text-red-400" />
+                                                    </div>
+                                                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-red-600 border-2 border-black flex items-center justify-center">
+                                                        <X className="w-3.5 h-3.5 text-white" />
+                                                    </div>
+                                                </div>
+
+                                                {/* Title + hint */}
+                                                <div className="space-y-1">
+                                                    <p className="text-red-300 font-bold text-base">Face AI Load Nahi Hua</p>
+                                                    <p className="text-slate-500 text-xs max-w-[220px]">
+                                                        Model files nahi mile. Internet check karo ya page reload karo.
+                                                    </p>
+                                                    {modelError && (
+                                                        <p className="text-red-600/70 text-[10px] font-mono mt-1 max-w-[220px] truncate" title={modelError}>
+                                                            {modelError.length > 60 ? modelError.slice(0, 60) + '…' : modelError}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                {/* Retry */}
+                                                <button
+                                                    onClick={retryLoadModels}
+                                                    className="flex items-center gap-2 px-5 py-2 bg-red-600/20 border border-red-500/30 text-red-300 rounded-xl text-sm font-bold hover:bg-red-600/30 transition-all"
+                                                >
+                                                    <RefreshCw className="w-4 h-4" /> Dobara Try Karo
+                                                </button>
+
+                                                {/* Divider */}
+                                                <div className="flex items-center gap-3 w-48">
+                                                    <div className="flex-1 h-px bg-slate-700/60" />
+                                                    <span className="text-slate-600 text-[10px] font-bold">YA</span>
+                                                    <div className="flex-1 h-px bg-slate-700/60" />
+                                                </div>
+
+                                                {/* Manual fallback shortcut */}
+                                                <button
+                                                    onClick={openManualPanel}
+                                                    className="flex items-center gap-2 px-5 py-2.5 bg-violet-600/20 border border-violet-500/30 text-violet-300 rounded-xl text-sm font-bold hover:bg-violet-600/30 transition-all"
+                                                >
+                                                    <UserX className="w-4 h-4" /> Employee ID se Punch Karo
                                                 </button>
                                             </>
                                         ) : (
@@ -703,28 +901,105 @@ export const FaceKioskPage = () => {
                             </div>
 
                             {/* Enroll warning */}
-                            {enrolledCount < activeEmployees.length && (
-                                <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2 text-amber-400 text-xs">
-                                    <AlertCircle className="w-4 h-4 shrink-0" />
-                                    {activeEmployees.length - enrolledCount} employees enroll nahi hain.
-                                    {isAdmin && <button onClick={() => setMode('enroll')} className="underline font-bold ml-1">Enroll tab mein jao</button>}
+                            {unenrolledEmployees.length > 0 && (
+                                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 flex flex-col gap-2">
+                                    <div className="flex items-start gap-2">
+                                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-amber-300 text-xs font-bold">
+                                                {unenrolledEmployees.length} employee{unenrolledEmployees.length > 1 ? 's' : ''} enroll nahi {unenrolledEmployees.length > 1 ? 'hain' : 'hai'}
+                                            </p>
+                                            <p className="text-amber-600/80 text-[10px] mt-0.5 leading-relaxed">
+                                                {unenrolledEmployees.slice(0, 3).map(e => e.name.split(' ')[0]).join(', ')}
+                                                {unenrolledEmployees.length > 3 && ` +${unenrolledEmployees.length - 3} aur`}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {isAdmin && (
+                                        <button
+                                            onClick={() => { stopAllLoops(); setMode('enroll'); }}
+                                            className="w-full flex items-center justify-center gap-2 py-2 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 hover:border-amber-400/50 text-amber-300 rounded-lg text-xs font-bold transition-all"
+                                        >
+                                            <Users className="w-3.5 h-3.5" /> Enroll Karo →
+                                        </button>
+                                    )}
                                 </div>
                             )}
+
+                            {/* Manual fallback trigger */}
+                            <button
+                                onClick={openManualPanel}
+                                className="flex items-center gap-2 text-slate-500 hover:text-slate-300 text-xs transition-colors border border-slate-700/40 hover:border-slate-600 rounded-xl px-4 py-2 bg-slate-900/40"
+                            >
+                                <UserX className="w-3.5 h-3.5" />
+                                Face nahi pehchan raha? Employee ID se punch karein
+                            </button>
                         </div>
 
                         {/* Right: Recent Punches Panel — hidden on mobile, visible on md+ */}
                         <div className="hidden md:flex w-72 shrink-0 border-l border-slate-800/60 bg-slate-900/40 flex-col overflow-hidden">
-                            <div className="px-4 py-3 border-b border-slate-800/60 shrink-0">
-                                <p className="text-white font-bold text-sm">Aaj ke Punches</p>
-                                <p className="text-slate-600 text-[11px]">{punchedInCount} / {activeEmployees.length} employees punched in</p>
+                            {/* Live stats header */}
+                            <div className="px-4 pt-3 pb-2 border-b border-slate-800/60 shrink-0">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-white font-bold text-sm">Aaj ki Attendance</p>
+                                    <span className="flex items-center gap-1 text-[10px] text-emerald-400/70">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                                        Live
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-4 gap-1.5">
+                                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg py-2 text-center">
+                                        <p className="text-emerald-400 font-bold text-base leading-none">{insideCount}</p>
+                                        <p className="text-slate-600 text-[9px] mt-1 leading-none">Inside</p>
+                                    </div>
+                                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg py-2 text-center">
+                                        <p className="text-blue-400 font-bold text-base leading-none">{leftCount}</p>
+                                        <p className="text-slate-600 text-[9px] mt-1 leading-none">Left</p>
+                                    </div>
+                                    <div className={`border rounded-lg py-2 text-center ${lateCount > 0 ? 'bg-amber-500/10 border-amber-500/20' : 'bg-slate-800/30 border-slate-700/20'}`}>
+                                        <p className={`font-bold text-base leading-none ${lateCount > 0 ? 'text-amber-400' : 'text-slate-600'}`}>{lateCount}</p>
+                                        <p className="text-slate-600 text-[9px] mt-1 leading-none">Late</p>
+                                    </div>
+                                    <div className={`border rounded-lg py-2 text-center ${pendingCount > 0 ? 'bg-slate-800/50 border-slate-700/40' : 'bg-emerald-500/5 border-emerald-500/10'}`}>
+                                        <p className={`font-bold text-base leading-none ${pendingCount > 0 ? 'text-slate-400' : 'text-emerald-600'}`}>{pendingCount}</p>
+                                        <p className="text-slate-600 text-[9px] mt-1 leading-none">Pending</p>
+                                    </div>
+                                </div>
+                                {/* progress bar */}
+                                <div className="mt-2 h-1 bg-slate-800 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                                        style={{ width: activeEmployees.length ? `${Math.round((punchedInCount / activeEmployees.length) * 100)}%` : '0%' }}
+                                    />
+                                </div>
+                                <p className="text-slate-600 text-[10px] mt-1">{punchedInCount}/{activeEmployees.length} punched in today</p>
                             </div>
-                            <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
+
+                            {/* Recent punches sub-header */}
+                            <div className="px-4 py-2 border-b border-slate-800/40 shrink-0 flex items-center justify-between">
+                                <p className="text-slate-400 text-xs font-semibold">Recent Punches</p>
+                                <div className="flex items-center gap-1.5">
+                                    {todayEvents.length > 0 && (
+                                        <span className="text-[10px] font-bold text-slate-500 bg-slate-800 border border-slate-700 rounded-lg px-2 py-0.5">
+                                            {todayEvents.length}
+                                        </span>
+                                    )}
+                                    <button
+                                        onClick={handleExportPunches}
+                                        title="Aaj ki attendance Excel mein export karo"
+                                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-slate-400 hover:text-emerald-400 bg-slate-800/60 hover:bg-emerald-500/10 border border-slate-700/50 hover:border-emerald-500/30 rounded-lg transition-all"
+                                    >
+                                        <FileDown className="w-3 h-3" /> Export
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700/50">
                                 {todayEvents.length === 0 ? (
                                     <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-10">
                                         <ScanFace className="w-10 h-10 text-slate-700" />
                                         <p className="text-slate-600 text-xs">Abhi koi punch nahi hua</p>
                                     </div>
-                                ) : todayEvents.slice(0, 10).map((ev, i) => (
+                                ) : todayEvents.map((ev, i) => (
                                     <div key={`${ev.emp.id}-${ev.type}-${ev.time}`}
                                         className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${i === 0 && liveState === 'success' ? 'border-violet-500/40 bg-violet-500/10' : 'border-slate-700/30 bg-slate-800/30'}`}>
                                         <img src={ev.emp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(ev.emp.name)}&size=48&background=random`}
@@ -739,16 +1014,13 @@ export const FaceKioskPage = () => {
                                     </div>
                                 ))}
                             </div>
-                            <div className="border-t border-slate-800/60 px-4 py-3 shrink-0 grid grid-cols-2 gap-2">
-                                <div className="text-center"><p className="text-emerald-400 font-bold text-lg">{insideCount}</p><p className="text-slate-600 text-[10px]">Inside</p></div>
-                                <div className="text-center"><p className="text-slate-400 font-bold text-lg">{leftCount}</p><p className="text-slate-600 text-[10px]">Left</p></div>
-                            </div>
                         </div>
-                        {/* Mobile: mini punch count bar */}
+                        {/* Mobile: mini stats bar */}
                         <div className="md:hidden absolute bottom-0 inset-x-0 flex items-center justify-around py-2 px-4 bg-slate-900/90 border-t border-slate-800/60 z-10">
-                            <div className="text-center"><p className="text-emerald-400 font-bold">{punchedInCount}</p><p className="text-slate-600 text-[9px]">Punched</p></div>
-                            <div className="text-center"><p className="text-amber-400 font-bold">{activeEmployees.length - punchedInCount}</p><p className="text-slate-600 text-[9px]">Pending</p></div>
-                            <div className="text-center"><p className="text-blue-400 font-bold">{leftCount}</p><p className="text-slate-600 text-[9px]">Left</p></div>
+                            <div className="text-center"><p className="text-emerald-400 font-bold text-sm">{insideCount}</p><p className="text-slate-600 text-[9px]">Inside</p></div>
+                            <div className="text-center"><p className="text-blue-400 font-bold text-sm">{leftCount}</p><p className="text-slate-600 text-[9px]">Left</p></div>
+                            <div className="text-center"><p className={`font-bold text-sm ${lateCount > 0 ? 'text-amber-400' : 'text-slate-600'}`}>{lateCount}</p><p className="text-slate-600 text-[9px]">Late</p></div>
+                            <div className="text-center"><p className={`font-bold text-sm ${pendingCount > 0 ? 'text-slate-400' : 'text-emerald-500'}`}>{pendingCount}</p><p className="text-slate-600 text-[9px]">Pending</p></div>
                         </div>
                     </div>
                 )}
@@ -866,6 +1138,110 @@ export const FaceKioskPage = () => {
                     </div>
                 )}
 
+                {/* ══ MANUAL ID FALLBACK OVERLAY ═══════════════════════════ */}
+                {showManualPanel && (
+                    <div className="absolute inset-0 z-50 bg-[#020408]/90 backdrop-blur-xl flex flex-col items-center justify-center gap-5 p-6">
+
+                        {/* Header */}
+                        <div className="text-center">
+                            <p className="text-slate-400 text-xs uppercase tracking-widest font-bold">Manual Punch</p>
+                            <h2 className="text-white font-black text-2xl mt-1">Employee ID se Punch</h2>
+                            <p className="text-slate-500 text-sm mt-1">Face scan nahi chal raha? Yahan ID enter karo.</p>
+                        </div>
+
+                        {/* Input step */}
+                        {(manualStep === 'input' || manualStep === 'error') && (
+                            <div className="w-full max-w-sm flex flex-col gap-3">
+                                <input
+                                    autoFocus
+                                    value={manualCode}
+                                    onChange={e => { setManualCode(e.target.value); setManualStep('input'); setManualMsg(''); }}
+                                    onKeyDown={e => e.key === 'Enter' && manualCode.trim() && handleManualLookup()}
+                                    placeholder="Employee ID (e.g. EMP-001)"
+                                    className="w-full bg-slate-800 border-2 border-slate-700 focus:border-violet-500 rounded-2xl px-5 py-4 text-white text-xl text-center outline-none transition-colors font-mono tracking-widest"
+                                />
+                                {manualStep === 'error' && manualMsg && (
+                                    <p className="text-red-400 text-sm text-center font-medium">{manualMsg}</p>
+                                )}
+                                <button
+                                    onClick={handleManualLookup}
+                                    disabled={!manualCode.trim()}
+                                    className="w-full py-4 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-lg transition-colors"
+                                >
+                                    Continue →
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Confirm step */}
+                        {manualStep === 'confirm' && manualEmp && (
+                            <div className="w-full max-w-sm flex flex-col gap-4">
+                                {/* Employee card */}
+                                <div className={`flex flex-col items-center gap-4 p-6 rounded-3xl border ${
+                                    manualPunchType === 'IN'  ? 'border-emerald-500/30 bg-emerald-950/60' :
+                                    manualPunchType === 'OUT' ? 'border-blue-500/30 bg-blue-950/60' :
+                                    'border-slate-600/30 bg-slate-900/60'
+                                }`}>
+                                    <img
+                                        src={manualEmp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(manualEmp.name)}&background=random&size=128`}
+                                        className="w-20 h-20 rounded-full border-4 border-white/20 object-cover"
+                                    />
+                                    <div className="text-center">
+                                        <h3 className="text-white font-black text-2xl">{manualEmp.name}</h3>
+                                        <p className="text-slate-400 text-sm">{manualEmp.code} · {(manualEmp as any).shift || 'GENERAL'}</p>
+                                    </div>
+                                    <div className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-base border ${
+                                        manualPunchType === 'IN'  ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' :
+                                        manualPunchType === 'OUT' ? 'bg-blue-500/20 border-blue-500/50 text-blue-300' :
+                                        'bg-slate-700/50 border-slate-600 text-slate-300'
+                                    }`}>
+                                        {manualPunchType === 'IN'  && <><LogIn className="w-4 h-4" /> PUNCH IN</>}
+                                        {manualPunchType === 'OUT' && <><LogOut className="w-4 h-4" /> PUNCH OUT</>}
+                                        {manualPunchType === 'DONE' && <><CheckCircle className="w-4 h-4" /> Shift Complete</>}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleManualPunch}
+                                    disabled={manualLoading}
+                                    className={`w-full py-4 rounded-2xl font-extrabold text-lg transition-colors flex items-center justify-center gap-2 ${
+                                        manualPunchType === 'IN'  ? 'bg-emerald-500 hover:bg-emerald-400 text-white' :
+                                        manualPunchType === 'OUT' ? 'bg-blue-500 hover:bg-blue-400 text-white' :
+                                        'bg-slate-700 hover:bg-slate-600 text-white'
+                                    } disabled:opacity-50`}
+                                >
+                                    {manualLoading
+                                        ? <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
+                                        : manualPunchType === 'IN'  ? <><LogIn className="w-5 h-5" /> Confirm Punch In</>
+                                        : manualPunchType === 'OUT' ? <><LogOut className="w-5 h-5" /> Confirm Punch Out</>
+                                        : <><CheckCircle className="w-5 h-5" /> OK</>
+                                    }
+                                </button>
+                                <button onClick={() => setManualStep('input')} className="text-slate-500 hover:text-slate-300 text-sm text-center transition-colors">
+                                    ← Wapas / Change ID
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Success step */}
+                        {manualStep === 'success' && (
+                            <div className="flex flex-col items-center gap-4 text-center">
+                                <div className="w-24 h-24 rounded-full bg-emerald-500/15 border-2 border-emerald-500/40 flex items-center justify-center">
+                                    <CheckCircle className="w-12 h-12 text-emerald-400" />
+                                </div>
+                                <p className="text-white font-bold text-xl whitespace-pre-line">{manualMsg}</p>
+                                <p className="text-slate-500 text-sm">Auto close in 3 seconds…</p>
+                            </div>
+                        )}
+
+                        {/* Close button */}
+                        {manualStep !== 'success' && (
+                            <button onClick={closeManualPanel} className="text-slate-600 hover:text-slate-400 text-sm underline transition-colors mt-2">
+                                ✕ Cancel — Wapas face scan pe jao
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 {/* ══ ENROLL MODE ════════════════════════════════════════════ */}
                 {mode === 'enroll' && (
                     <div className="flex-1 flex flex-col md:flex-row overflow-hidden w-full h-full min-h-0">
@@ -881,7 +1257,7 @@ export const FaceKioskPage = () => {
                                             el.play().catch(() => { });
                                         }
                                     }}
-                                    autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
+                                    autoPlay playsInline muted className={`w-full h-full object-cover ${isFrontCamera ? 'scale-x-[-1]' : ''}`} />
                                 {enrollingId ? (
                                     <div className="absolute inset-x-0 bottom-0 bg-black/70 py-3 px-4">
                                         <div className="flex items-center justify-between text-xs mb-1.5">
@@ -918,6 +1294,37 @@ export const FaceKioskPage = () => {
                                     className="w-full max-w-[260px] sm:max-w-sm mx-auto md:max-w-none py-2.5 bg-red-950/40 border border-red-900/50 rounded-xl text-red-400 text-sm font-bold hover:bg-red-900/60 transition-all shrink-0 mt-1 shadow-sm">
                                     Cancel Scanning
                                 </button>
+                            )}
+
+                            {/* Match threshold setting — admin only */}
+                            {isAdmin && (
+                                <div className="w-full max-w-[260px] sm:max-w-sm mx-auto md:max-w-none bg-slate-900/60 border border-slate-700/40 rounded-xl p-3 shrink-0">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <p className="text-slate-400 text-[11px] font-bold">Match Sensitivity</p>
+                                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg ${
+                                            matchThreshold <= 0.35 ? 'bg-emerald-950 text-emerald-400' :
+                                            matchThreshold <= 0.45 ? 'bg-blue-950 text-blue-400' :
+                                            'bg-amber-950 text-amber-400'
+                                        }`}>
+                                            {matchThreshold <= 0.35 ? 'Strict' : matchThreshold <= 0.45 ? 'Balanced' : 'Lenient'} — {matchThreshold.toFixed(2)}
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="0.30" max="0.60" step="0.05"
+                                        value={matchThreshold}
+                                        onChange={e => updateMatchThreshold(parseFloat(e.target.value))}
+                                        className="w-full h-1.5 rounded-full accent-violet-500 cursor-pointer"
+                                    />
+                                    <div className="flex justify-between text-slate-700 text-[9px] mt-1">
+                                        <span>Strict (0.30)</span>
+                                        <span>Default (0.45)</span>
+                                        <span>Lenient (0.60)</span>
+                                    </div>
+                                    <p className="text-slate-600 text-[10px] mt-1.5 leading-relaxed">
+                                        Strict = kam false match, zyada miss. Lenient = zyada match, galti ka risk.
+                                    </p>
+                                </div>
                             )}
                         </div>
 
@@ -956,23 +1363,56 @@ export const FaceKioskPage = () => {
                                         {filteredEnrollEmployees.map(emp => {
                                             const isEnrolled = biometricStore.isFaceRegistered(emp.id);
                                             const isActive = enrollingId === emp.id;
+                                            const isConfirmDelete = deleteConfirmId === emp.id;
+                                            const isDeleting = deletingId === emp.id;
                                             const registeredAt = biometricStore.getRegisteredAt(emp.id);
+                                            const disabled = !!enrollingId && !isActive;
                                             return (
-                                                <button key={emp.id}
-                                                    onClick={() => { if (!enrollingId) startEnroll(emp.id); }}
-                                                    disabled={!!enrollingId && enrollingId !== emp.id}
-                                                    className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-200 ${isActive ? 'border-violet-500/60 bg-violet-500/15 ring-2 ring-violet-500/30'
-                                                        : isEnrolled ? 'border-emerald-500/30 bg-emerald-500/8 hover:border-emerald-400/50'
-                                                            : 'border-slate-700/40 bg-slate-900/40 hover:border-slate-600 hover:bg-slate-800/60'
-                                                        } disabled:opacity-40 disabled:cursor-not-allowed`}>
-                                                    <div className="relative shrink-0">
+                                                <div key={emp.id} className={`relative flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 ${
+                                                    isActive        ? 'border-violet-500/60 bg-violet-500/15 ring-2 ring-violet-500/30' :
+                                                    isConfirmDelete ? 'border-red-500/50 bg-red-950/40' :
+                                                    isEnrolled      ? 'border-emerald-500/30 bg-emerald-500/10' :
+                                                    'border-slate-700/40 bg-slate-900/40'
+                                                } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+
+                                                    {/* Confirm-delete overlay */}
+                                                    {isConfirmDelete && (
+                                                        <div className="absolute inset-0 rounded-xl flex items-center justify-center gap-2 bg-red-950/90 z-10 px-3">
+                                                            <span className="text-red-300 text-xs font-bold flex-1">{emp.name} ka enrollment delete karein?</span>
+                                                            <button
+                                                                onClick={() => handleDeleteEnrollment(emp.id)}
+                                                                disabled={isDeleting}
+                                                                className="flex items-center gap-1 px-2.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-[11px] font-bold transition-colors disabled:opacity-50"
+                                                            >
+                                                                {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                                                                Haan, Delete
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setDeleteConfirmId(null)}
+                                                                className="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-[11px] font-bold transition-colors"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Avatar */}
+                                                    <div
+                                                        className="relative shrink-0 cursor-pointer"
+                                                        onClick={() => { if (!disabled && !isConfirmDelete) startEnroll(emp.id); }}
+                                                    >
                                                         <img src={emp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=random&size=64`}
                                                             className="w-12 h-12 rounded-full object-cover border-2 border-slate-700" />
                                                         <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-[#060a0f] flex items-center justify-center ${isEnrolled ? 'bg-emerald-500' : 'bg-slate-600'}`}>
                                                             {isEnrolled ? <CheckCircle className="w-2.5 h-2.5 text-white" /> : <UserX className="w-2.5 h-2.5 text-slate-300" />}
                                                         </div>
                                                     </div>
-                                                    <div className="flex-1 min-w-0">
+
+                                                    {/* Info — click to enroll */}
+                                                    <div
+                                                        className="flex-1 min-w-0 cursor-pointer"
+                                                        onClick={() => { if (!disabled && !isConfirmDelete) startEnroll(emp.id); }}
+                                                    >
                                                         <p className="text-white font-semibold text-sm truncate">{emp.name}</p>
                                                         <p className="text-slate-500 text-[11px] truncate">{emp.code}</p>
                                                         {isEnrolled && registeredAt && (
@@ -981,12 +1421,26 @@ export const FaceKioskPage = () => {
                                                         {!isEnrolled && <p className="text-slate-600 text-[10px] mt-0.5">Not enrolled</p>}
                                                         {isActive && <p className="text-violet-400 text-[10px] mt-0.5 animate-pulse">Scanning...</p>}
                                                     </div>
-                                                    {isEnrolled && !isActive && (
-                                                        <div className="shrink-0 flex items-center gap-1 text-[10px] text-slate-500 bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-0.5">
-                                                            <RefreshCw className="w-2.5 h-2.5" /> Re-enroll
+
+                                                    {/* Right actions */}
+                                                    {!isActive && (
+                                                        <div className="shrink-0 flex flex-col items-end gap-1">
+                                                            {isEnrolled && (
+                                                                <>
+                                                                    <div className="flex items-center gap-1 text-[10px] text-slate-500 bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-0.5">
+                                                                        <RefreshCw className="w-2.5 h-2.5" /> Re-enroll
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={e => { e.stopPropagation(); setDeleteConfirmId(emp.id); }}
+                                                                        className="flex items-center gap-1 text-[10px] text-red-500/70 hover:text-red-400 bg-red-950/30 hover:bg-red-950/60 border border-red-900/30 hover:border-red-700/50 rounded-lg px-1.5 py-0.5 transition-colors"
+                                                                    >
+                                                                        <Trash2 className="w-2.5 h-2.5" /> Delete
+                                                                    </button>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     )}
-                                                </button>
+                                                </div>
                                             );
                                         })}
                                     </div>
@@ -997,10 +1451,27 @@ export const FaceKioskPage = () => {
                 )}
             </div>
 
+            {/* Enrollment success toast */}
+            {enrollToast && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[110] pointer-events-none">
+                    <div className="flex items-center gap-3 px-5 py-3 bg-emerald-600 border border-emerald-400/40 rounded-2xl shadow-2xl shadow-emerald-900/60 animate-fade-in-up">
+                        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                            <CheckCircle className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                            <p className="text-white font-bold text-sm leading-tight">{enrollToast}</p>
+                            <p className="text-emerald-200 text-[11px]">Face successfully enrolled ✓</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Scan line animation */}
             <style>{`
                 @keyframes scan-line { 0%{top:10%} 50%{top:90%} 100%{top:10%} }
                 .animate-scan-line { position:absolute; animation:scan-line 2s ease-in-out infinite; left:0; right:0; }
+                @keyframes fade-in-up { from { opacity:0; transform:translateX(-50%) translateY(12px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+                .animate-fade-in-up { animation:fade-in-up 0.25s ease-out; }
             `}</style>
         </div>
     );

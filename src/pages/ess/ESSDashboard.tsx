@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { API_URL } from '@/lib/apiConfig';
-import { authHeader } from '@/lib/authHeader';
+import { apiFetch } from '@/lib/apiClient';
 import { useAuthStore } from '@/store/authStore';
 import {
     User, Banknote, CalendarCheck, CreditCard,
@@ -31,44 +30,58 @@ export const ESSDashboard = () => {
     const [showLeaveForm, setShowLeaveForm] = useState(false);
     const [leaveForm, setLeaveForm] = useState({ type: 'CASUAL', startDate: '', endDate: '', reason: '' });
     const [submitting, setSubmitting] = useState(false);
+    const [loadError, setLoadError] = useState(false);
     const [toast, setToast] = useState<string | null>(null);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
     useEffect(() => {
         const load = async () => {
-            const h = authHeader();
-            const [profileRes, payslipsRes, leavesRes, loansRes, attRes] = await Promise.allSettled([
-                fetch(`${API_URL}/ess/me`, { headers: h }),
-                fetch(`${API_URL}/ess/payslips`, { headers: h }),
-                fetch(`${API_URL}/ess/leaves`, { headers: h }),
-                fetch(`${API_URL}/ess/loans`, { headers: h }),
-                fetch(`${API_URL}/ess/attendance`, { headers: h }),
-            ]);
-            const profile = profileRes.status === 'fulfilled' && profileRes.value.ok ? await profileRes.value.json() : null;
-            const payslips = payslipsRes.status === 'fulfilled' && payslipsRes.value.ok ? await payslipsRes.value.json() : [];
-            const leaves = leavesRes.status === 'fulfilled' && leavesRes.value.ok ? await leavesRes.value.json() : [];
-            const loans = loansRes.status === 'fulfilled' && loansRes.value.ok ? await loansRes.value.json() : [];
-            const attendance = attRes.status === 'fulfilled' && attRes.value.ok ? await attRes.value.json() : [];
-            setData({ profile, latestSlip: payslips[0] || null, leaves, loans, attendance });
-            setLoading(false);
+            try {
+                const [profileRes, payslipsRes, leavesRes, loansRes, attRes] = await Promise.allSettled([
+                    apiFetch('/ess/me'),
+                    apiFetch('/ess/payslips'),
+                    apiFetch('/ess/leaves'),
+                    apiFetch('/ess/loans'),
+                    apiFetch('/ess/attendance'),
+                ]);
+                const profile = profileRes.status === 'fulfilled' && profileRes.value.ok ? await profileRes.value.json() : null;
+                const payslips = payslipsRes.status === 'fulfilled' && payslipsRes.value.ok ? await payslipsRes.value.json() : [];
+                const leaves = leavesRes.status === 'fulfilled' && leavesRes.value.ok ? await leavesRes.value.json() : [];
+                const loans = loansRes.status === 'fulfilled' && loansRes.value.ok ? await loansRes.value.json() : [];
+                const attendance = attRes.status === 'fulfilled' && attRes.value.ok ? await attRes.value.json() : [];
+
+                if (!profile && payslips.length === 0 && leaves.length === 0) {
+                    setLoadError(true);
+                } else {
+                    setData({ profile, latestSlip: payslips[0] || null, leaves, loans, attendance });
+                }
+            } catch {
+                setLoadError(true);
+            } finally {
+                setLoading(false);
+            }
         };
         load();
     }, []);
 
     const handleApplyLeave = async () => {
         if (!leaveForm.startDate || !leaveForm.endDate) { showToast('Start and end date required'); return; }
+        if (leaveForm.endDate < leaveForm.startDate) { showToast('End date cannot be before start date'); return; }
         setSubmitting(true);
         try {
-            const res = await fetch(`${API_URL}/ess/leaves`, {
+            const res = await apiFetch('/ess/leaves', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...authHeader() },
                 body: JSON.stringify(leaveForm),
             });
-            if (!res.ok) throw new Error('Failed to apply leave');
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Failed to apply leave');
+            }
             const newLeave = await res.json();
             setData(d => ({ ...d, leaves: [newLeave, ...d.leaves] }));
             setShowLeaveForm(false);
+            setLeaveForm({ type: 'CASUAL', startDate: '', endDate: '', reason: '' });
             showToast('Leave applied successfully');
         } catch (e: any) { showToast(e.message); }
         setSubmitting(false);
@@ -78,6 +91,18 @@ export const ESSDashboard = () => {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <Loader2 className="w-8 h-8 text-primary-400 animate-spin" />
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-6">
+                <div className="glass rounded-2xl p-8 text-center max-w-sm w-full border border-red-500/20">
+                    <AlertCircle className="w-10 h-10 text-danger mx-auto mb-3" />
+                    <p className="text-dark-text font-semibold mb-1">Unable to load your data</p>
+                    <p className="text-dark-muted text-sm">Server se connect nahi ho pa raha. Thodi der baad dobara try karein.</p>
+                </div>
             </div>
         );
     }
@@ -148,7 +173,10 @@ export const ESSDashboard = () => {
                         <CalendarCheck className="w-5 h-5 text-info" />
                         <span className="font-semibold text-dark-text">Leave Balance</span>
                     </div>
-                    <button onClick={() => setShowLeaveForm(!showLeaveForm)}
+                    <button onClick={() => {
+                        if (showLeaveForm) setLeaveForm({ type: 'CASUAL', startDate: '', endDate: '', reason: '' });
+                        setShowLeaveForm(!showLeaveForm);
+                    }}
                         className="flex items-center gap-1 px-3 py-1.5 bg-primary-600/20 text-primary-400 hover:bg-primary-600/30 rounded-lg text-xs font-medium transition-colors">
                         <Plus className="w-3.5 h-3.5" /> Apply
                     </button>

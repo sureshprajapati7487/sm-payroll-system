@@ -40,7 +40,8 @@ function init(models) {
 router.get('/export', async (req, res) => {
     try {
         const where = {};
-        if (req.query.companyId) where.companyId = req.query.companyId;
+        const companyId = req.companyId || req.query.companyId;
+        if (companyId) where.companyId = companyId;
         if (req.query.assignedTo) where.assignedTo = req.query.assignedTo;
         if (req.query.status && req.query.status !== 'ALL') where.status = req.query.status;
         const clients = await Client.findAll({ where, order: [['name', 'ASC']] });
@@ -74,7 +75,8 @@ router.get('/demo-export', (req, res) => {
 router.get('/', async (req, res) => {
     try {
         const where = {};
-        if (req.query.companyId) where.companyId = req.query.companyId;
+        const companyId = req.companyId || req.query.companyId;
+        if (companyId) where.companyId = companyId;
         if (req.query.assignedTo) where.assignedTo = req.query.assignedTo;
         if (req.query.status) where.status = req.query.status;
         res.json(await Client.findAll({ where, order: [['name', 'ASC']] }));
@@ -84,12 +86,16 @@ router.get('/', async (req, res) => {
 // POST /api/clients
 router.post('/', async (req, res) => {
     try {
-        const data = req.body;
+        const data = { ...req.body };
+        // JWT companyId takes priority over client-supplied value
+        if (req.companyId) data.companyId = req.companyId;
         if (!data.code) {
             const count = await Client.count({ where: { companyId: data.companyId } });
             data.code = `C-${String(count + 1).padStart(4, '0')}`;
         }
-        const client = await Client.create({ id: data.id || uuidv4(), ...data });
+        // Always generate ID server-side
+        data.id = uuidv4();
+        const client = await Client.create(data);
         res.status(201).json(client);
     } catch (e) { addError(e, 'POST /api/clients'); res.status(500).json({ error: e.message }); }
 });
@@ -100,8 +106,10 @@ const BULK_CLIENT_ALLOWED_FIELDS = ['id', 'companyId', 'code', 'name', 'shopName
 
 router.post('/bulk', async (req, res) => {
     try {
-        const { clients, companyId } = req.body;
-        if (!Array.isArray(clients) || !companyId) return res.status(400).json({ error: 'clients[] and companyId required' });
+        const { clients } = req.body;
+        // JWT companyId takes priority — prevents cross-tenant bulk import
+        const companyId = req.companyId || req.body.companyId;
+        if (!Array.isArray(clients) || !companyId) return res.status(400).json({ error: 'clients[] required (companyId from session)' });
 
         const succeeded = [];
         const errors = [];
@@ -142,6 +150,9 @@ router.put('/:id', async (req, res) => {
     try {
         const client = await Client.findByPk(req.params.id);
         if (!client) return res.status(404).json({ error: 'Client not found' });
+        if (req.companyId && client.companyId && client.companyId !== req.companyId) {
+            return res.status(403).json({ error: 'Forbidden — cross-company access denied' });
+        }
         await client.update(req.body);
         res.json(client);
     } catch (e) { addError(e, 'PUT /api/clients/:id'); res.status(500).json({ error: e.message }); }
@@ -164,6 +175,9 @@ router.delete('/:id', async (req, res) => {
     try {
         const client = await Client.findByPk(req.params.id);
         if (!client) return res.status(404).json({ error: 'Client not found' });
+        if (req.companyId && client.companyId && client.companyId !== req.companyId) {
+            return res.status(403).json({ error: 'Forbidden — cross-company access denied' });
+        }
         await client.destroy();
         res.json({ success: true });
     } catch (e) { addError(e, 'DELETE /api/clients/:id'); res.status(500).json({ error: e.message }); }
@@ -188,8 +202,10 @@ visitsRouter.get('/', async (req, res) => {
 // POST /api/visits/checkin
 visitsRouter.post('/checkin', async (req, res) => {
     try {
-        const { companyId, clientId, salesmanId, salesmanName, checkInLat, checkInLng, purpose, notes } = req.body;
-        if (!companyId || !clientId || !salesmanId) return res.status(400).json({ error: 'companyId, clientId, salesmanId required' });
+        const { clientId, salesmanId, salesmanName, checkInLat, checkInLng, purpose, notes } = req.body;
+        // companyId from JWT (tamper-proof) — body value ignored
+        const companyId = req.companyId || req.body.companyId;
+        if (!companyId || !clientId || !salesmanId) return res.status(400).json({ error: 'clientId and salesmanId required' });
         const open = await ClientVisit.findOne({ where: { salesmanId, checkOutAt: null } });
         if (open) return res.status(400).json({ error: 'Already checked in at another client. Please check-out first.', openVisit: open });
         const client = await Client.findByPk(clientId);

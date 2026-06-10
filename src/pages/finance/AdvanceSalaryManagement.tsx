@@ -50,8 +50,12 @@ export const AdvanceSalaryManagement = () => {
     };
 
     const handleApprove = async (id: string) => {
-        await approveRequest(id, user?.name || 'Admin');
-        showToast(true, 'Request approved — will deduct from next payroll');
+        try {
+            await approveRequest(id, user?.name || 'Admin');
+            showToast(true, 'Request approved — will deduct from next payroll');
+        } catch (e: any) {
+            showToast(false, e.message || 'Approval failed');
+        }
     };
     const handleReject = async (id: string) => {
         await rejectRequest(id);

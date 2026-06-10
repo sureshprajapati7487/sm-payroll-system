@@ -110,11 +110,28 @@ export const AdminPunchModal = ({
     const handleSubmit = async () => {
         if (!reason.trim()) { setErrorMsg('Reason likhna zaroori hai.'); return; }
 
+        const punchDateTime = new Date(`${punchDate}T${punchTime}:00`).toISOString();
+
+        // Validate time order: punch out must be after punch in
+        if (mode === 'adjust' && adjustRecord) {
+            if (adjustField === 'checkOut' && adjustRecord.checkIn) {
+                if (new Date(punchDateTime) <= new Date(adjustRecord.checkIn)) {
+                    setErrorMsg(`Punch Out time, Punch In (${toTimeInput(adjustRecord.checkIn)}) se baad hona chahiye.`);
+                    return;
+                }
+            }
+            if (adjustField === 'checkIn' && adjustRecord.checkOut) {
+                if (new Date(punchDateTime) >= new Date(adjustRecord.checkOut)) {
+                    setErrorMsg(`Punch In time, Punch Out (${toTimeInput(adjustRecord.checkOut)}) se pehle hona chahiye.`);
+                    return;
+                }
+            }
+        }
+
         setStatus('loading');
         setErrorMsg('');
 
         try {
-            const punchDateTime = new Date(`${punchDate}T${punchTime}:00`).toISOString();
             const adminName = user?.name || 'Admin';
 
             if (mode === 'adjust' && adjustRecord) {

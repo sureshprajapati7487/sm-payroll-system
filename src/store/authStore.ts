@@ -266,7 +266,12 @@ export const useAuthStore = create<AuthState>()(
                 // isHydrated intentionally NOT persisted
             }),
             onRehydrateStorage: () => (state) => {
-                if (!state) return;
+                if (!state) {
+                    // No persisted state (first visit or after logout cleared localStorage)
+                    // Must still mark hydration done or AuthGuard will return null forever
+                    useAuthStore.setState({ isHydrated: true });
+                    return;
+                }
 
                 const token = state.token;
 

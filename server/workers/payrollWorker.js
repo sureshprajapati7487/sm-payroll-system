@@ -52,6 +52,7 @@ async function runPayroll() {
             enableOTMultipliers: true, otNormalMultiplier: 1.5,
             enableEMICap: true, emiCapPercentage: 50,
             enableAttendanceBonus: false, attendanceBonusAmount: 1000,
+            standardWorkHours: 9,
         };
         let savedConfig = {};
         if (payrollConfigSetting?.value) {
@@ -151,15 +152,15 @@ async function runPayroll() {
                     basicEarnings = pdr.times(new Decimal(basePaidDays).plus(otBonusDays)).round();
                     let effOT = new Decimal(overtimeHours);
                     if (config.enableOTCap && effOT.greaterThan(config.otCapHoursPerMonth)) effOT = new Decimal(config.otCapHoursPerMonth);
-                    const hrRate = basicSalaryD.dividedBy(30).dividedBy(9);
+                    const hrRate = basicSalaryD.dividedBy(30).dividedBy(config.standardWorkHours);
                     overtimeEarnings = hrRate.times(effOT).times(config.otNormalMultiplier).round();
                 } else if (emp.salaryType === 'DAILY') {
                     const rt = new Decimal(emp.paymentRate || 0);
                     basicEarnings = rt.times(new Decimal(basePaidDays).plus(otBonusDays)).round();
-                    overtimeEarnings = rt.dividedBy(9).times(overtimeHours).round();
+                    overtimeEarnings = rt.dividedBy(config.standardWorkHours).times(overtimeHours).round();
                 } else if (emp.salaryType === 'HOURLY') {
                     const rt = new Decimal(emp.paymentRate || 0);
-                    basicEarnings = rt.times(new Decimal(basePaidDays).plus(otBonusDays)).times(9).round();
+                    basicEarnings = rt.times(new Decimal(basePaidDays).plus(otBonusDays)).times(config.standardWorkHours).round();
                     overtimeEarnings = rt.times(overtimeHours).round();
                 }
 

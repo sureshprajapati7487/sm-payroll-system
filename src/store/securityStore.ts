@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { apiFetch } from '@/lib/apiClient';
 
 interface KioskDevice {
     id: string; // generated UUID stored in browser localStorage
@@ -49,17 +50,15 @@ export const useSecurityStore = create<SecurityState>()(
 
             fetchCurrentIp: async () => {
                 try {
-                    // Quick check via ipify
-                    const res = await fetch('https://api.ipify.org?format=json');
+                    // Use server-side IP echo — avoids sending user IP to third-party services
+                    const res = await apiFetch('/health/ip', { skipAuth: true });
                     if (res.ok) {
                         const data = await res.json();
                         set({ currentIp: data.ip });
+                        return;
                     }
-                } catch (error) {
-                    console.error('Failed to fetch public IP:', error);
-                    // Fallback to local if fetch fails (e.g. offline)
-                    set({ currentIp: '127.0.0.1' });
-                }
+                } catch { /* fall through to local fallback */ }
+                set({ currentIp: '127.0.0.1' });
             }
         }),
         {

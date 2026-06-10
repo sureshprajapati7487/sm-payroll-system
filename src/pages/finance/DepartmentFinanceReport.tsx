@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { TrendingUp, DollarSign, FileText, Download } from 'lucide-react';
+import { usePayrollStore } from '@/store/payrollStore';
+import { useEmployeeStore } from '@/store/employeeStore';
 
 interface DepartmentSalaryData {
     department: string;
@@ -9,16 +11,32 @@ interface DepartmentSalaryData {
 }
 
 export const DepartmentFinanceReport = () => {
-    const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+    const now = new Date();
+    const [selectedMonth, setSelectedMonth] = useState(
+        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    );
+    const { slips, fetchPayroll } = usePayrollStore();
+    const { employees } = useEmployeeStore();
 
-    // Mock data - in production, fetch from backend
-    const departmentData: DepartmentSalaryData[] = [
-        { department: 'Production', totalSalary: 450000, employeeCount: 15, avgSalary: 30000 },
-        { department: 'Admin', totalSalary: 280000, employeeCount: 8, avgSalary: 35000 },
-        { department: 'Sales', totalSalary: 320000, employeeCount: 10, avgSalary: 32000 },
-        { department: 'Quality', totalSalary: 180000, employeeCount: 6, avgSalary: 30000 },
-        { department: 'Maintenance', totalSalary: 120000, employeeCount: 4, avgSalary: 30000 }
-    ];
+    useEffect(() => { fetchPayroll(selectedMonth); }, [selectedMonth]);
+
+    const departmentData: DepartmentSalaryData[] = useMemo(() => {
+        const monthSlips = slips.filter(s => s.month === selectedMonth && (s.status === 'LOCKED' || s.status === 'PAID'));
+        const map = new Map<string, { total: number; count: number }>();
+        monthSlips.forEach(slip => {
+            const dept = employees.find(e => e.id === slip.employeeId)?.department || 'Unassigned';
+            const cur = map.get(dept) || { total: 0, count: 0 };
+            map.set(dept, { total: cur.total + slip.netSalary, count: cur.count + 1 });
+        });
+        return Array.from(map.entries())
+            .map(([department, { total, count }]) => ({
+                department,
+                totalSalary: total,
+                employeeCount: count,
+                avgSalary: count > 0 ? Math.round(total / count) : 0,
+            }))
+            .sort((a, b) => b.totalSalary - a.totalSalary);
+    }, [slips, employees, selectedMonth]);
 
     const totalSalary = departmentData.reduce((sum, d) => sum + d.totalSalary, 0);
 

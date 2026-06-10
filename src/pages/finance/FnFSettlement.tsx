@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useEmployeeStore } from '@/store/employeeStore';
-import { API_URL } from '@/lib/apiConfig';
-import { authHeader } from '@/lib/authHeader';
+import { apiFetch } from '@/lib/apiClient';
 import { Calculator, CheckCircle, Save, ChevronRight } from 'lucide-react';
 
 interface FnFResult {
@@ -22,7 +21,7 @@ export const FnFSettlement = () => {
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [form, setForm] = useState({
         employeeId: '',
-        separationDate: new Date().toISOString().split('T')[0],
+        separationDate: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })(),
         reason: 'RESIGNATION',
         noticePeriodDays: 0,
         pendingLeaveDays: 0,
@@ -42,9 +41,8 @@ export const FnFSettlement = () => {
         if (!form.employeeId || !form.separationDate) { showToast(false, 'Employee and separation date required'); return; }
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/fnf/calculate`, {
+            const res = await apiFetch('/fnf/calculate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...authHeader() },
                 body: JSON.stringify(form),
             });
             const data = await res.json();
@@ -58,9 +56,8 @@ export const FnFSettlement = () => {
     const handleSaveDraft = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/fnf`, {
+            const res = await apiFetch('/fnf', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...authHeader() },
                 body: JSON.stringify(form),
             });
             const data = await res.json();
@@ -76,10 +73,7 @@ export const FnFSettlement = () => {
         if (!savedId) return;
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/fnf/${savedId}/approve`, {
-                method: 'PATCH',
-                headers: authHeader(),
-            });
+            const res = await apiFetch(`/fnf/${savedId}/approve`, { method: 'PATCH' });
             if (!res.ok) throw new Error('Approval failed');
             showToast(true, 'Settlement approved!');
         } catch (e: any) { showToast(false, e.message); }
@@ -219,7 +213,7 @@ export const FnFSettlement = () => {
                         <CheckCircle className="w-4 h-4" />
                         {loading ? 'Approving...' : 'Approve Settlement'}
                     </button>
-                    <button onClick={() => { setStep(1); setForm({ employeeId: '', separationDate: new Date().toISOString().split('T')[0], reason: 'RESIGNATION', noticePeriodDays: 0, pendingLeaveDays: 0, otherDeductions: 0 }); setResult(null); setSavedId(null); }}
+                    <button onClick={() => { setStep(1); setForm({ employeeId: '', separationDate: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })(), reason: 'RESIGNATION', noticePeriodDays: 0, pendingLeaveDays: 0, otherDeductions: 0 }); setResult(null); setSavedId(null); }}
                         className="w-full py-2 text-dark-muted text-sm hover:text-dark-text transition-colors">
                         New Settlement
                     </button>

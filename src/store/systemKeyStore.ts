@@ -42,7 +42,7 @@ export const useInternalSystemKeyStore = create<SystemKeyStore>((set, get) => ({
     },
 
     addKey: async (data) => {
-        const tempId = Math.random().toString(36).substr(2, 9);
+        const tempId = crypto.randomUUID();
         const tempKey: SystemKey = { ...data, id: tempId };
 
         // Optimistic update

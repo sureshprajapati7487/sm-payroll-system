@@ -91,12 +91,8 @@ export const useMultiCompanyStore = create<MultiCompanyState>()(
 
                     if (!res.ok) {
                         const err = await res.json().catch(() => ({}));
-                        console.error('Failed to add company:', err);
-                        // Fallback: store locally if server fails
-                        set(state => ({
-                            companies: [...(Array.isArray(state.companies) ? state.companies : []), newCompany]
-                        }));
-                        return newCompany as Company;
+                        console.error('Failed to add company:', err.error || err);
+                        return null;
                     }
 
                     const savedCompany = await res.json();

@@ -16,7 +16,7 @@ function LogoutPasswordCard() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        apiFetch('/api/auth/logout-password')
+        apiFetch('/auth/logout-password')
             .then(r => r.json())
             .then(d => { if (d.masked) setCurrentMasked(d.masked); })
             .catch(() => { });
@@ -30,7 +30,7 @@ function LogoutPasswordCard() {
 
         setStatus('saving');
         try {
-            const res = await apiFetch('/api/auth/logout-password', {
+            const res = await apiFetch('/auth/logout-password', {
                 method: 'PUT',
                 body: JSON.stringify({ newPassword: newPassword.trim() }),
             });

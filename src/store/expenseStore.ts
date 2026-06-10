@@ -96,11 +96,11 @@ export const useInternalExpenseStore = create<ExpenseState>((set, get) => ({
 
         const newExpense: Expense = {
             ...expense,
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             companyId: companyId || undefined,
             status: 'PENDING',
             auditTrail: [{
-                id: Math.random().toString(36).substr(2, 9),
+                id: crypto.randomUUID(),
                 date: new Date().toISOString(),
                 action: 'CREATED',
                 performedBy: currentUser?.name || expense.addedBy || 'System',
@@ -141,7 +141,7 @@ export const useInternalExpenseStore = create<ExpenseState>((set, get) => ({
         const currentUser = useAuthStore.getState().user;
 
         const newLog: AuditLog = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             date: new Date().toISOString(),
             action: status,
             performedBy: currentUser?.name || 'Admin',
@@ -162,9 +162,9 @@ export const useInternalExpenseStore = create<ExpenseState>((set, get) => ({
             const updatedAuditTrail = [...(expense?.auditTrail || [])];
 
             await apiFetch(`/expenses/${id}`, {
-                method: 'PUT',
+                method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status, auditTrail: updatedAuditTrail }),
+                body: JSON.stringify({ status, performedBy: useAuthStore.getState().user?.name, auditTrail: updatedAuditTrail }),
             });
         } catch (e) {
             console.error('[ExpenseStore] updateStatus failed:', e);

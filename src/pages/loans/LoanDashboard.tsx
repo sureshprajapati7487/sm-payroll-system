@@ -55,7 +55,7 @@ export const LoanDashboard = () => {
         tenure: '', // Months
         emi: '', // Manual EMI
         reason: '',
-        issuedDate: new Date().toISOString().split('T')[0], // Default Today
+        issuedDate: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })(), // Default Today
         approverId: '', // For WhatsApp Flow
         checkingApproverId: '', // New
     });
@@ -97,7 +97,6 @@ export const LoanDashboard = () => {
         if (deleteStage < 3) {
             setDeleteStage(prev => (prev + 1) as any);
         } else {
-            console.log("DELETING");
             if (viewLedgerId && deleteTxnId) {
                 useLoanStore.getState().deleteTransaction(viewLedgerId, deleteTxnId);
                 setDeleteTxnId(null);
@@ -215,7 +214,7 @@ export const LoanDashboard = () => {
             tenure: '',
             emi: '',
             reason: '',
-            issuedDate: new Date().toISOString().split('T')[0],
+            issuedDate: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })(),
             approverId: '',
             checkingApproverId: ''
         });
@@ -572,7 +571,9 @@ export const LoanDashboard = () => {
                             {visibleLoans.map(loan => {
                                 const emp = employees.find(e => e.id === loan.employeeId);
                                 const paid = loan.amount - loan.balance;
-                                const progress = (paid / loan.amount) * 100;
+                                const progress = loan.amount > 0
+                                    ? Math.min(100, Math.max(0, (paid / loan.amount) * 100))
+                                    : 0;
                                 const isEditing = editingLoanId === loan.id;
 
                                 return (

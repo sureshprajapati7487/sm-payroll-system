@@ -47,11 +47,16 @@ router.get('/leaves', async (req, res) => {
     } catch (e) { addError(e, 'GET /api/ess/leaves'); res.status(500).json(formatError(e)); }
 });
 
-// POST /api/ess/leaves — apply for leave
+// POST /api/ess/leaves — apply for leave (whitelisted fields only)
 router.post('/leaves', async (req, res) => {
     try {
+        const { type, startDate, endDate, reason, isHalfDay } = req.body;
+        if (!startDate || !endDate) return res.status(400).json({ error: 'startDate and endDate are required' });
+        if (endDate < startDate) return res.status(400).json({ error: 'End date cannot be before start date' });
         const data = {
-            ...req.body,
+            type: type || 'CASUAL',
+            startDate, endDate, reason,
+            isHalfDay: !!isHalfDay,
             employeeId: req.user.id,
             companyId: req.user.companyId,
             status: 'PENDING',
@@ -93,11 +98,17 @@ router.post('/loans', async (req, res) => {
             });
         }
 
+        // Whitelist only expected fields — prevent field injection
+        const { type, reason, tenureMonths, emiAmount } = req.body;
         const data = {
-            ...req.body,
             amount: Number(amount),
+            type: type || 'PERSONAL',
+            reason,
+            tenureMonths: tenureMonths ? Number(tenureMonths) : undefined,
+            emiAmount: emiAmount ? Number(emiAmount) : undefined,
             employeeId: req.user.id,
             companyId: req.user.companyId,
+            balance: Number(amount),
             status: 'REQUESTED',
         };
         const loan = await Loan.create(data);

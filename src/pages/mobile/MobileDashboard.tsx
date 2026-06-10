@@ -95,8 +95,8 @@ export const MobileDashboard = () => {
     const { entries } = useProductionStore();
     const { stats, fetchDashboardStats } = useAnalyticsStore();
 
-    const today = new Date().toISOString().split('T')[0];
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
+    const currentMonth = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })();
 
     // ── Offline detection ────────────────────────────────────────────────
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -145,7 +145,7 @@ export const MobileDashboard = () => {
 
     // ── My personal data (if employee) ─────────────────────────────────────
     const me = isEmployee
-        ? companyEmployees.find(e => e.email === user?.email || e.id === user?.id)
+        ? (companyEmployees.find(e => e.id === user?.id) || companyEmployees.find(e => e.email === user?.email))
         : null;
     const myRecord = me ? records.find(r => r.employeeId === me.id && r.date === today) : null;
     const myLoan = me ? loans.find(l => l.employeeId === me.id && l.status === 'ACTIVE') : null;
@@ -255,7 +255,7 @@ export const MobileDashboard = () => {
                     >
                         <Clock className="w-5 h-5 text-primary-400 mx-auto mb-1" />
                         <p className="text-white font-bold text-lg">
-                            {records.filter(r => r.employeeId === me.id && ['PRESENT', 'LATE', 'HALF_DAY'].includes(r.status)).length}
+                            {records.filter(r => r.employeeId === me.id && r.date?.startsWith(currentMonth) && ['PRESENT', 'LATE', 'HALF_DAY'].includes(r.status)).length}
                         </p>
                         <p className="text-dark-muted text-[10px]">Days Present</p>
                     </motion.div>

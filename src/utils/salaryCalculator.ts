@@ -379,7 +379,7 @@ export const calculateSalary = (
     const netSalary = Math.round(grossSalary - totalDeductions);
 
     return {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         employeeId: employee.id,
         month,
         totalDays: daysInMonth,

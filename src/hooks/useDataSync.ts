@@ -17,13 +17,13 @@ import { useAuthStore } from '@/store/authStore';
  * (e.g., fetchEmployees(), fetchAttendance()) from the relevant page.
  */
 export const useDataSync = (_intervalMs = 30000) => {
-    const { isAuthenticated } = useAuthStore();
+    const { isAuthenticated, isHydrated } = useAuthStore();
     const { fetchEmployees } = useEmployeeStore();
     const { fetchCompanies } = useMultiCompanyStore();
     const isSyncing = useRef(false);
 
     useEffect(() => {
-        if (!isAuthenticated) return;
+        if (!isHydrated || !isAuthenticated) return;
         if (isSyncing.current) return;
 
         // Load data ONCE after login — no recurring timer

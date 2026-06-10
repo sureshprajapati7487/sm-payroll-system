@@ -31,7 +31,7 @@ export const useRateStore = create<RateState>((set, get) => ({
     addItem: async (item) => {
         const newItem: ProductionItem = {
             ...item,
-            id: Math.random().toString(36).substr(2, 9)
+            id: crypto.randomUUID()
         };
         // Optimistic update
         set(state => ({ items: [...state.items, newItem] }));

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useDialog } from '@/components/DialogProvider';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { useInternalDepartmentStore, useDepartmentStore, DeptSalaryBasis } from '@/store/departmentStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
@@ -255,7 +256,7 @@ const WorkAllocationPanel = ({
                                                     <p className="text-xs text-slate-500">{count} employees assigned</p>
                                                 </div>
                                                 <button
-                                                    onClick={() => { if (window.confirm(`"${g.name}" group delete karna chahte ho? ${count > 0 ? `(${count} employees unassign ho jaenge)` : ''}`)) removeGroup(g.id); }}
+                                                    onClick={() => dlgConfirm({ title: `"${g.name}" delete karein?`, message: count > 0 ? `${count} employees unassign ho jaenge.` : 'Yeh group permanently delete ho jayega.', confirmLabel: 'Delete', cancelLabel: 'Cancel', variant: 'danger' }).then(ok => ok && removeGroup(g.id))}
                                                     className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded-lg transition-all">
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
@@ -281,7 +282,7 @@ const WorkAllocationPanel = ({
                                                     <p className="text-xs text-slate-500">{g.department} · {count} employees assigned</p>
                                                 </div>
                                                 <button
-                                                    onClick={() => { if (window.confirm(`"${g.name}" delete karein?`)) removeGroup(g.id); }}
+                                                    onClick={() => dlgConfirm({ title: `"${g.name}" delete karein?`, message: 'Is work group ko permanently delete karna chahte hain?', confirmLabel: 'Delete', cancelLabel: 'Cancel', variant: 'danger' }).then(ok => ok && removeGroup(g.id))}
                                                     className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded-lg transition-all">
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
@@ -651,6 +652,7 @@ const SalesmanConfigPanel = () => {
 };
 
 export const ConfigurationPage = () => {
+    const { confirm: dlgConfirm, toast: dlgToast } = useDialog();
 
     const [activeTab, setActiveTab] = useState<'departments' | 'workAllocation' | 'shifts' | 'rules' | 'salaryTypes' | 'attendance' | 'keys' | 'holidays' | 'punch' | 'salesman' | 'statutory' | 'roles' | 'customFields' | 'workflows'>('departments');
     const { departments, addDepartment, updateDepartment, deleteDepartment } = useDepartmentStore();
@@ -732,7 +734,7 @@ export const ConfigurationPage = () => {
     };
 
     const _addShiftPunchWindow = (win: any) => {
-        const newWin = { ...win, id: Math.random().toString(36).substr(2, 9) };
+        const newWin = { ...win, id: crypto.randomUUID() };
         updateSetting('SHIFT_PUNCH_WINDOWS', [...shiftPunchWindows, newWin]);
     };
 
@@ -1964,9 +1966,9 @@ export const ConfigurationPage = () => {
                                     };
 
                                     const saveLocation = () => {
-                                        if (!locDraft.lat || !locDraft.lng) return alert('Pehli GPS Location set kijiye');
+                                        if (!locDraft.lat || !locDraft.lng) { dlgToast('Pehli GPS Location set kijiye', 'warning'); return; }
                                         _updatePunchLocationMaster(locDraft);
-                                        alert('Master Location Save ho gayi');
+                                        dlgToast('Master Location Save ho gayi', 'success');
                                     };
                                     return (
                                         <div className="space-y-4">

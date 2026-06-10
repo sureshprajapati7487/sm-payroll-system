@@ -29,7 +29,7 @@ export const useCustomFieldStore = create<CustomFieldState>()(
             addField: (field) => {
                 const newField: CustomField = {
                     ...field,
-                    id: Math.random().toString(36).substr(2, 9),
+                    id: crypto.randomUUID(),
                 };
                 set((state) => ({ fields: [...state.fields, newField] }));
             },

@@ -168,7 +168,9 @@ export const AuditLogs = () => {
         const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `audit_logs_${new Date().toISOString().slice(0, 10)}.csv`;
+        const d = new Date();
+        const localDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        a.download = `audit_logs_${localDate}.csv`;
         a.click();
     };
 

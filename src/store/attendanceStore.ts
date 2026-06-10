@@ -9,6 +9,17 @@ import { useEmployeeStore } from './employeeStore';
 
 const OFFLINE_MAX_RETRIES = 3;
 
+// Compute standard working hours from shift start/end times
+function shiftWorkingHours(shift: { startTime: string; endTime: string } | null | undefined): number {
+    if (!shift?.startTime || !shift?.endTime) return 9;
+    const [sh, sm] = shift.startTime.split(':').map(Number);
+    const [eh, em] = shift.endTime.split(':').map(Number);
+    let startMins = sh * 60 + sm;
+    let endMins = eh * 60 + em;
+    if (endMins <= startMins) endMins += 24 * 60; // crosses midnight
+    return (endMins - startMins) / 60;
+}
+
 interface OfflineQueueItem {
     method: 'POST' | 'PUT' | 'DELETE';
     url: string;
@@ -186,7 +197,7 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
             const status = lateMinutes > 0 ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
 
             const newRecord: AttendanceRecord = {
-                id: Math.random().toString(36).substr(2, 9),
+                id: crypto.randomUUID(),
                 employeeId,
                 date: today,
                 checkIn: now.toISOString(),
@@ -221,7 +232,7 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
                 } else throw new Error('Server returned error');
             } catch (err) {
                 console.warn('Network error, saving check-in to offline queue', err);
-                const q = [...get().offlineQueue, { id: Math.random().toString(), method: 'POST' as const, url: '/attendance', body: newRecord, retryCount: 0 }];
+                const q = [...get().offlineQueue, { id: crypto.randomUUID(), method: 'POST' as const, url: '/attendance', body: newRecord, retryCount: 0 }];
                 set({ offlineQueue: q });
                 saveQueue(q);
             }
@@ -237,10 +248,11 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
             const todayRecord = get().records.find(r => r.employeeId === employeeId && r.date === today);
             if (!todayRecord) return; // No check-in found
 
-            // Calculate overtime
+            // Calculate overtime using shift's actual working hours
             const checkInTime = new Date(todayRecord.checkIn!);
             const durationHours = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
-            const standardHours = 9;
+            const shift = todayRecord.shiftId ? useInternalShiftStore.getState().getShift(todayRecord.shiftId) : null;
+            const standardHours = shiftWorkingHours(shift);
             const overtimeHours = parseFloat(
                 (durationHours > standardHours ? durationHours - standardHours : 0).toFixed(2)
             );
@@ -274,7 +286,7 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
                 if (!res.ok) throw new Error('Server error on checkout');
             } catch (err) {
                 console.warn('Network error, saving check-out to offline queue', err);
-                const q = [...get().offlineQueue, { id: Math.random().toString(), method: 'PUT' as const, url: `/attendance/${todayRecord.id}`, body: checkOutPayload, retryCount: 0 }];
+                const q = [...get().offlineQueue, { id: crypto.randomUUID(), method: 'PUT' as const, url: `/attendance/${todayRecord.id}`, body: checkOutPayload, retryCount: 0 }];
                 set({ offlineQueue: q });
                 saveQueue(q);
             }
@@ -319,7 +331,7 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
             } else {
                 // Create new record
                 recordToSave = {
-                    id: Math.random().toString(36).substr(2, 9),
+                    id: crypto.randomUUID(),
                     employeeId,
                     date: targetDate,
                     checkIn: status === AttendanceStatus.ABSENT ? undefined : checkInTime,
@@ -449,9 +461,17 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
             const existing = get().records.find(r => r.employeeId === employeeId && r.date === today);
 
             if (type === 'checkIn') {
+                // Calculate late minutes from shift for accurate status
+                const resolvedShiftId = shiftId || existing?.shiftId;
+                const shift = resolvedShiftId ? useInternalShiftStore.getState().getShift(resolvedShiftId) : null;
+                const lateMinutes = shift ? calculateLateDuration(new Date(time), shift.startTime, shift.graceTimeMinutes) : 0;
+                const checkInStatus = lateMinutes > 0 ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
+
                 if (existing) {
-                    // Update checkIn time
-                    const updates = { checkIn: time, isManualPunch: true, manualPunchBy: adminName, manualPunchReason: reason, punchMode: 'admin' as const };
+                    const updates = {
+                        checkIn: time, lateByMinutes: lateMinutes, status: checkInStatus,
+                        isManualPunch: true, manualPunchBy: adminName, manualPunchReason: reason, punchMode: 'admin' as const,
+                    };
                     set(state => ({
                         records: state.records.map(r =>
                             r.employeeId === employeeId && r.date === today ? { ...r, ...updates } : r
@@ -460,12 +480,11 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
                     try { await apiFetch(`/attendance/${existing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) }); }
                     catch (err) { console.error('Admin punch sync failed:', err); }
                 } else {
-                    // Create new record
                     const newRec: AttendanceRecord = {
-                        id: Math.random().toString(36).substr(2, 9),
+                        id: crypto.randomUUID(),
                         employeeId, date: today, checkIn: time,
-                        status: AttendanceStatus.PRESENT,
-                        shiftId, lateByMinutes: 0, overtimeHours: 0, breaks: [],
+                        status: checkInStatus, lateByMinutes: lateMinutes,
+                        shiftId: resolvedShiftId, overtimeHours: 0, breaks: [],
                         isManualPunch: true, manualPunchBy: adminName, manualPunchReason: reason, punchMode: 'admin',
                     };
                     set(state => ({ records: [...state.records, newRec] }));
@@ -525,14 +544,22 @@ const useInternalAttendanceStore = create<AttendanceState>((set, get) => {
                         const diffH = (outDt.getTime() - inDt.getTime()) / 3600000;
                         updates.overtimeHours = parseFloat((diffH > 9 ? diffH - 9 : 0).toFixed(2));
                     }
-                    // Recalculate late minutes if checkIn changed
+                    // Recalculate late minutes if checkIn changed — use actual shift config
                     if (field === 'checkIn') {
-                        // Simple recalc — late if after 09:05 with 5 min grace
-                        const inHour = new Date(newTime).getHours();
-                        const inMin = new Date(newTime).getMinutes();
-                        const minutesSince9 = (inHour - 9) * 60 + inMin;
-                        updates.lateByMinutes = minutesSince9 > 5 ? minutesSince9 : 0;
-                        updates.status = (updates.lateByMinutes > 0 ? AttendanceStatus.LATE : AttendanceStatus.PRESENT);
+                        const shift = r.shiftId
+                            ? useInternalShiftStore.getState().getShift(r.shiftId)
+                            : null;
+                        const lateMinutes = shift
+                            ? calculateLateDuration(new Date(newTime), shift.startTime, shift.graceTimeMinutes)
+                            : (() => {
+                                // Fallback: 9AM + 5min grace
+                                const inHour = new Date(newTime).getHours();
+                                const inMin = new Date(newTime).getMinutes();
+                                const mins = (inHour - 9) * 60 + inMin;
+                                return mins > 5 ? mins : 0;
+                            })();
+                        updates.lateByMinutes = lateMinutes;
+                        updates.status = lateMinutes > 0 ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
                     }
                     return { ...r, ...updates };
                 })

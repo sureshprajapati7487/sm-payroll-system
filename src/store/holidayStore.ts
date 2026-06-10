@@ -94,7 +94,7 @@ export const useHolidayStore = create<HolidayState>((set, get) => ({
     // ── Bulk import (Indian holidays preload) ─────────────────────────────────
     bulkImport: async (holidays) => {
         const companyId = useMultiCompanyStore.getState().currentCompanyId;
-        const withIds = holidays.map(h => ({ ...h, id: `hol-${h.date}-${Math.random().toString(36).substr(2, 5)}` }));
+        const withIds = holidays.map(h => ({ ...h, id: `hol-${h.date}-${crypto.randomUUID()}` }));
         set(s => {
             const existing = new Set(s.holidays.map(h => h.date));
             const newOnes = withIds.filter(h => !existing.has(h.date));

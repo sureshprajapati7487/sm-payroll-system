@@ -4,6 +4,8 @@ import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { Save, Trash2, CalendarCheck, Shield } from 'lucide-react';
 import { PERMISSIONS } from '@/config/permissions';
 import { InfoTip } from '@/components/ui/InfoTip';
+import { apiFetch } from '@/lib/apiClient';
+import { useDialog } from '@/components/DialogProvider';
 
 interface StatutoryRule {
     id: string;
@@ -23,9 +25,12 @@ export const StatutorySettings = () => {
 
     const [rules, setRules] = useState<StatutoryRule[]>([]);
     const [loading, setLoading] = useState(false);
+    const { confirm, toast } = useDialog();
+
+    const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
     const [form, setForm] = useState<Partial<StatutoryRule>>({
-        effectiveDate: new Date().toISOString().split('T')[0],
+        effectiveDate: localToday(),
         pfRate: 12.0,
         pfCappedAmount: 1800,
         esicRate: 0.75,
@@ -37,14 +42,8 @@ export const StatutorySettings = () => {
         if (!currentCompanyId) return;
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`/api/statutory-rules?companyId=${currentCompanyId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setRules(data);
-            }
+            const res = await apiFetch(`/admin/statutory-rules?companyId=${currentCompanyId}`);
+            if (res.ok) setRules(await res.json());
         } catch (e) {
             console.error('Failed to fetch statutory rules', e);
         }
@@ -59,44 +58,38 @@ export const StatutorySettings = () => {
         e.preventDefault();
         if (!currentCompanyId) return;
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch('/api/statutory-rules', {
+            const res = await apiFetch('/admin/statutory-rules', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ ...form, companyId: currentCompanyId })
+                body: JSON.stringify({ ...form, companyId: currentCompanyId }),
             });
-
             if (res.ok) {
                 fetchRules();
-                setForm({
-                    effectiveDate: new Date().toISOString().split('T')[0],
-                    pfRate: 12.0,
-                    pfCappedAmount: 1800,
-                    esicRate: 0.75,
-                    esicThreshold: 21000,
-                    ptSlabs: []
-                });
+                setForm({ effectiveDate: localToday(), pfRate: 12.0, pfCappedAmount: 1800, esicRate: 0.75, esicThreshold: 21000, ptSlabs: [] });
+                toast('Statutory rule saved!', 'success');
             } else {
                 const err = await res.json();
-                alert(err.error || 'Failed to save rule');
+                toast(err.error || 'Failed to save rule', 'error');
             }
-        } catch (e) {
-            console.error(e);
-            alert('Error saving rule');
+        } catch {
+            toast('Server se connect nahi ho saka', 'error');
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this rule? Historical payrolls may be affected if recalculated.')) return;
+        const ok = await confirm({
+            title: 'Delete Statutory Rule?',
+            message: 'Yeh rule delete hoga. Historical payrolls recalculate pe affect ho sakti hain.',
+            confirmLabel: 'Haan, Delete Karo',
+            cancelLabel: 'Cancel',
+            variant: 'danger',
+        });
+        if (!ok) return;
         try {
-            const token = localStorage.getItem('token');
-            await fetch(`/api/statutory-rules/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            await apiFetch(`/admin/statutory-rules/${id}`, { method: 'DELETE' });
             fetchRules();
-        } catch (e) {
-            console.error(e);
+            toast('Rule deleted', 'warning');
+        } catch {
+            toast('Delete failed', 'error');
         }
     };
 

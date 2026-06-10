@@ -38,7 +38,7 @@ export const BulkLoanEntryModal = ({ onClose }: BulkLoanEntryModalProps) => {
 
     const addRow = () => {
         setRows([...rows, {
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             employeeId: '',
             type: LoanType.ADVANCE_CASH,
             amount: 0,

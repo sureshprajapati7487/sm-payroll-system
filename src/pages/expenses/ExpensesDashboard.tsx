@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useExpenseStore, Expense } from '@/store/expenseStore';
+import { useExpenseStore, Expense, getReceiptUrl } from '@/store/expenseStore';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/config/permissions';
+import { apiFetch } from '@/lib/apiClient';
 import {
     Banknote, Plus, Trash2, Calendar,
     TrendingUp, Coffee, Truck, Wrench, CircleDollarSign, CheckCircle, XCircle, Clock
@@ -10,7 +11,6 @@ import { clsx } from 'clsx';
 import { SkeletonPage } from '@/components/SkeletonLoaders';
 import { useDialog } from '@/components/DialogProvider';
 import { InfoTip } from '@/components/ui/InfoTip';
-import { getServerBaseUrl } from '@/lib/apiConfig';
 
 export const ExpensesDashboard = () => {
     const { user, hasPermission } = useAuthStore();
@@ -21,9 +21,12 @@ export const ExpensesDashboard = () => {
     const canManage = hasPermission(PERMISSIONS.MANAGE_EXPENSES);
 
     // State
-    const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+    const localDateStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+    const localMonthStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; };
+
+    const [currentMonth, setCurrentMonth] = useState(localMonthStr);
     const [form, setForm] = useState({
-        date: new Date().toISOString().split('T')[0],
+        date: localDateStr(),
         category: 'OTHER' as Expense['category'],
         amount: '',
         description: '',
@@ -52,17 +55,12 @@ export const ExpensesDashboard = () => {
             try {
                 const formData = new FormData();
                 formData.append('receipt', receiptFile);
-
-                // Assuming you have an API client base URL configured
-                const response = await fetch(`${getServerBaseUrl()}/api/upload/receipt`, {
-                    method: 'POST',
-                    body: formData,
-                });
-                const data = await response.json();
-                if (data.url) {
-                    receiptUrl = data.url;
+                const response = await apiFetch('/upload/receipt', { method: 'POST', body: formData });
+                if (response.ok) {
+                    const data = await response.json();
+                    receiptUrl = data.key || data.url;
                 } else {
-                    console.error('Upload failed:', data);
+                    console.error('Upload failed:', response.status);
                 }
             } catch (err) {
                 console.error('Upload error:', err);
@@ -77,7 +75,7 @@ export const ExpensesDashboard = () => {
             amount: Number(form.amount),
             description: form.description,
             paidTo: form.paidTo || undefined,
-            addedBy: user?.name || 'Admin',
+            addedBy: user?.name || user?.id || 'Unknown',
             receiptUrl
         } as any); // Type cast due to adding receiptUrl
 
@@ -244,7 +242,7 @@ export const ExpensesDashboard = () => {
                         {/* Stats Card */}
                         <div className="glass p-6 rounded-2xl flex items-center justify-between">
                             <div>
-                                <p className="text-dark-muted text-sm uppercase tracking-wider">Total Approved ({new Date(currentMonth).toLocaleString('default', { month: 'long' })})</p>
+                                <p className="text-dark-muted text-sm uppercase tracking-wider">Total Expenses ({new Date(currentMonth + '-01').toLocaleString('default', { month: 'long' })})</p>
                                 <h2 className="text-3xl font-bold text-white mt-1">₹ {stats.total.toLocaleString()}</h2>
                             </div>
                             <div className="flex gap-4">
@@ -292,8 +290,15 @@ export const ExpensesDashboard = () => {
                                                             </div>
                                                             <div className="text-white font-medium">{exp.description}</div>
                                                             {exp.paidTo && <div className="text-xs text-dark-muted">Paid to: {exp.paidTo}</div>}
-                                                            {/* @ts-ignore - receiptUrl is newly added */}
-                                                            {exp.receiptUrl && <a href={exp.receiptUrl} target="_blank" rel="noreferrer" className="text-xs text-primary-400 hover:underline mt-1 inline-block">View Receipt 🔗</a>}
+                                                            {exp.receiptUrl && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        try { window.open(await getReceiptUrl(exp.receiptUrl!), '_blank'); }
+                                                                        catch { window.open(exp.receiptUrl, '_blank'); }
+                                                                    }}
+                                                                    className="text-xs text-primary-400 hover:underline mt-1 inline-block"
+                                                                >View Receipt 🔗</button>
+                                                            )}
                                                         </td>
                                                         <td className="p-4">
                                                             <div className="flex flex-col gap-1">

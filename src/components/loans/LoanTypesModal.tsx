@@ -3,6 +3,7 @@ import { useSystemConfigStore } from '@/store/systemConfigStore';
 import { X, Plus, Edit2, Wallet, Trash2, ShieldAlert } from 'lucide-react';
 import { LoanType } from '@/types';
 import { apiFetch } from '@/lib/apiClient';
+import { useDialog } from '@/components/DialogProvider';
 
 interface Props {
     onClose: () => void;
@@ -11,6 +12,7 @@ interface Props {
 export const LoanTypesModal = ({ onClose }: Props) => {
     const config = useSystemConfigStore();
     const loanTypes = config.loanTypes || [];
+    const { confirm, toast } = useDialog();
 
     const [form, setForm] = useState({ key: '', label: '' });
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export const LoanTypesModal = ({ onClose }: Props) => {
         } else {
             // Check if key already exists
             if (loanTypes.some(lt => lt.key === finalKey)) {
-                alert('A loan type with this key already exists!');
+                toast('A loan type with this key already exists!', 'warning');
                 return;
             }
             config.addLoanType(finalKey, form.label);
@@ -49,24 +51,22 @@ export const LoanTypesModal = ({ onClose }: Props) => {
 
     const handleDelete = async (id: string, key: string) => {
         if (isSystemType(key)) {
-            alert('Cannot delete core system loan types.');
+            toast('Cannot delete core system loan types.', 'warning');
             return;
         }
-        // Check if any active loans are using this type before deleting
         try {
             const res = await apiFetch(`/loans?type=${encodeURIComponent(key)}&status=ACTIVE`);
             if (res.ok) {
                 const active = await res.json();
                 if (Array.isArray(active) && active.length > 0) {
-                    alert(`Cannot delete — ${active.length} active loan(s) are using this type. Close those loans first.`);
+                    toast(`Cannot delete — ${active.length} active loan(s) are using this type. Close those loans first.`, 'error');
                     return;
                 }
             }
         } catch { /* ignore network error — proceed with local delete */ }
 
-        if (window.confirm('Are you sure you want to delete this loan type?')) {
-            config.deleteLoanType(id);
-        }
+        const ok = await confirm({ title: 'Delete Loan Type?', message: 'Is loan type ko permanently delete karna chahte hain?', confirmLabel: 'Delete', cancelLabel: 'Cancel', variant: 'danger' });
+        if (ok) config.deleteLoanType(id);
     };
 
     return (

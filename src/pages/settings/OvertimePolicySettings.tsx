@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { API_URL } from '@/lib/apiConfig';
 import { Plus, Pencil, Trash2, Clock, Check, X } from 'lucide-react';
+import { apiFetch } from '@/lib/apiClient';
+import { useDialog } from '@/components/DialogProvider';
 
 interface OTPolicy {
     id: string;
@@ -13,16 +14,6 @@ interface OTPolicy {
 
 const EMPTY: Omit<OTPolicy, 'id'> = { name: '', weeklyCapHours: 48, dailyCapHours: 12, multiplier: 1.5, effectiveFrom: '' };
 
-function authHeader(): Record<string, string> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    try {
-        const raw = localStorage.getItem('auth-storage');
-        const token = raw ? JSON.parse(raw)?.state?.token : null;
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-    } catch { /* localStorage unavailable (SSR/private browsing) */ }
-    return headers;
-}
-
 export const OvertimePolicySettings = () => {
     const [policies, setPolicies] = useState<OTPolicy[]>([]);
     const [loading, setLoading] = useState(true);
@@ -33,11 +24,12 @@ export const OvertimePolicySettings = () => {
     const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null);
 
     const showToast = (ok: boolean, msg: string) => { setToast({ ok, msg }); setTimeout(() => setToast(null), 3500); };
+    const { confirm } = useDialog();
 
     const fetchPolicies = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_URL}/overtime-policy`, { headers: authHeader() });
+            const res = await apiFetch('/overtime-policy');
             if (res.ok) setPolicies(await res.json());
         } catch { showToast(false, 'Network error — policies load nahi huin. Server chal raha hai?'); }
         setLoading(false);
@@ -49,9 +41,9 @@ export const OvertimePolicySettings = () => {
         if (!form.name) { showToast(false, 'Policy name is required'); return; }
         setSaving(true);
         try {
-            const url = editId ? `${API_URL}/overtime-policy/${editId}` : `${API_URL}/overtime-policy`;
+            const url = editId ? `/overtime-policy/${editId}` : `/overtime-policy`;
             const method = editId ? 'PUT' : 'POST';
-            const res = await fetch(url, { method, headers: authHeader(), body: JSON.stringify(form) });
+            const res = await apiFetch(url, { method, body: JSON.stringify(form) });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Save failed');
             showToast(true, editId ? 'Policy updated' : 'Policy created');
@@ -64,9 +56,10 @@ export const OvertimePolicySettings = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete this overtime policy?')) return;
+        const ok = await confirm({ title: 'Delete Policy?', message: 'Is overtime policy ko permanently delete karna chahte hain?', confirmLabel: 'Delete', cancelLabel: 'Cancel', variant: 'danger' });
+        if (!ok) return;
         try {
-            await fetch(`${API_URL}/overtime-policy/${id}`, { method: 'DELETE', headers: authHeader() });
+            await apiFetch(`/overtime-policy/${id}`, { method: 'DELETE' });
             showToast(true, 'Deleted');
             fetchPolicies();
         } catch { showToast(false, 'Delete failed'); }

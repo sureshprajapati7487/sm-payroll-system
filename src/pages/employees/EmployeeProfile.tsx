@@ -27,8 +27,7 @@ import {
     Download,
     Paperclip,
 } from 'lucide-react';
-import { API_URL } from '@/lib/apiConfig';
-import { authHeader as getAuthHeader } from '@/lib/authHeader';
+import { apiFetch } from '@/lib/apiClient';
 
 export const EmployeeProfile = () => {
     const { id } = useParams();
@@ -89,9 +88,7 @@ export const EmployeeProfile = () => {
 
     const loadDocs = async () => {
         try {
-            const res = await fetch(`${API_URL}/employees/${id}/documents`, {
-                headers: getAuthHeader(),
-            });
+            const res = await apiFetch(`/employees/${id}/documents`);
             if (res.ok) setDocs(await res.json());
         } catch { /* docs list is optional — profile still usable without it */ }
         setDocsLoaded(true);
@@ -102,9 +99,8 @@ export const EmployeeProfile = () => {
         fd.append('file', file);
         setDocUploading(true);
         try {
-            const res = await fetch(`${API_URL}/employees/${id}/documents`, {
+            const res = await apiFetch(`/employees/${id}/documents`, {
                 method: 'POST',
-                headers: getAuthHeader(),
                 body: fd,
             });
             const data = await res.json();

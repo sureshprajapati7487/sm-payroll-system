@@ -50,7 +50,7 @@ export const useSalesTaskStore = create<SalesTaskState>((set, get) => ({
             }
         } catch (err: any) {
             set({ error: err.message || 'Failed to fetch sales tasks', isLoading: false });
-            throw err;
+            // Not re-thrown — fetchTasks is called in background; failure shows error state, not crash
         }
     },
 

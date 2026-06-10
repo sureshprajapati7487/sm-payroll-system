@@ -45,7 +45,7 @@ export const useInternalShiftStore = create<ShiftState>((set, get) => ({
             const res = await apiFetch(`/shifts`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...newShift, id: Math.random().toString(36).substr(2, 9) })
+                body: JSON.stringify({ ...newShift, id: crypto.randomUUID() })
             });
 
             if (res.ok) {

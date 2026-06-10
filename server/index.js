@@ -71,7 +71,16 @@ if (IS_PRODUCTION) {
 const JWT_SECRET = process.env.JWT_SECRET || generateDevSecret('JWT_SECRET');
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '15m';
 const REFRESH_SECRET = process.env.REFRESH_SECRET || generateDevSecret('REFRESH_SECRET');
-const REFRESH_EXPIRES = '7d';
+const REFRESH_EXPIRES = process.env.REFRESH_EXPIRES || '7d';
+
+// Convert JWT_EXPIRES string (e.g. '15m', '1h', '7d') to seconds for client response
+function jwtExpiresSeconds(str) {
+    const match = (str || '').match(/^(\d+)(s|m|h|d)$/);
+    if (!match) return 15 * 60;
+    const multipliers = { s: 1, m: 60, h: 3600, d: 86400 };
+    return parseInt(match[1]) * multipliers[match[2]];
+}
+const JWT_EXPIRES_SECONDS = jwtExpiresSeconds(JWT_EXPIRES);
 
 // ── Error Hints / Error Log → see ./middlewares/errorHandler.js (IF-03) ──────
 
@@ -103,37 +112,37 @@ function isAllowedOrigin(origin) {
 
 // ── DEV ONLY: Reset Admin Password — not registered at all in production ──────
 if (!IS_PRODUCTION) {
-app.get('/api/dev/reset-admin', async (req, res) => {
-    const ip = req.socket.remoteAddress || req.ip || '';
-    const isLocalhost = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-    if (!isLocalhost) {
-        return res.status(403).json({ error: 'Access denied. Only accessible from localhost in development mode.' });
-    }
-    try {
-        const emp = await Employee.findOne({ where: { code: 'ACLLP-01' } });
-        if (!emp) {
-            const firstCompany = await Company.findOne({ order: [['createdAt', 'ASC']] });
-            if (!firstCompany) return res.json({ error: 'No company found. Create a company first via /company-setup.' });
-            const hashed = await bcrypt.hash('8824834657@AA', 10);
-            await Employee.create({
-                id: 'admin-recovery',
-                companyId: firstCompany.id,
-                code: 'ACLLP-01',
-                name: 'Admin Recovered',
-                phone: '8824834657',
-                role: 'ADMIN',
-                password: hashed,
-                status: 'ACTIVE'
-            });
-            return res.json({ msg: 'Admin did not exist. Force created.', code: 'ACLLP-01', pass: '8824834657@AA', companyId: firstCompany.id });
+    app.get('/api/dev/reset-admin', async (req, res) => {
+        const ip = req.socket.remoteAddress || req.ip || '';
+        const isLocalhost = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+        if (!isLocalhost) {
+            return res.status(403).json({ error: 'Access denied. Only accessible from localhost in development mode.' });
         }
-        const hashed = await bcrypt.hash('8824834657@AA', 10);
-        await emp.update({ password: hashed });
-        res.json({ msg: 'Admin existed. Password forcefully reset.', code: 'ACLLP-01', pass: '8824834657@AA' });
-    } catch (e) {
-        res.json({ error: e.message });
-    }
-});
+        try {
+            const emp = await Employee.findOne({ where: { code: 'ACLLP-01' } });
+            if (!emp) {
+                const firstCompany = await Company.findOne({ order: [['createdAt', 'ASC']] });
+                if (!firstCompany) return res.json({ error: 'No company found. Create a company first via /company-setup.' });
+                const hashed = await bcrypt.hash('8824834657@AA', 10);
+                await Employee.create({
+                    id: 'admin-recovery',
+                    companyId: firstCompany.id,
+                    code: 'ACLLP-01',
+                    name: 'Admin Recovered',
+                    phone: '8824834657',
+                    role: 'ADMIN',
+                    password: hashed,
+                    status: 'ACTIVE'
+                });
+                return res.json({ msg: 'Admin did not exist. Force created.', code: 'ACLLP-01', pass: '8824834657@AA', companyId: firstCompany.id });
+            }
+            const hashed = await bcrypt.hash('8824834657@AA', 10);
+            await emp.update({ password: hashed });
+            res.json({ msg: 'Admin existed. Password forcefully reset.', code: 'ACLLP-01', pass: '8824834657@AA' });
+        } catch (e) {
+            res.json({ error: e.message });
+        }
+    });
 } // end if (!IS_PRODUCTION)
 
 // ── IF-01: Helmet — HTTP Security Headers ────────────────────────────────────
@@ -216,6 +225,15 @@ app.get('/api/health', async (req, res) => {
         database: { status: dbStatus, error: dbError, why: dbWhy, fix: dbFix, engine: 'SQLite', file: 'database.sqlite' },
         recentErrors: getErrorLog().slice(0, 20), totalErrors: getErrorLog().length,
     });
+});
+
+// ── Client IP echo — used by frontend to detect own public IP without third-party services
+app.get('/api/health/ip', (req, res) => {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+        || req.socket.remoteAddress
+        || req.ip
+        || '127.0.0.1';
+    res.json({ ip });
 });
 
 // ── DEEP HEALTH CHECK ────────────────────────────────────────────────────────
@@ -742,7 +760,7 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
             maxAge: 7 * 24 * 60 * 60 * 1000,
             path: '/',
         });
-        res.json({ token, user: payload, expiresIn: 15 * 60 });
+        res.json({ token, user: payload, expiresIn: JWT_EXPIRES_SECONDS});
     } catch (e) {
         addError(e, 'POST /api/auth/login');
         const h = getErrorHint(e);
@@ -767,7 +785,7 @@ app.post('/api/auth/refresh', async (req, res) => {
         const payload = { id: decoded.id, name: decoded.name, role: decoded.role, email: decoded.email, companyId: decoded.companyId, sessionId: decoded.sessionId };
         const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
         console.log(`🔄 Token refreshed for: ${decoded.id}`);
-        res.json({ token: newToken, user: payload, expiresIn: 15 * 60 });
+        res.json({ token: newToken, user: payload, expiresIn: JWT_EXPIRES_SECONDS});
     } catch (e) {
         res.clearCookie('refresh_token', { path: '/' });
         return res.status(401).json({ error: 'Refresh token expired or invalid', fix: 'Please login again' });
@@ -859,6 +877,10 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
         const hashed = await bcrypt.hash(newPassword.trim(), BCRYPT_ROUNDS);
         await employee.update({ password: hashed });
+
+        // Clear any active lockout so user can login immediately with new password
+        clearFailedAttempts(getAttemptKey(employee.code));
+        if (employee.email) clearFailedAttempts(getAttemptKey(employee.email));
 
         await AuditLog.create({
             id: uuidv4(), timestamp: new Date().toISOString(),
@@ -1095,7 +1117,9 @@ app.post('/api/auth/cross-company-token', async (req, res) => {
 // ── COMPANY ROUTES ────────────────────────────────────────────────────────────
 app.get('/api/companies', async (req, res) => {
     try {
-        if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+        // Unauthenticated: return empty — no company data exposed before login
+        if (!req.user) return res.json([]);
+
         if (req.user.role === 'SUPER_ADMIN') {
             res.json(await Company.findAll());
         } else {
@@ -1106,19 +1130,28 @@ app.get('/api/companies', async (req, res) => {
 });
 app.post('/api/companies', async (req, res) => {
     try {
-        // First company creation is public (setup wizard — no user exists yet).
-        // After that, only SUPER_ADMIN can create additional companies.
         const companyCount = await Company.count();
-        if (companyCount > 0 && (!req.user || req.user.role !== 'SUPER_ADMIN')) {
-            return res.status(403).json({ error: 'Only SUPER_ADMIN can create additional companies.', fix: 'Login as SUPER_ADMIN first.' });
+
+        if (companyCount === 0) {
+            // First company: public (setup wizard). Validate license key server-side.
+            const expectedKey = process.env.LICENSE_KEY;
+            if (expectedKey && req.body.licenseKey !== expectedKey) {
+                return res.status(403).json({ error: 'Invalid License Key', fix: 'Contact administrator for a valid license key' });
+            }
+        } else {
+            // Additional companies: SUPER_ADMIN only
+            if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+                return res.status(403).json({ error: 'Only SUPER_ADMIN can create additional companies', fix: 'Login as SUPER_ADMIN first' });
+            }
         }
 
-        const existing = await Company.findOne({ where: { id: req.body.id } });
+        const existing = req.body.id ? await Company.findOne({ where: { id: req.body.id } }) : null;
         if (existing) { await existing.update(req.body); return res.json(existing); }
         let code = req.body.code || 'CO', newCompany;
+        const newCompanyId = req.body.id || `company-${Date.now()}`;
         for (let attempt = 0; attempt < 5; attempt++) {
             try {
-                newCompany = await Company.create({ ...req.body, code: attempt === 0 ? code : `${code}${attempt + 1}` });
+                newCompany = await Company.create({ ...req.body, id: newCompanyId, code: attempt === 0 ? code : `${code}${attempt + 1}` });
                 break;
             } catch (uniqueErr) { if (uniqueErr.name !== 'SequelizeUniqueConstraintError') throw uniqueErr; }
         }
@@ -1164,6 +1197,9 @@ app.post('/api/companies', async (req, res) => {
 });
 app.put('/api/companies/:id', async (req, res) => {
     try {
+        if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+            return res.status(403).json({ error: 'Only SUPER_ADMIN can update company details' });
+        }
         const company = await Company.findOne({ where: { id: req.params.id } });
         if (!company) return res.status(404).json({ error: 'Company not found' });
         await company.update(req.body);
@@ -1172,6 +1208,9 @@ app.put('/api/companies/:id', async (req, res) => {
 });
 app.delete('/api/companies/:id', async (req, res) => {
     try {
+        if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+            return res.status(403).json({ error: 'Only SUPER_ADMIN can delete a company' });
+        }
         const company = await Company.findOne({ where: { id: req.params.id } });
         if (!company) return res.status(404).json({ error: 'Company not found' });
         await company.destroy();
@@ -1202,7 +1241,7 @@ const sharedModels = {
     SystemSetting, SystemKey, IPRestriction, UserSession,
     addError, getErrorHint,
     doBackup, getBackupStatus, getConfig, updateConfig,
-    CustomReportTemplate, ScheduledReport, StatutoryRule,
+    CustomReportTemplate, ScheduledReport, ReportJob, StatutoryRule,
     FnFSettlement, OvertimePolicy,
 };
 employeesRoute.init(sharedModels);

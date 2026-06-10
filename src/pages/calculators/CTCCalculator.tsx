@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Calculator, Download, RefreshCw, Loader2, AlertTriangle } from 'lucide-react';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
+import { apiFetch } from '@/lib/apiClient';
 
 export const CTCCalculator = () => {
     const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
@@ -15,12 +16,10 @@ export const CTCCalculator = () => {
         setIsLoading(true);
         setError('');
         try {
-            const response = await fetch('/api/calculators/ctc', {
+            const response = await apiFetch('/calculators/ctc', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                body: JSON.stringify({ companyId: currentCompanyId, basicSalary, state })
+                body: JSON.stringify({ basicSalary, state }),
             });
-
             if (!response.ok) throw new Error('Calculation Engine Error');
             const data = await response.json();
             setResult(data);
@@ -29,6 +28,40 @@ export const CTCCalculator = () => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleExportCSV = () => {
+        if (!result) return;
+        const rows = [
+            ['CTC Calculator Export'],
+            ['Basic Salary Input', basicSalary],
+            [''],
+            ['Component', 'Monthly (₹)'],
+            ['Basic Salary', result.basicSalary],
+            ['HRA', result.hra],
+            ['Special Allowance', result.specialAllowance],
+            ['Gross Salary', result.grossSalary],
+            [''],
+            ['Employee PF', result.employeePF],
+            ['Employee ESI', result.employeeESI],
+            ['Professional Tax', result.professionalTax],
+            ['TDS', result.tds],
+            ['Total Deductions', result.totalDeductions],
+            [''],
+            ['Net Salary (In-Hand)', result.netSalary],
+            [''],
+            ['Employer PF', result.employerPF],
+            ['Employer ESI', result.employerESI],
+            ['Gratuity', result.gratuity],
+            ['Total CTC (Monthly)', result.totalCTC],
+            ['Total CTC (Annual)', result.totalCTC * 12],
+        ];
+        const csv = rows.map(r => r.join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `CTC_${basicSalary}.csv`; a.click();
+        URL.revokeObjectURL(url);
     };
 
     const handleReset = () => {
@@ -164,9 +197,9 @@ export const CTCCalculator = () => {
                         <div className="lg:col-span-3 glass rounded-2xl p-6">
                             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                                 <h3 className="text-lg font-semibold text-white">Detailed Breakdown</h3>
-                                <button className="flex items-center gap-2 px-3 py-1.5 bg-primary-500/20 hover:bg-primary-500/30 text-primary-400 rounded-lg text-sm transition-all">
+                                <button onClick={handleExportCSV} className="flex items-center gap-2 px-3 py-1.5 bg-primary-500/20 hover:bg-primary-500/30 text-primary-400 rounded-lg text-sm transition-all">
                                     <Download className="w-4 h-4" />
-                                    Export PDF
+                                    Export CSV
                                 </button>
                             </div>
 

@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
 const { requireRole } = require('../rbac');
 const { formatError } = require('../middlewares/errorHandler');
 const BCRYPT_ROUNDS = 10;
@@ -31,6 +32,14 @@ function init(models) {
     Biometric = models.Biometric;
     addError = models.addError;
     getErrorHint = models.getErrorHint;
+}
+
+// Strip password hash before sending employee data to frontend
+function stripPassword(emp) {
+    if (!emp) return emp;
+    const obj = emp.toJSON ? emp.toJSON() : { ...emp };
+    delete obj.password;
+    return obj;
 }
 
 // ── Face Distance Calculator ──────────────────────────────────────────────────
@@ -90,7 +99,7 @@ router.get('/', async (req, res) => {
         });
 
         res.json({
-            data: rows,
+            data: rows.map(stripPassword),
             total: count,
             page,
             limit,
@@ -106,6 +115,9 @@ router.post('/', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'
         // Always enforce companyId from JWT (prevents cross-tenant employee creation)
         if (req.companyId) data.companyId = req.companyId;
 
+        // Generate server-side ID if client didn't provide one
+        if (!data.id) data.id = `emp-${Date.now()}-${uuidv4().substring(0, 8)}`;
+
         // RBAC: Reject financial fields if user lacks salary management permission
         const canManageFinancials = req.user && ['SUPER_ADMIN', 'ACCOUNT_ADMIN'].includes(req.user.role);
         const FINANCIAL_FIELDS = ['basicSalary', 'salaryType', 'bankDetails', 'statutoryConfig'];
@@ -118,12 +130,19 @@ router.post('/', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'
             });
         }
 
+        // Duplicate code check — codes must be globally unique
+        if (data.code) {
+            const existing = await Employee.findOne({ where: { code: data.code.trim().toUpperCase() } });
+            if (existing) return res.status(409).json({ error: `Employee code '${data.code}' already exists`, fix: 'Use a different employee code' });
+            data.code = data.code.trim().toUpperCase();
+        }
+
         const pwdErr = validatePasswordStrength(data.password);
         if (pwdErr) return res.status(400).json({ error: pwdErr, fix: 'Please use a stronger password (min 8 chars, 1 number, 1 letter)' });
         if (data.password && !data.password.startsWith('$2b$')) {
             data.password = await bcrypt.hash(data.password.trim(), BCRYPT_ROUNDS);
         }
-        res.json(await Employee.create(data));
+        res.json(stripPassword(await Employee.create(data)));
     }
     catch (e) { addError(e, 'POST /api/employees'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
@@ -220,7 +239,11 @@ router.delete('/:id', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), as
             }
         }
         // Soft delete: update status to INACTIVE instead of destroy()
-        await Employee.update({ status: 'INACTIVE' }, { where: { id: req.params.id } });
+        const reason = req.body?.reason;
+        await Employee.update(
+            { status: 'INACTIVE', ...(reason ? { deleteReason: reason } : {}) },
+            { where: { id: req.params.id } }
+        );
         res.json({ success: true, message: 'Employee deactivated successfully (Soft Deleted)' });
     } catch (e) { addError(e, 'DELETE /api/employees/:id'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });

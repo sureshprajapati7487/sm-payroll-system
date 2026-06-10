@@ -9,7 +9,7 @@ import { useProductionStore } from '@/store/productionStore';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { sendPayslipWhatsApp } from '@/utils/whatsappService';
-import { API_URL } from '@/lib/apiConfig';
+import { apiFetch } from '@/lib/apiClient';
 import type { SalarySlip } from '@/types';
 
 export const PayslipView = () => {
@@ -35,7 +35,7 @@ export const PayslipView = () => {
         if (localSlip) return; // Already have it
         if (!id) { setNotFound(true); return; }
         setIsLoading(true);
-        fetch(`${API_URL}/payroll/${id}`)
+        apiFetch(`/payroll/${id}`)
             .then(r => r.ok ? r.json() : Promise.reject())
             .then((data: SalarySlip) => setLocalSlip(data))
             .catch(() => setNotFound(true))

@@ -83,13 +83,13 @@ const useInternalLoanStore = create<LoanState>()(
 
                 const newLoan: LoanRecord = {
                     ...loan,
-                    id: Math.random().toString(36).substr(2, 9),
+                    id: crypto.randomUUID(),
                     companyId: currentCompanyId, // Link
                     balance: loan.amount,
                     status: LoanStatus.REQUESTED,
                     ledger: [],
                     auditTrail: [{
-                        id: Math.random().toString(36).substr(2, 9),
+                        id: crypto.randomUUID(),
                         date: new Date().toISOString(),
                         action: 'REQUESTED',
                         performedBy: useAuthStore.getState().user?.name || 'Unknown',
@@ -128,7 +128,6 @@ const useInternalLoanStore = create<LoanState>()(
 
                 set(state => ({
                     _rawLoans: [newLoan, ...state._rawLoans],
-                    loans: [newLoan, ...state._rawLoans]
                 }));
 
                 try {
@@ -246,7 +245,7 @@ const useInternalLoanStore = create<LoanState>()(
                                 status: allDone ? LoanStatus.ACTIVE : LoanStatus.CHECKED,
                                 ...(allDone ? {
                                     ledger: [{
-                                        id: Math.random().toString(36).substr(2, 9),
+                                        id: crypto.randomUUID(),
                                         date: l.issuedDate || new Date().toISOString().split('T')[0],
                                         amount: l.amount,
                                         type: 'ADVANCE_PAYMENT' as const,
@@ -288,7 +287,7 @@ const useInternalLoanStore = create<LoanState>()(
                                 ...l,
                                 status: LoanStatus.ACTIVE,
                                 ledger: [{
-                                    id: Math.random().toString(36).substr(2, 9),
+                                    id: crypto.randomUUID(),
                                     date: l.issuedDate || new Date().toISOString().split('T')[0],
                                     amount: l.amount,
                                     type: 'ADVANCE_PAYMENT',
@@ -349,12 +348,12 @@ const useInternalLoanStore = create<LoanState>()(
                 const currentCompanyId = useMultiCompanyStore.getState().currentCompanyId;
                 const newLoan: LoanRecord = {
                     ...loan,
-                    id: Math.random().toString(36).substr(2, 9),
+                    id: crypto.randomUUID(),
                     companyId: currentCompanyId || undefined,
                     balance: loan.amount,
                     status: LoanStatus.ACTIVE,
                     ledger: [{
-                        id: Math.random().toString(36).substr(2, 9),
+                        id: crypto.randomUUID(),
                         date: loan.issuedDate || new Date().toISOString().split('T')[0],
                         amount: loan.amount,
                         type: 'ADVANCE_PAYMENT',
@@ -396,7 +395,7 @@ const useInternalLoanStore = create<LoanState>()(
                                 balance: newBal,
                                 status: newBal <= 0 ? LoanStatus.CLOSED : LoanStatus.ACTIVE,
                                 ledger: [...l.ledger, {
-                                    id: Math.random().toString(36).substr(2, 9),
+                                    id: crypto.randomUUID(),
                                     date: new Date().toISOString().split('T')[0],
                                     amount: amount,
                                     type: 'EMI',
@@ -473,7 +472,7 @@ const useInternalLoanStore = create<LoanState>()(
                         if (alreadyApproved >= (l.allowedSkips ?? 2)) return l;
 
                         const skipRequest = {
-                            id: Math.random().toString(36).substr(2, 9),
+                            id: crypto.randomUUID(),
                             loanId,
                             monthYear,
                             reason,
@@ -541,7 +540,7 @@ const useInternalLoanStore = create<LoanState>()(
                         return {
                             ...l,
                             settlementRequest: {
-                                id: Math.random().toString(36).substr(2, 9),
+                                id: crypto.randomUUID(),
                                 loanId,
                                 outstandingAmount: l.balance,
                                 settlementAmount: l.balance,
@@ -607,7 +606,7 @@ const useInternalLoanStore = create<LoanState>()(
 
                         const settledAmount = l.settlementRequest!.settlementAmount ?? l.balance;
                         const settlementEntry: LoanTransaction = {
-                            id: Math.random().toString(36).substr(2, 9),
+                            id: crypto.randomUUID(),
                             date: new Date().toISOString().split('T')[0],
                             amount: settledAmount,
                             type: 'EMI',

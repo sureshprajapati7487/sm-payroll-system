@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useDialog } from "@/components/DialogProvider";
 import {
   useWorkGroupStore,
   GROUP_COLOR_MAP,

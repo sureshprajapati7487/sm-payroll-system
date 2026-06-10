@@ -96,7 +96,7 @@ const EmployeeSearchableSelect = ({ employees, selectedId, currentUserId, onSele
                                 )}
                             >
                                 <div className="flex items-center gap-2">
-                                    <img src={emp.avatar} className="w-5 h-5 rounded-full border border-dark-border bg-dark-bg" />
+                                    <img src={emp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&size=20`} className="w-5 h-5 rounded-full border border-dark-border bg-dark-bg" />
                                     <span>{emp.name}</span>
                                 </div>
                                 {selectedId === emp.id && <CheckCircle className="w-3.5 h-3.5" />}
@@ -127,6 +127,7 @@ export const LeaveDashboard = () => {
     });
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     const canApprove = hasPermission(PERMISSIONS.APPROVE_LEAVES);
     const canManageLeaves = hasPermission(PERMISSIONS.MANAGE_LEAVES) || canApprove;
@@ -153,22 +154,31 @@ export const LeaveDashboard = () => {
         return roleMatch && searchMatch;
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (isBlocked) return; // Security Check
+        setSubmitError(null);
+        if (isBlocked) return;
         if (!targetEmployeeId || !form.startDate || (!form.endDate && !form.isHalfDay)) return;
 
-        requestLeave({
-            employeeId: targetEmployeeId,
-            type: form.type,
-            startDate: form.startDate,
-            endDate: form.isHalfDay ? form.startDate : form.endDate, // Same day for half day
-            isHalfDay: form.isHalfDay,
-            reason: form.reason,
-        });
+        // Validate date range
+        if (!form.isHalfDay && form.endDate && form.endDate < form.startDate) {
+            setSubmitError('End date cannot be before start date.');
+            return;
+        }
 
-        // Reset
-        setForm({ type: LeaveType.CASUAL, startDate: '', endDate: '', isHalfDay: false, reason: '' });
+        try {
+            await requestLeave({
+                employeeId: targetEmployeeId,
+                type: form.type,
+                startDate: form.startDate,
+                endDate: form.isHalfDay ? form.startDate : form.endDate,
+                isHalfDay: form.isHalfDay,
+                reason: form.reason,
+            });
+            setForm({ type: LeaveType.CASUAL, startDate: '', endDate: '', isHalfDay: false, reason: '' });
+        } catch {
+            setSubmitError('Leave request submit nahi ho saka. Server se connect karein.');
+        }
     };
 
     return (
@@ -217,6 +227,11 @@ export const LeaveDashboard = () => {
                         )}
 
                         <form onSubmit={handleSubmit} className="space-y-4">
+                            {submitError && (
+                                <div className="p-3 bg-danger/10 border border-danger/30 rounded-lg text-danger text-xs flex items-center gap-2">
+                                    <XCircle className="w-4 h-4 shrink-0" /> {submitError}
+                                </div>
+                            )}
 
                             {/* Employee Selector (Only for Admins/Managers) */}
                             {canManageLeaves && (

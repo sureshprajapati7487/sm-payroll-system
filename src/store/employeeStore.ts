@@ -17,7 +17,7 @@ interface EmployeeState {
     // Actions
     addEmployee: (employee: Omit<Employee, 'id'>, companyIdOverride?: string) => void;
     updateEmployee: (id: string, updates: Partial<Employee>) => void;
-    deleteEmployee: (id: string) => void;
+    deleteEmployee: (id: string, reason?: string) => void;
     getEmployeeById: (id: string) => Employee | undefined;
     toggleLeaveBlock: (id: string) => void;
     generateNextCode: () => string;
@@ -105,7 +105,7 @@ const useInternalEmployeeStore = create<EmployeeState>((set, get) => ({
         const newEmployeeModel = {
             ...employee,
             code: employeeCode || employee.code,
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             companyId: currentCompanyId,
             isLeaveBlocked: false,
             leaveBalance: { CASUAL: 12, SICK: 7, PAID: 15, UNPAID: 0 }
@@ -126,7 +126,6 @@ const useInternalEmployeeStore = create<EmployeeState>((set, get) => ({
 
             set((state) => ({
                 _rawEmployees: [...state._rawEmployees, savedEmployee],
-                employees: [...state._rawEmployees, savedEmployee]
             }));
             // Audit
             audit({
@@ -176,23 +175,24 @@ const useInternalEmployeeStore = create<EmployeeState>((set, get) => ({
         }
     },
 
-    deleteEmployee: async (id) => {
+    deleteEmployee: async (id, reason?) => {
         const emp = get()._rawEmployees.find(e => e.id === id);
-        // Optimistic update first: set status to INACTIVE instead of filtering out
-        set((state) => {
-            const updated = state._rawEmployees.map((e) =>
+        set((state) => ({
+            _rawEmployees: state._rawEmployees.map((e) =>
                 e.id === id ? { ...e, status: EmployeeStatus.INACTIVE } : e
-            );
-            return { _rawEmployees: updated };
-        });
+            ),
+        }));
         try {
-            await apiFetch(`/employees/${id}`, { method: 'DELETE' });
+            await apiFetch(`/employees/${id}`, {
+                method: 'DELETE',
+                body: reason ? JSON.stringify({ reason }) : undefined,
+            });
             audit({
                 action: 'DELETE_EMPLOYEE',
                 entityType: 'EMPLOYEE',
                 entityId: id,
                 entityName: emp?.name,
-                details: { code: emp?.code, department: emp?.department },
+                details: { code: emp?.code, department: emp?.department, reason },
                 status: 'SUCCESS',
             });
         } catch (e) {
@@ -289,34 +289,5 @@ export const useEmployeeStore = () => {
     };
 };
 
-// Also export getState for non-hook usage (AuthStore needs this!)
-// We must be careful. AuthStore used useEmployeeStore.getState().employees.
-// The Internal store has ALL employees.
-// AuthStore loop: finds user by ID/Email.
-// Ideally Auth should check Company ID too? 
-// Login is usually Global or Per Company?
-// User said "Start me Company Creat".
-// If I login as "Aero-01", and that ID exists in Company A.
-// If I am in Company B context?
-// "Login" happens BEFORE Company? No, Company Setup happens BEFORE.
-// But Login page is separate.
-// Wait, the User FLOW:
-// 1. App Open -> Company Setup (if none).
-// 2. Dashboard -> Login?
-// Actually the App structure is:
-// ProtectedRoute wraps Dashboard.
-// Login Page is public.
-// When unauthenticated, we go to Login.
-// Does Login require Company?
-// Default: Global Login? Or Company Specific?
-// If "Aero-01" is in Company A.
-// If I create Company B, and try to login as "Aero-01"?
-// Should fail.
-// So AuthStore needs to know Current Company too?
-// OR, AuthStore should authenticate against ALL employees, and then SET the current company based on the employee's company?
-// BUT User said "Pahle Option aana chahiye Create Company".
-// This implies the Admin is setting it up.
-// This is an "Admin/Owner" view. not Employee view yet.
-// For now, let's stick to: useEmployeeStore exports filtered employees for the VIEW.
-// AuthStore might need to check ALL to find the user.
+// getState exposes the internal (unfiltered) store for non-hook usage
 useEmployeeStore.getState = () => useInternalEmployeeStore.getState();

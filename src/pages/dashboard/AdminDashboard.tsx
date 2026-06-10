@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAnalyticsStore } from '@/store/analyticsStore';
 import { useEmployeeStore } from '@/store/employeeStore';
@@ -106,13 +106,24 @@ export const AdminDashboard = () => {
     const { records } = useAttendanceStore();
     const { hasPermission } = useAuthStore();
     const { currentCompanyId } = useMultiCompanyStore();
-    const { logs: auditLogs } = useAuditStore();
+    const { logs: auditLogs, fetchLogs } = useAuditStore();
     const { stats, isLoading, error, fetchDashboardStats } = useAnalyticsStore();
     const { getStats: getExpenseStats, fetchExpenses } = useExpenseStore();
     const navigate = useNavigate();
 
     const today = new Date().toISOString().split('T')[0];
     const currentMonth = new Date().toISOString().slice(0, 7);
+
+    // Live clock — updates every minute
+    const [liveTime, setLiveTime] = useState(() =>
+        new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+    );
+    useEffect(() => {
+        const t = setInterval(() =>
+            setLiveTime(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }))
+        , 60000);
+        return () => clearInterval(t);
+    }, []);
 
     const companyEmployees = currentCompanyId
         ? employees.filter(e => e.companyId === currentCompanyId)
@@ -123,6 +134,9 @@ export const AdminDashboard = () => {
             fetchDashboardStats(currentCompanyId, currentMonth);
             if (hasPermission(PERMISSIONS.VIEW_FINANCE_DASHBOARD)) {
                 fetchExpenses(currentMonth);
+            }
+            if (hasPermission(PERMISSIONS.VIEW_AUDIT_LOGS)) {
+                fetchLogs({ companyId: currentCompanyId, limit: 20 });
             }
         }
     }, [currentCompanyId, currentMonth]); // eslint-disable-line
@@ -179,7 +193,6 @@ export const AdminDashboard = () => {
     } = stats;
 
     const hasPayrollData = payrollDistribution.length > 0;
-    const activeLoans = { length: activeLoansCount };
 
     const lateArrivalsToday = records.filter(r => r.date === today && r.companyId === currentCompanyId && r.status === 'LATE').length;
     const markedAbsentToday = records.filter(r => r.date === today && r.companyId === currentCompanyId && r.status === 'ABSENT').length;
@@ -241,7 +254,7 @@ export const AdminDashboard = () => {
                     </button>
                     <div className="flex items-center gap-1.5 text-xs text-dark-muted bg-dark-card border border-dark-border px-3 py-1.5 rounded-lg">
                         <Zap className="w-3 h-3 text-primary-400" />
-                        <span>Live — {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                        <span>Live — {liveTime}</span>
                     </div>
                 </div>
             </div>
@@ -311,7 +324,7 @@ export const AdminDashboard = () => {
                         <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet className="w-16 h-16 text-danger" /></div>
                         <p className="text-dark-muted text-xs uppercase tracking-wider mb-2">Outstanding Loans</p>
                         <h3 className="text-3xl font-bold text-danger">₹ {(totalOutstanding / 1000).toFixed(1)}k</h3>
-                        <div className="mt-2 text-xs text-dark-muted flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {activeLoans.length} active loans</div>
+                        <div className="mt-2 text-xs text-dark-muted flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {activeLoansCount} active loans</div>
                     </div>
                 )}
 

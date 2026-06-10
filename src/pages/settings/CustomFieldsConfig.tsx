@@ -4,11 +4,13 @@ import { useCustomFieldStore, CustomFieldType, CustomField } from '@/store/custo
 import { useAuthStore } from '@/store/authStore';
 import { InfoTip } from '@/components/ui/InfoTip';
 import { PERMISSIONS } from '@/config/permissions';
+import { useDialog } from '@/components/DialogProvider';
 
 export const CustomFieldsConfig: React.FC = () => {
     const { fields, addField, updateField, deleteField } = useCustomFieldStore();
     const { hasPermission } = useAuthStore();
     const isAdmin = hasPermission(PERMISSIONS.MANAGE_SETTINGS);
+    const { confirm, toast } = useDialog();
 
     const [editingId, setEditingId] = useState<string | null>(null);
     const [draft, setDraft] = useState<Partial<CustomField>>({});
@@ -16,12 +18,12 @@ export const CustomFieldsConfig: React.FC = () => {
     const [isAdding, setIsAdding] = useState(false);
 
     const handleSaveNew = () => {
-        if (!draft.name || !draft.type) return alert('Name aur Type dono zaroori hain');
+        if (!draft.name || !draft.type) { toast('Name aur Type dono zaroori hain', 'warning'); return; }
 
         let optionsArray: string[] | undefined;
         if (draft.type === 'select') {
             if (!draft.options || (draft.options as any).length === 0) {
-                return alert('Dropdown (Select) ke liye options (comma-separated) lazmi hain');
+                toast('Dropdown (Select) ke liye options (comma-separated) lazmi hain', 'warning'); return;
             }
             if (typeof draft.options === 'string') {
                 optionsArray = (draft.options as string).split(',').map(s => s.trim()).filter(Boolean);
@@ -43,7 +45,7 @@ export const CustomFieldsConfig: React.FC = () => {
     };
 
     const handleUpdate = (id: string) => {
-        if (!draft.name || !draft.type) return alert('Name aur Type required hain');
+        if (!draft.name || !draft.type) { toast('Name aur Type required hain', 'warning'); return; }
 
         let optionsArray: string[] | undefined;
         if (draft.type === 'select') {
@@ -225,7 +227,7 @@ export const CustomFieldsConfig: React.FC = () => {
                                         {field.isActive ? 'Disable' : 'Enable'}
                                     </button>
                                     <button onClick={() => { setEditingId(field.id); setDraft(field); }} className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all"><Edit2 className="w-4 h-4" /></button>
-                                    <button onClick={() => { if (confirm('Are you sure you want to delete this field permanently?')) deleteField(field.id); }} className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
+                                    <button onClick={() => confirm({ title: 'Custom Field Delete Karein?', message: `"${field.name}" field permanently delete ho jayega.`, confirmLabel: 'Delete', cancelLabel: 'Cancel', variant: 'danger' }).then(ok => ok && deleteField(field.id))} className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
                                 </div>
                             )}
                         </div>

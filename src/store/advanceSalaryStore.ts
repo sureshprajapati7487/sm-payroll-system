@@ -65,7 +65,7 @@ export const useInternalAdvanceSalaryStore = create<AdvanceSalaryState>((set, ge
         const companyId = useMultiCompanyStore.getState().currentCompanyId;
         const monthlyDeduction = Math.round(amount / installments);
         const optimistic: AdvanceSalaryRequest = {
-            id: `adv-${Date.now()}`,
+            id: `adv-${crypto.randomUUID()}`,
             employeeId, employeeName, companyId: companyId || undefined,
             amount, reason, installments, monthlyDeduction,
             remainingBalance: amount,
@@ -96,10 +96,9 @@ export const useInternalAdvanceSalaryStore = create<AdvanceSalaryState>((set, ge
 
         if (!request) return;
 
-        // 🛡️ Advance > ₹50,000 requires Account Admin +
+        // Advance > ₹50,000 requires ACCOUNT_ADMIN or SUPER_ADMIN
         if (request.amount > 50000 && user?.role !== 'ACCOUNT_ADMIN' && user?.role !== 'SUPER_ADMIN') {
-            alert('Security Guard: Advance requests over ₹50,000 can only be approved by an Account Admin or Super Admin.');
-            return;
+            throw new Error('Advance requests over ₹50,000 can only be approved by an Account Admin or Super Admin.');
         }
 
         set(s => ({ requests: s.requests.map(r => r.id === requestId ? { ...r, status: 'approved' as const, approvedBy, approvedDate: new Date().toISOString() } : r) }));

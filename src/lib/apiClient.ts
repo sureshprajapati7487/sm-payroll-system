@@ -137,12 +137,12 @@ export async function apiFetch(path: string, options: FetchOptions = {}): Promis
     }
 
     // Inject JWT token and Company ID
+    let tokenSent = false;
     if (!skipAuth) {
         let token = getToken();
 
-        // TASK 2 FIX: If auth-storage exists in localStorage but token is null,
-        // Zustand hydration may still be in-flight (parsing + onRehydrateStorage).
-        // Wait up to 300ms (6 × 50ms) for the token to appear before giving up.
+        // If auth-storage exists but token is null, Zustand hydration may still be
+        // in-flight. Wait up to 300ms (6 × 50ms) for the token to appear.
         if (!token && localStorage.getItem('auth-storage')) {
             for (let i = 0; i < 6; i++) {
                 await new Promise<void>(r => setTimeout(r, 50));
@@ -152,10 +152,7 @@ export async function apiFetch(path: string, options: FetchOptions = {}): Promis
         }
 
         const companyId = getActiveCompanyId();
-
-        if (companyId) {
-            headers['x-company-id'] = companyId;
-        }
+        if (companyId) headers['x-company-id'] = companyId;
 
         // When SUPER_ADMIN is viewing a different company, attach the daily HMAC token
         if (companyId && companyId !== getUserCompanyId()) {
@@ -163,14 +160,10 @@ export async function apiFetch(path: string, options: FetchOptions = {}): Promis
             if (ccToken) headers['x-cross-company-token'] = ccToken;
         }
 
-        if (!token && !_isRetry) {
-            // No token after waiting — return synthetic 401
-            return new Response(JSON.stringify({ error: 'No token' }), {
-                status: 401,
-                headers: { 'Content-Type': 'application/json' },
-            });
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+            tokenSent = true;
         }
-        if (token) headers['Authorization'] = `Bearer ${token}`;
     }
 
     const response = await fetch(url, {
@@ -179,15 +172,16 @@ export async function apiFetch(path: string, options: FetchOptions = {}): Promis
         credentials: 'include', // always include cookies for refresh_token
     });
 
-    // On 401 from server — try to refresh once, then retry the original request
-    if (response.status === 401 && !skipAuth && !_isRetry) {
+    // On 401: only attempt refresh + potential logout when we actually sent a token
+    // that the server rejected. If no token was sent (unauthenticated call), the 401
+    // is expected — do NOT wipe auth-storage or trigger a spurious refresh.
+    if (response.status === 401 && !skipAuth && !_isRetry && tokenSent) {
         const refreshed = await doRefresh();
         if (refreshed) {
-            // Retry original request with new token
             return apiFetch(path, { ...options, _isRetry: true });
         }
-        // Refresh failed — force logout
-        try { localStorage.removeItem('auth-storage'); } catch { /* ignore — localStorage may be unavailable */ }
+        // Refresh failed — token is truly dead, clear session
+        try { localStorage.removeItem('auth-storage'); } catch { /* ignore */ }
     }
 
     return response;

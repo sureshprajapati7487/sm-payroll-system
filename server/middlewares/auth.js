@@ -22,8 +22,14 @@ const PUBLIC_PATHS = [
     { method: 'POST', path: '/api/auth/refresh' },
     { method: 'POST', path: '/api/auth/verify-password' },
     { method: 'POST', path: '/api/auth/logout' },
+    // Self-registration & password reset — unauthenticated users call these
+    { method: 'POST', path: '/api/auth/signup' },
+    { method: 'POST', path: '/api/auth/forgot-password' },
+    { method: 'POST', path: '/api/auth/reset-password' },
     // Health — for Render's health check probe (no token needed)
     { method: 'GET', path: '/api/health' },
+    // Client IP echo — called before auth to detect public IP without third-party services
+    { method: 'GET', path: '/api/health/ip' },
     // Company setup wizard — new installs need to create first company before login
     { method: 'GET', path: '/api/companies' },
     { method: 'POST', path: '/api/companies' },
@@ -36,16 +42,37 @@ const PUBLIC_PATHS = [
 ];
 
 function isPublic(req) {
-    return PUBLIC_PATHS.some(p => p.method === req.method && req.path.startsWith(p.path));
+    const cleanPath = req.path.replace(/\/$/, ''); // Remove trailing slash
+    return PUBLIC_PATHS.some(p => {
+        const pClean = p.path.replace(/\/$/, '');
+        return p.method === req.method && (cleanPath === pClean || cleanPath.startsWith(pClean + '/'));
+    });
 }
 
 function authMiddleware(req, res, next) {
-    if (isPublic(req)) return next();
+    const isPublicPath = isPublic(req);
     const header = req.headers['authorization'] || '';
     const token = header.startsWith('Bearer ') ? header.slice(7) : (req.query.token || null);
-    if (!token) return res.status(401).json({ error: 'Unauthorized — token required', fix: 'Include Authorization: Bearer <token> header' });
-    try { req.user = jwt.verify(token, getJwtSecret()); next(); }
-    catch (e) { return res.status(401).json({ error: 'Invalid or expired token', fix: 'Login again to get a new token' }); }
+
+    if (token) {
+        try {
+            req.user = jwt.verify(token, getJwtSecret());
+        } catch (e) {
+            // If it's a public path, we can ignore a bad token and proceed as guest.
+            // But if it's protected, a bad token MUST be a 401.
+            if (!isPublicPath) {
+                console.warn(`🔒 [auth] 401 Invalid Token for ${req.method} ${req.path}: ${e.message}`);
+                return res.status(401).json({ error: 'Invalid or expired token', fix: 'Login again' });
+            }
+        }
+    }
+
+    if (!req.user && !isPublicPath) {
+        console.warn(`🔒 [auth] 401 Unauthorized: No token for ${req.method} ${req.path}`);
+        return res.status(401).json({ error: 'Unauthorized — token required' });
+    }
+
+    next();
 }
 
 module.exports = { authMiddleware, isPublic, PUBLIC_PATHS };

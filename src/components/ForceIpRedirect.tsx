@@ -7,7 +7,11 @@ export const ForceIpRedirect = () => {
         useSecurityStore.getState().fetchCurrentIp();
 
         if (window.location.hostname === 'localhost') {
-            const newUrl = window.location.href.replace('localhost', '127.0.0.1');
+            // Replace only the hostname portion, not any occurrence of "localhost" in the URL
+            const newUrl = window.location.href.replace(
+                /^(https?:\/\/)localhost(:\d+)?/,
+                `$1127.0.0.1$2`
+            );
             window.location.replace(newUrl);
         }
     }, []);

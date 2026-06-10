@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useEmployeeStore } from '@/store/employeeStore';
@@ -13,7 +13,7 @@ export const EmployeeDashboard = () => {
     const { user } = useAuthStore();
     const { employees } = useEmployeeStore();
     const { records } = useAttendanceStore();
-    const { entries } = useProductionStore();
+    const { entries, fetchProductionEntries } = useProductionStore();
     const { loans } = useLoanStore();
     const { requests: leaves } = useLeaveStore();
     const { currentCompanyId } = useMultiCompanyStore();
@@ -23,11 +23,15 @@ export const EmployeeDashboard = () => {
     const currentMonth = new Date().toISOString().slice(0, 7);
     const [selectedMonth, setSelectedMonth] = useState(currentMonth);
 
+    useEffect(() => {
+        if (currentCompanyId) fetchProductionEntries(currentCompanyId);
+    }, [currentCompanyId]); // eslint-disable-line
+
     const companyEmployees = currentCompanyId
         ? employees.filter(e => e.companyId === currentCompanyId)
         : employees;
 
-    const me = companyEmployees.find(e => e.email === user?.email) || companyEmployees.find(e => e.id === user?.id);
+    const me = companyEmployees.find(e => e.id === user?.id) || companyEmployees.find(e => e.email === user?.email);
 
     if (!me) return <div className="text-white p-6">Profile not found. Please contact HR.</div>;
 
@@ -45,7 +49,18 @@ export const EmployeeDashboard = () => {
     const myPendingLeaves = leaves.filter((l: any) => l.employeeId === me.id && l.status === 'PENDING').length;
 
     const myPresentDays = myRecords.filter(r => ['PRESENT', 'LATE', 'HALF_DAY'].includes(r.status)).length;
-    const myAttPercentage = Math.round((myPresentDays / 26) * 100);
+
+    // Actual working days = days in month minus Sundays (standard Indian payroll: Mon–Sat)
+    const workingDaysInMonth = (() => {
+        const [y, m] = selectedMonth.split('-').map(Number);
+        const total = new Date(y, m, 0).getDate();
+        let sundays = 0;
+        for (let d = 1; d <= total; d++) {
+            if (new Date(y, m - 1, d).getDay() === 0) sundays++;
+        }
+        return total - sundays;
+    })();
+    const myAttPercentage = Math.min(100, Math.round((myPresentDays / workingDaysInMonth) * 100));
     const myProdValue = myProduction.reduce((sum, p) => sum + p.totalAmount, 0);
 
     const todayRecord = isCurrentMonth ? records.find(r => r.employeeId === me.id && r.date === today) : undefined;

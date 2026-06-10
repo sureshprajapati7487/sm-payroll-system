@@ -88,8 +88,8 @@ export const QuickCheckIn = () => {
     const [result, setResult] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
     // ── Derived: current employee & today's attendance ─────────────────────
-    const me = employees.find(e => e.email === user?.email || e.id === user?.id);
-    const today = new Date().toISOString().split('T')[0];
+    const me = employees.find(e => e.id === user?.id) || employees.find(e => e.email === user?.email);
+    const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
     const myRecord = me ? records.find(r => r.employeeId === me.id && r.date === today) : null;
     const activeBreak = me ? getActiveBreak(me.id) : undefined;
 
@@ -197,7 +197,7 @@ export const QuickCheckIn = () => {
         setResult(null);
         try {
             if (act === 'checkin') {
-                await markCheckIn(user.id, (me as any)?.shift || 'GENERAL', undefined, { punchMode: 'manual' } as any);
+                await markCheckIn(user.id, (me as any)?.shift || 'GENERAL', undefined, { punchMode: 'mobile' } as any);
                 setResult({ type: 'success', msg: `✅ Punch In recorded — ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` });
             } else if (act === 'checkout') {
                 await markCheckOut(user.id);

@@ -106,6 +106,9 @@ export interface Employee {
     password?: string;
     whatsappNumber?: string;
 
+    // Attendance PIN (4-digit, for PIN kiosk punch)
+    attendancePin?: string;
+
     // Secure Data
     faceData?: string;
     bankDetails?: BankDetails;

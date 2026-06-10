@@ -173,7 +173,7 @@ export const useSystemConfigStore = create<SystemConfigState>()(
                 loanTypes: [
                     ...state.loanTypes,
                     {
-                        id: Math.random().toString(36).substr(2, 9),
+                        id: crypto.randomUUID(),
                         key: key.toUpperCase().replace(/\s+/g, '_'),
                         label
                     }

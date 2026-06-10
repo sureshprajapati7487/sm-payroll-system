@@ -51,7 +51,7 @@ export const useSecurityAlertsStore = create<SecurityAlertsState>()(
             addAlert: (alert) => {
                 const newAlert: SecurityAlert = {
                     ...alert,
-                    id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    id: `alert-${crypto.randomUUID()}`,
                     timestamp: new Date().toISOString(),
                     isRead: false,
                     isAcknowledged: false

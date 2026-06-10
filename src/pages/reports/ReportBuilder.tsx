@@ -214,6 +214,19 @@ export const ReportBuilder = () => {
     };
 
     const handleGenerate = () => {
+        // Require at least a start date to prevent loading entire dataset
+        if (!dateRange.start) {
+            alert('Please select a Start Date before generating the report.');
+            return;
+        }
+        // Limit range to 90 days to prevent UI freeze
+        if (dateRange.start && dateRange.end) {
+            const days = (new Date(dateRange.end).getTime() - new Date(dateRange.start).getTime()) / 86400000;
+            if (days > 90) {
+                alert('Date range cannot exceed 90 days. Please narrow your selection.');
+                return;
+            }
+        }
         setIsGenerating(true);
         setTimeout(() => {
             const data = generateRealData();

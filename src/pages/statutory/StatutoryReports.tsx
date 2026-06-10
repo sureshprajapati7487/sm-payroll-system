@@ -38,7 +38,10 @@ function downloadCSV(filename: string, rows: string[][]) {
 }
 
 export const StatutoryReports = () => {
-    const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+    const [selectedMonth, setSelectedMonth] = useState(() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
     const [reportType, setReportType] = useState<ReportType>('PF');
 
     const { employees } = useEmployeeStore();

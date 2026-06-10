@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { TrendingUp, Download, AlertCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { apiFetch } from '@/lib/apiClient';
 import { useSystemKeyStore } from '@/store/systemKeyStore';
 import { TDSCalculator as TDSCalc } from '@/utils/tdsCalculator';
 
@@ -24,12 +25,10 @@ export const TDSCalculator = () => {
         setIsLoading(true);
         setError('');
         try {
-            const response = await fetch('/api/calculators/tds', {
+            const response = await apiFetch('/calculators/tds', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                body: JSON.stringify({ annualSalary, section80C, section80D, customSlabs })
+                body: JSON.stringify({ annualSalary, section80C, section80D, customSlabs }),
             });
-
             if (!response.ok) throw new Error('Calculation Engine Error');
             const data = await response.json();
             setResult(data);
@@ -38,6 +37,32 @@ export const TDSCalculator = () => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleExportCSV = () => {
+        if (!result) return;
+        const rows = [
+            ['TDS Calculator Export — FY 2024-25'],
+            ['Annual Gross Salary', annualSalary],
+            [''],
+            ['', 'Old Regime', 'New Regime'],
+            ['Gross Income', result.grossIncome, result.grossIncome],
+            ['Standard Deduction', result.standardDeduction, result.standardDeduction],
+            ['80C Deduction', result.section80C, 'N/A'],
+            ['80D Deduction', result.section80D, 'N/A'],
+            ['Taxable Income', result.oldRegimeTaxableIncome, result.newRegimeTaxableIncome],
+            ['Annual Tax', result.oldRegimeTax, result.newRegimeTax],
+            ['Monthly TDS', Math.round(result.oldRegimeTax / 12), Math.round(result.newRegimeTax / 12)],
+            [''],
+            ['Recommended Regime', result.recommendedRegime],
+            ['Monthly TDS (Recommended)', result.monthlyTDS],
+        ];
+        const csv = rows.map(r => r.join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `TDS_${annualSalary}.csv`; a.click();
+        URL.revokeObjectURL(url);
     };
 
     const formatCurrency = (amount: number) => {
@@ -250,9 +275,9 @@ export const TDSCalculator = () => {
                                             {formatCurrency(result.monthlyTDS)}
                                         </div>
                                     </div>
-                                    <button className="flex items-center gap-2 px-4 py-2 bg-primary-500/20 hover:bg-primary-500/30 text-primary-400 rounded-lg transition-all">
+                                    <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 bg-primary-500/20 hover:bg-primary-500/30 text-primary-400 rounded-lg transition-all">
                                         <Download className="w-4 h-4" />
-                                        Export
+                                        Export CSV
                                     </button>
                                 </div>
                             </div>

@@ -164,7 +164,7 @@ export const EmployeeList = () => {
         });
 
         return result;
-    }, [employees, deptFilter, statusFilter, shiftFilter, salaryTypeFilter,
+    }, [scopedEmployees, deptFilter, statusFilter, shiftFilter, salaryTypeFilter,
         salaryMin, salaryMax, designationFilter, sortKey, sortDir]);
 
     // ── Approve handler ───────────────────────────────────────────────────────
@@ -183,7 +183,7 @@ export const EmployeeList = () => {
 
     // ── Stats strip ───────────────────────────────────────────────────────────
     const totalActive = employees.filter(e => e.status === EmployeeStatus.ACTIVE).length;
-    const totalInactive = employees.filter(e => e.status !== EmployeeStatus.ACTIVE).length;
+    const totalInactive = employees.filter(e => e.status === EmployeeStatus.INACTIVE).length;
     const totalPending = employees.filter(e => e.status === EmployeeStatus.PENDING).length;
 
     const toggleSort = (key: SortKey) => {
@@ -193,9 +193,6 @@ export const EmployeeList = () => {
 
     return (
         <div className="space-y-5 min-w-0 max-w-full w-full">
-            {credentialEmployee && (
-                <CredentialsModal employee={credentialEmployee} onClose={() => setCredentialEmployee(null)} />
-            )}
 
             {/* ── Header ─────────────────────────────────────────── */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -617,7 +614,7 @@ export const EmployeeList = () => {
                                         )}
                                         {hasPermission(PERMISSIONS.VIEW_ATTENDANCE) && (
                                             <button
-                                                onClick={() => navigate(`/attendance`)}
+                                                onClick={() => navigate(`/employees/${employee.id}`)}
                                                 className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white transition-colors"
                                                 title="View Attendance"
                                             >
@@ -626,7 +623,7 @@ export const EmployeeList = () => {
                                         )}
                                         {hasPermission(PERMISSIONS.VIEW_PAYROLL) && (
                                             <button
-                                                onClick={() => navigate(`/payroll`)}
+                                                onClick={() => navigate(`/employees/${employee.id}`)}
                                                 className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white transition-colors"
                                                 title="View Payroll"
                                             >
@@ -771,8 +768,7 @@ export const EmployeeList = () => {
                 matchText={deleteConfirmEmp ? `DELETE ${deleteConfirmEmp.name}` : undefined}
                 onConfirm={(reason) => {
                     if (deleteConfirmEmp) {
-                        console.log(`Deleting employee ${deleteConfirmEmp.id} for reason: ${reason}`);
-                        deleteEmployee(deleteConfirmEmp.id);
+                        deleteEmployee(deleteConfirmEmp.id, reason);
                         setDeleteConfirmEmp(null);
                     }
                 }}

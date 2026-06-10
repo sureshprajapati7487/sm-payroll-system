@@ -62,7 +62,7 @@ export const useInternalDepartmentStore = create<DepartmentState>((set) => ({
             const res = await apiFetch(`/departments`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...newDept, id: Math.random().toString(36).substr(2, 9) })
+                body: JSON.stringify({ ...newDept, id: crypto.randomUUID() })
             });
 
             if (res.ok) {

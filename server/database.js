@@ -251,6 +251,7 @@ const Employee = sequelize.define('Employee', {
     paymentRate: { type: DataTypes.FLOAT, defaultValue: 0 },
     reportsTo: { type: DataTypes.STRING },
     password: { type: DataTypes.STRING },
+    attendancePin: { type: DataTypes.STRING },
     whatsappNumber: { type: DataTypes.STRING },
     avatar: { type: DataTypes.STRING },
     bankDetails: { type: DataTypes.JSON },
@@ -372,7 +373,7 @@ const Leave = sequelize.define('Leave', {
 // ── 6. Loan Record ────────────────────────────────────────────────────────────
 const Loan = sequelize.define('Loan', {
     id: { type: DataTypes.STRING, primaryKey: true },
-    companyId: { type: DataTypes.STRING },
+    companyId: { type: DataTypes.STRING, allowNull: false },
     employeeId: { type: DataTypes.STRING, allowNull: false },
     type: { type: DataTypes.STRING, defaultValue: 'OTHER' }, // LoanType enum as string
     amount: { type: DataTypes.FLOAT, defaultValue: 0 },
@@ -719,6 +720,26 @@ const initDB = async () => {
             if (!biometricMigErr.message?.includes('no such table')) {
                 console.warn('⚠️  Biometric pre-migration warning:', biometricMigErr.message);
             }
+        }
+
+        // ── Post-migration Index Cleanup: SQLite fails on 'alter: true' if indexes already exist ──
+        try {
+            await sequelize.query('DROP INDEX IF EXISTS user_sessions_user_id_is_active');
+            await sequelize.query('DROP INDEX IF EXISTS ip_restrictions_company_id');
+            await sequelize.query('DROP INDEX IF EXISTS custom_report_templates_company_id');
+            await sequelize.query('DROP INDEX IF EXISTS scheduled_reports_company_id');
+            await sequelize.query('DROP INDEX IF EXISTS audit_logs_company_id_timestamp');
+            await sequelize.query('DROP INDEX IF EXISTS audit_logs_action');
+            await sequelize.query('DROP INDEX IF EXISTS audit_logs_user_id');
+            await sequelize.query('DROP INDEX IF EXISTS clients_company_id');
+            await sequelize.query('DROP INDEX IF EXISTS clients_assigned_to');
+            await sequelize.query('DROP INDEX IF EXISTS sales_tasks_company_id');
+            await sequelize.query('DROP INDEX IF EXISTS sales_tasks_salesman_id');
+            await sequelize.query('DROP INDEX IF EXISTS fnf_settlements_company_id_employee_id');
+            await sequelize.query('DROP INDEX IF EXISTS fnf_settlements_company_id_status');
+            await sequelize.query('DROP INDEX IF EXISTS overtime_policies_company_id');
+        } catch (idxDropErr) {
+            console.warn('⚠️  Index preemptive drop warning (non-critical):', idxDropErr.message);
         }
 
         // Safe Auto-Migration: adds missing columns/tables without dropping data.

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Building2, ChevronDown, Plus, TrendingUp, Users, DollarSign, Edit, Trash2, X, Save, Info } from 'lucide-react';
+import { Building2, ChevronDown, Plus, Users, DollarSign, Edit, Trash2, X, Save, Info } from 'lucide-react';
 import { useMultiCompanyStore, Company } from '@/store/multiCompanyStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { usePayrollStore } from '@/store/payrollStore';
@@ -328,39 +328,6 @@ export const CompanySwitcher = () => {
                 </div>
             </div>
 
-            {/* Consolidated HR View */}
-            <div className="glass rounded-2xl p-6">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-primary-400" />
-                    Consolidated HR Insights
-                </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-dark-surface rounded-xl">
-                        <div className="text-dark-muted text-sm mb-2">Average Salary</div>
-                        <div className="text-2xl font-bold text-white">₹42,500</div>
-                        <div className="text-xs text-green-400 mt-1">+5% vs last quarter</div>
-                    </div>
-
-                    <div className="p-4 bg-dark-surface rounded-xl">
-                        <div className="text-dark-muted text-sm mb-2">Attrition Rate</div>
-                        <div className="text-2xl font-bold text-white">8.5%</div>
-                        <div className="text-xs text-green-400 mt-1">-2.3% improvement</div>
-                    </div>
-
-                    <div className="p-4 bg-dark-surface rounded-xl">
-                        <div className="text-dark-muted text-sm mb-2">Open Positions</div>
-                        <div className="text-2xl font-bold text-white">12</div>
-                        <div className="text-xs text-dark-muted mt-1">Across all companies</div>
-                    </div>
-
-                    <div className="p-4 bg-dark-surface rounded-xl">
-                        <div className="text-dark-muted text-sm mb-2">Total Attendance</div>
-                        <div className="text-2xl font-bold text-white">94.2%</div>
-                        <div className="text-xs text-green-400 mt-1">Above target</div>
-                    </div>
-                </div>
-            </div>
 
             {/* Add/Edit Company Modal */}
             {isModalOpen && (

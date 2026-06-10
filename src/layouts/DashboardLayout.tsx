@@ -8,8 +8,8 @@ import {
     LogOut, Menu, X, ShieldAlert, LayoutDashboard,
     Banknote, UserCheck, ChevronRight, Zap, ShieldCheck, Database, ShoppingBag,
     MoreHorizontal, Calculator, BarChart2, IndianRupee, TrendingUp, FileText,
-    Scale, Trash2, Upload, GitBranch, FlaskConical, Building2
-
+    Scale, Trash2, Upload, GitBranch, FlaskConical, Building2,
+    Fingerprint, Camera, Hash
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -73,6 +73,9 @@ const NAV_GROUPS = [
                 subItems: [
                     { label: 'Holiday Manager', path: '/attendance/holidays', icon: CalendarClock, perm: PERMISSIONS.MANAGE_HOLIDAYS },
                     { label: 'Face Kiosk', path: '/attendance/kiosk', icon: ShieldCheck, perm: PERMISSIONS.USE_FACE_KIOSK },
+                    { label: 'Thumb Print', path: '/attendance/pin-kiosk?mode=fingerprint', icon: Fingerprint, perm: PERMISSIONS.USE_FACE_KIOSK },
+                    { label: 'Live Selfie', path: '/attendance/pin-kiosk?mode=selfie', icon: Camera, perm: PERMISSIONS.USE_FACE_KIOSK },
+                    { label: 'PIN Kiosk', path: '/attendance/pin-kiosk?mode=pin', icon: Hash, perm: PERMISSIONS.USE_FACE_KIOSK },
                 ],
             },
             {
@@ -280,7 +283,11 @@ export const DashboardLayout = () => {
                                     const hasSubItems = visibleSubItems.length > 0;
 
                                     const isExpanded = expandedItems.includes(item.path);
-                                    const isSubActive = hasSubItems && visibleSubItems.some(s => location.pathname.startsWith(s.path));
+                                    const isSubActive = hasSubItems && visibleSubItems.some(s => {
+                                        const [sPath, sQuery] = s.path.split('?');
+                                        if (sQuery) return location.pathname === sPath && location.search === `?${sQuery}`;
+                                        return location.pathname.startsWith(sPath);
+                                    });
 
                                     return (
                                         <div key={item.path}>
@@ -317,22 +324,29 @@ export const DashboardLayout = () => {
                                                     {/* Sub-items */}
                                                     {isExpanded && (
                                                         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-dark-border/50 pl-2">
-                                                            {visibleSubItems.map(sub => (
-                                                                <NavLink
-                                                                    key={sub.path}
-                                                                    to={sub.path}
-                                                                    onClick={() => setIsMobileMenuOpen(false)}
-                                                                    className={({ isActive }) => cn(
-                                                                        'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all',
-                                                                        isActive
-                                                                            ? 'bg-primary-500/15 text-primary-400'
-                                                                            : 'text-dark-muted hover:text-dark-text hover:bg-dark-border/30'
-                                                                    )}
-                                                                >
-                                                                    <sub.icon className="w-3.5 h-3.5 shrink-0" />
-                                                                    <span>{sub.label}</span>
-                                                                </NavLink>
-                                                            ))}
+                                                            {visibleSubItems.map(sub => {
+                                                                // Query-param aware active: /path?key=val must match exactly
+                                                                const [subPath, subQuery] = sub.path.split('?');
+                                                                const subActive = subQuery
+                                                                    ? location.pathname === subPath && location.search === `?${subQuery}`
+                                                                    : location.pathname.startsWith(subPath);
+                                                                return (
+                                                                    <NavLink
+                                                                        key={sub.path}
+                                                                        to={sub.path}
+                                                                        onClick={() => setIsMobileMenuOpen(false)}
+                                                                        className={() => cn(
+                                                                            'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all',
+                                                                            subActive
+                                                                                ? 'bg-primary-500/15 text-primary-400'
+                                                                                : 'text-dark-muted hover:text-dark-text hover:bg-dark-border/30'
+                                                                        )}
+                                                                    >
+                                                                        <sub.icon className="w-3.5 h-3.5 shrink-0" />
+                                                                        <span>{sub.label}</span>
+                                                                    </NavLink>
+                                                                );
+                                                            })}
                                                         </div>
                                                     )}
                                                 </>

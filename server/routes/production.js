@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
 const { Production, ProductionItem, Employee } = require('../database');
 const { Op } = require('sequelize');
+const { requireRole } = require('../rbac');
 
-// Auth handled globally by authMiddleware in server/index.js
-
-// Helper for error logging (using same pattern as other routes)
+// Helper for error logging
 const addError = (error, context) => {
     console.error(`[Production API Error] ${context}:`, error);
 };
@@ -128,7 +128,7 @@ router.get('/', async (req, res) => {
 // POST add new production entry
 router.post('/', async (req, res) => {
     try {
-        const { id, employeeId, date, item, qty, rate, totalAmount, status, remarks } = req.body;
+        const { employeeId, date, item, qty, rate, totalAmount, status, remarks } = req.body;
 
         if (!employeeId || !date || !item) {
             return res.status(400).json({ error: 'employeeId, date, and item are required' });
@@ -158,7 +158,7 @@ router.post('/', async (req, res) => {
         const resolvedTotal = totalAmount || (resolvedQty * resolvedRate) || 0;
 
         const newEntry = await Production.create({
-            id: id || `prod-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            id: `prod-${uuidv4()}`,
             companyId,
             employeeId,
             date,
@@ -199,7 +199,7 @@ router.post('/bulk', async (req, res) => {
                 }
 
                 const newEntry = await Production.create({
-                    id: entry.id || `prod-${Date.now()}-${Math.random().toString(36).substr(2, 5)}-${index}`,
+                    id: `prod-${uuidv4()}`,
                     companyId: companyId || entry.companyId,
                     employeeId: entry.employeeId,
                     date: entry.date,
@@ -239,7 +239,17 @@ router.put('/:id', async (req, res) => {
             return res.status(404).json({ error: 'Production entry not found' });
         }
 
-        // Only update provided fields
+        // Cross-company check
+        if (req.companyId && entry.companyId && entry.companyId !== req.companyId) {
+            return res.status(403).json({ error: 'Forbidden — cross-company access denied' });
+        }
+        // Only privileged roles or the entry owner can update
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        const isOwner = entry.employeeId === req.user?.id;
+        if (!isPrivileged && !isOwner) {
+            return res.status(403).json({ error: 'Forbidden — you can only edit your own production entries' });
+        }
+
         const updates = req.body;
         if (updates.qty !== undefined && updates.rate !== undefined && updates.totalAmount === undefined) {
             updates.totalAmount = updates.qty * updates.rate;
@@ -263,6 +273,15 @@ router.delete('/:id', async (req, res) => {
             return res.status(404).json({ error: 'Production entry not found' });
         }
 
+        if (req.companyId && entry.companyId && entry.companyId !== req.companyId) {
+            return res.status(403).json({ error: 'Forbidden — cross-company access denied' });
+        }
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER'].includes(req.user.role);
+        const isOwner = entry.employeeId === req.user?.id;
+        if (!isPrivileged && !isOwner) {
+            return res.status(403).json({ error: 'Forbidden — you can only delete your own production entries' });
+        }
+
         await entry.destroy();
         res.json({ success: true, message: 'Production entry deleted' });
     } catch (e) {
@@ -276,8 +295,8 @@ router.delete('/:id', async (req, res) => {
 // GET all production items/rates (company scoped)
 router.get('/items/all', async (req, res) => {
     try {
-        const { companyId } = req.query;
         const whereClause = {};
+        const companyId = req.companyId || req.query.companyId;
         if (companyId) whereClause.companyId = companyId;
 
         const items = await ProductionItem.findAll({
@@ -292,17 +311,17 @@ router.get('/items/all', async (req, res) => {
 });
 
 // POST add new production item
-router.post('/items/add', async (req, res) => {
+router.post('/items/add', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER']), async (req, res) => {
     try {
-        const { id, companyId, name, rate, category } = req.body;
+        const { name, rate, category } = req.body;
 
         if (!name) {
             return res.status(400).json({ error: 'name is required' });
         }
 
         const newItem = await ProductionItem.create({
-            id: id || `item-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-            companyId,
+            id: `item-${uuidv4()}`,
+            companyId: req.companyId || req.body.companyId,
             name,
             rate: rate || 0,
             category
@@ -316,7 +335,7 @@ router.post('/items/add', async (req, res) => {
 });
 
 // PUT update production item
-router.put('/items/:id', async (req, res) => {
+router.put('/items/:id', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN', 'MANAGER']), async (req, res) => {
     try {
         const { id } = req.params;
         const item = await ProductionItem.findByPk(id);
@@ -334,7 +353,7 @@ router.put('/items/:id', async (req, res) => {
 });
 
 // DELETE production item
-router.delete('/items/:id', async (req, res) => {
+router.delete('/items/:id', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN']), async (req, res) => {
     try {
         const { id } = req.params;
         const item = await ProductionItem.findByPk(id);

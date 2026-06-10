@@ -4,7 +4,7 @@ import {
     MessageSquare, Settings, CheckCircle, XCircle, AlertTriangle,
     Send, Eye, EyeOff, Loader2, Bell, Smartphone, Info
 } from 'lucide-react';
-import { API_URL } from '@/lib/apiConfig';
+import { apiFetch } from '@/lib/apiClient';
 
 interface WAConfig {
     enabled: boolean;
@@ -32,7 +32,7 @@ export const NotificationSettings = () => {
 
     useEffect(() => {
         if ('Notification' in window) setBrowserPerm(Notification.permission);
-        fetch(`${API_URL}/whatsapp/config`)
+        apiFetch('/whatsapp/config')
             .then(r => r.json())
             .then(d => setConfig(d))
             .catch(() => { })
@@ -42,9 +42,8 @@ export const NotificationSettings = () => {
     const handleSave = async () => {
         setSaving(true);
         try {
-            const res = await fetch(`${API_URL}/whatsapp/config`, {
+            const res = await apiFetch('/whatsapp/config', {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config),
             });
             const data = await res.json();
@@ -58,9 +57,8 @@ export const NotificationSettings = () => {
         if (!testPhone) { showToast('err', 'Enter a phone number'); return; }
         setTesting(true);
         try {
-            const res = await fetch(`${API_URL}/whatsapp/test`, {
+            const res = await apiFetch('/whatsapp/test', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ phone: testPhone }),
             });
             const data = await res.json();

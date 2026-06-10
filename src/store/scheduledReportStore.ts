@@ -57,6 +57,7 @@ export const useScheduledReportStore = create<ScheduledReportState>()(
                 }));
             } catch (error) {
                 console.error('Failed to create scheduled report:', error);
+                throw error;
             }
         },
 
@@ -80,6 +81,7 @@ export const useScheduledReportStore = create<ScheduledReportState>()(
                 }));
             } catch (error) {
                 console.error('Failed to delete scheduled report:', error);
+                throw error;
             }
         },
 

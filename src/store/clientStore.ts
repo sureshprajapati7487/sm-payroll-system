@@ -1,18 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { API_URL as API } from '@/lib/apiConfig';
-
-// Use relative path — Vite dev proxy handles /api → http://localhost:3000
-// This avoids ERR_SSL_PROTOCOL_ERROR when app is on HTTPS but backend is HTTP
-
-function authHeader(): Record<string, string> {
-    try {
-        // Token is stored by Zustand persist under 'auth-storage'
-        const raw = localStorage.getItem('auth-storage');
-        const token = raw ? JSON.parse(raw)?.state?.token : null;
-        return token ? { Authorization: `Bearer ${token}` } : {};
-    } catch { return {}; }
-}
+import { apiFetch } from '@/lib/apiClient';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type ClientStatus = 'ACTIVE' | 'INACTIVE' | 'PROSPECT' | 'BLOCKED';
@@ -94,7 +82,7 @@ interface ClientStore {
     loading: boolean;
     error: string | null;
 
-    fetchClients: (params?: { companyId?: string; assignedTo?: string; status?: string }) => Promise<void>;
+    fetchClients: (params?: { assignedTo?: string; status?: string }) => Promise<void>;
     addClient: (data: Partial<SalesClient>) => Promise<SalesClient>;
     updateClient: (id: string, data: Partial<SalesClient>) => Promise<SalesClient>;
     deleteClient: (id: string) => Promise<void>;
@@ -102,8 +90,8 @@ interface ClientStore {
 
     setClientLocation: (clientId: string, lat: number, lng: number, setBy: string) => Promise<void>;
 
-    fetchVisits: (params?: { clientId?: string; salesmanId?: string; companyId?: string; date?: string }) => Promise<void>;
-    checkIn: (params: { companyId: string; clientId: string; salesmanId: string; salesmanName?: string; lat?: number; lng?: number; purpose?: VisitPurpose; notes?: string }) => Promise<ClientVisitRecord>;
+    fetchVisits: (params?: { clientId?: string; salesmanId?: string; date?: string }) => Promise<void>;
+    checkIn: (params: { clientId: string; salesmanId: string; salesmanName?: string; lat?: number; lng?: number; purpose?: VisitPurpose; notes?: string }) => Promise<ClientVisitRecord>;
     checkOut: (visitId: string, params: { lat?: number; lng?: number; outcome?: VisitOutcome; orderAmount?: number; collectionAmount?: number; notes?: string; nextVisitDate?: string }) => Promise<void>;
     fetchActiveVisit: (salesmanId: string) => Promise<void>;
     fetchStats: (salesmanId: string) => Promise<SalesmanStats>;
@@ -121,8 +109,11 @@ export const useClientStore = create<ClientStore>()(
             fetchClients: async (params = {}) => {
                 set({ loading: true, error: null });
                 try {
-                    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
-                    const res = await fetch(`${API}/clients${qs ? '?' + qs : ''}`, { headers: authHeader() });
+                    // companyId not sent — server uses JWT req.companyId
+                    const qs = new URLSearchParams(
+                        Object.entries(params).filter(([, v]) => v) as [string, string][]
+                    ).toString();
+                    const res = await apiFetch(`/clients${qs ? '?' + qs : ''}`);
                     const data = await res.json();
                     if (!res.ok) throw new Error(data.error || 'Failed to fetch clients');
                     set({ clients: data, loading: false });
@@ -130,10 +121,9 @@ export const useClientStore = create<ClientStore>()(
             },
 
             addClient: async (data) => {
-                const res = await fetch(`${API}/clients`, {
+                const res = await apiFetch('/clients', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...authHeader() },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(data),
                 });
                 const client = await res.json();
                 if (!res.ok) throw new Error(client.error || 'Failed to add client');
@@ -142,10 +132,9 @@ export const useClientStore = create<ClientStore>()(
             },
 
             updateClient: async (id, data) => {
-                const res = await fetch(`${API}/clients/${id}`, {
+                const res = await apiFetch(`/clients/${id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', ...authHeader() },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(data),
                 });
                 const client = await res.json();
                 if (!res.ok) throw new Error(client.error || 'Failed to update client');
@@ -154,28 +143,26 @@ export const useClientStore = create<ClientStore>()(
             },
 
             deleteClient: async (id) => {
-                const res = await fetch(`${API}/clients/${id}`, { method: 'DELETE', headers: authHeader() });
+                const res = await apiFetch(`/clients/${id}`, { method: 'DELETE' });
                 if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to delete'); }
                 set(s => ({ clients: s.clients.filter(c => c.id !== id) }));
             },
 
             bulkImportClients: async (clients, companyId) => {
-                const res = await fetch(`${API}/clients/bulk`, {
+                const res = await apiFetch('/clients/bulk', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...authHeader() },
-                    body: JSON.stringify({ clients, companyId })
+                    body: JSON.stringify({ clients, companyId }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Bulk import failed');
-                await get().fetchClients({ companyId });
+                await get().fetchClients();
                 return data;
             },
 
             setClientLocation: async (clientId, lat, lng, setBy) => {
-                const res = await fetch(`${API}/clients/${clientId}/location`, {
+                const res = await apiFetch(`/clients/${clientId}/location`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', ...authHeader() },
-                    body: JSON.stringify({ latitude: lat, longitude: lng, setBy })
+                    body: JSON.stringify({ latitude: lat, longitude: lng, setBy }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed to set location');
@@ -185,19 +172,21 @@ export const useClientStore = create<ClientStore>()(
             fetchVisits: async (params = {}) => {
                 set({ loading: true });
                 try {
-                    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
-                    const res = await fetch(`${API}/visits${qs ? '?' + qs : ''}`, { headers: authHeader() });
+                    const qs = new URLSearchParams(
+                        Object.entries(params).filter(([, v]) => v) as [string, string][]
+                    ).toString();
+                    const res = await apiFetch(`/visits${qs ? '?' + qs : ''}`);
                     const visits = await res.json();
                     if (!res.ok) throw new Error(visits.error);
                     set({ visits, loading: false });
                 } catch (e: any) { set({ error: e.message, loading: false }); }
             },
 
-            checkIn: async ({ companyId, clientId, salesmanId, salesmanName, lat, lng, purpose, notes }) => {
-                const res = await fetch(`${API}/visits/checkin`, {
+            checkIn: async ({ clientId, salesmanId, salesmanName, lat, lng, purpose, notes }) => {
+                // companyId not sent — server uses JWT req.companyId via x-company-id header
+                const res = await apiFetch('/visits/checkin', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...authHeader() },
-                    body: JSON.stringify({ companyId, clientId, salesmanId, salesmanName, checkInLat: lat, checkInLng: lng, purpose, notes })
+                    body: JSON.stringify({ clientId, salesmanId, salesmanName, checkInLat: lat, checkInLng: lng, purpose, notes }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Check-in failed');
@@ -206,31 +195,28 @@ export const useClientStore = create<ClientStore>()(
             },
 
             checkOut: async (visitId, params) => {
-                const res = await fetch(`${API}/visits/${visitId}/checkout`, {
+                const res = await apiFetch(`/visits/${visitId}/checkout`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...authHeader() },
-                    body: JSON.stringify({ checkOutLat: params.lat, checkOutLng: params.lng, ...params })
+                    body: JSON.stringify({ checkOutLat: params.lat, checkOutLng: params.lng, ...params }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Check-out failed');
                 set({ activeVisit: null });
                 set(s => ({ visits: s.visits.map(v => v.id === visitId ? data.visit : v) }));
-                // update client stats in store
                 set(s => ({ clients: s.clients.map(c => c.id === data.visit.clientId ? { ...c, totalVisits: (c.totalVisits || 0) + 1, lastVisitAt: new Date().toISOString() } : c) }));
             },
 
             fetchActiveVisit: async (salesmanId) => {
                 try {
-                    const res = await fetch(`${API}/visits/active/${salesmanId}`, { headers: authHeader() });
+                    const res = await apiFetch(`/visits/active/${salesmanId}`);
                     if (!res.ok) { set({ activeVisit: null }); return; }
                     const data = await res.json();
-                    // Only set if data has a valid visit object
                     set({ activeVisit: (data && data.visit) ? data : null });
                 } catch { set({ activeVisit: null }); }
             },
 
             fetchStats: async (salesmanId) => {
-                const res = await fetch(`${API}/visits/stats/${salesmanId}`, { headers: authHeader() });
+                const res = await apiFetch(`/visits/stats/${salesmanId}`);
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error);
                 return data;

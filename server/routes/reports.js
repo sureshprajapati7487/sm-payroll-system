@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
 const { requireRole } = require('../rbac');
 
 let CustomReportTemplate, ScheduledReport, Employee;
@@ -36,9 +37,9 @@ router.post('/templates', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res
     try {
         const { name, description, columns, filters } = req.body;
         const companyId = req.companyId || req.body.companyId;
-        if (!companyId) return res.status(400).json({ error: 'companyId required' });
+        if (!companyId) return res.status(400).json({ error: 'Company context required — ensure you are logged in with a valid session' });
         const newTemplate = await CustomReportTemplate.create({
-            id: `tpl-${Date.now()}`,
+            id: `tpl-${uuidv4()}`,
             companyId,
             name,
             description,
@@ -121,10 +122,10 @@ router.post('/schedules', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res
     try {
         const { name, reportType, frequency, dayOfWeek, dayOfMonth, recipients, enabled, nextRun, createdBy } = req.body;
         const companyId = req.companyId || req.body.companyId;
-        if (!companyId) return res.status(400).json({ error: 'companyId required' });
+        if (!companyId) return res.status(400).json({ error: 'Company context required — ensure you are logged in with a valid session' });
 
         const newSchedule = await ScheduledReport.create({
-            id: `sched-${Date.now()}`,
+            id: `sched-${uuidv4()}`,
             companyId,
             name,
             reportType,
@@ -236,7 +237,7 @@ router.post('/generate', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res)
         }
 
         // Asynchronous Background Job
-        const jobId = `job-${Date.now()}`;
+        const jobId = `job-${uuidv4()}`;
         const job = await ReportJob.create({
             id: jobId,
             companyId,
@@ -285,7 +286,7 @@ router.get('/download', requireRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) 
         employees.forEach(e => csv += `${e.id},${e.name},${type} data\n`);
 
         res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename="${type}_report_${Date.now()}.csv"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${type}_report_${new Date().toISOString().split('T')[0]}.csv"`);
         res.send(csv);
     } catch (error) {
         console.error('Error downloading report:', error);

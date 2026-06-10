@@ -83,12 +83,14 @@ export const TrashManagement = () => {
     const handlePermanentDelete = async (emp: DeletedEmployee, reason: string) => {
         setActionInProgress(emp.id);
         try {
-            const res = await apiFetch(`/admin/employees/${emp.id}/permanent`, { method: 'DELETE' });
+            const res = await apiFetch(`/admin/employees/${emp.id}/permanent`, {
+                method: 'DELETE',
+                body: JSON.stringify({ reason }),
+            });
             if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
             setEmployees(prev => prev.filter(e => e.id !== emp.id));
             setDeleteConfirmItem(null);
             toast(`${emp.name} permanently delete ho gaya.`, 'warning');
-            console.log(`[TrashManagement] Permanent delete: ${emp.id} | Reason: ${reason}`);
         } catch (e: any) {
             toast(`Delete failed: ${e.message}`, 'error');
         } finally {

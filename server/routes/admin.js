@@ -4,6 +4,7 @@ const router = express.Router();
 const { Op } = require('sequelize');
 const fs = require('fs');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 const { requireRole } = require('../rbac');
 
 let Department, Shift, WorkGroup, SalaryType, AttendanceAction, PunchLocation, SystemSetting, SystemKey, Employee, Biometric, Expense, AdvanceSalary, Holiday, AuditLog, UserSession, IPRestriction, Attendance, Production, Loan, SalarySlip, StatutoryRule, addError, getErrorHint;
@@ -309,7 +310,7 @@ router.post('/system-settings', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_AD
         if (setting) {
             await setting.update({ value });
         } else {
-            setting = await SystemSetting.create({ ...req.body, id: Math.random().toString(36).substr(2, 9) });
+            setting = await SystemSetting.create({ ...req.body, id: uuidv4() });
         }
         res.json(setting);
     } catch (e) { addError(e, 'POST /api/system-settings'); res.status(500).json({ error: e.message }); }
@@ -336,7 +337,7 @@ router.post('/system-keys', requireRole(['SUPER_ADMIN', 'ACCOUNT_ADMIN']), async
         const { companyId, key, label, value, category } = req.body;
         if (!companyId || !key || !label || !value || !category) return res.status(400).json({ error: 'Required fields missing' });
 
-        const record = await SystemKey.create({ ...req.body, id: Math.random().toString(36).substr(2, 9) });
+        const record = await SystemKey.create({ ...req.body, id: uuidv4() });
         res.status(201).json(record);
     } catch (e) { addError(e, 'POST /api/system-keys'); res.status(500).json({ error: e.message }); }
 });
@@ -362,10 +363,16 @@ router.delete('/system-keys/:id', requireRole(['SUPER_ADMIN', 'ACCOUNT_ADMIN']),
 // ── Biometrics ─────────────────────────────────────────────────────────────────
 router.get('/biometrics/all', async (req, res) => {
     try {
-        const records = await Biometric.findAll({ attributes: ['employeeId', 'faceDescriptor'] });
+        const records = await Biometric.findAll({
+            attributes: ['employeeId', 'faceDescriptor', 'registeredAt'],
+            order: [['registeredAt', 'DESC']], // latest first — deduplication keeps first seen per emp
+        });
         const result = {};
         for (const r of records) {
-            if (r.faceDescriptor && r.faceDescriptor.length > 0) result[r.employeeId] = r.faceDescriptor;
+            // Only take first (latest) record per employeeId — handles duplicate rows from old bug
+            if (r.faceDescriptor && r.faceDescriptor.length > 0 && !result[r.employeeId]) {
+                result[r.employeeId] = r.faceDescriptor;
+            }
         }
         res.json(result);
     } catch (e) { addError(e, 'GET /api/biometrics/all'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
@@ -373,7 +380,8 @@ router.get('/biometrics/all', async (req, res) => {
 
 router.get('/biometrics/:employeeId', async (req, res) => {
     try {
-        const record = await Biometric.findByPk(req.params.employeeId);
+        // findByPk won't work — PK is auto-increment id, not employeeId
+        const record = await Biometric.findOne({ where: { employeeId: req.params.employeeId } });
         if (!record) return res.status(404).json({ error: 'Not found' });
         res.json(record);
     } catch (e) { addError(e, 'GET /api/biometrics/:id'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
@@ -382,17 +390,35 @@ router.post('/biometrics/:employeeId', async (req, res) => {
     try {
         const { employeeId } = req.params;
         const { faceDescriptor, thumbCredential } = req.body;
-        const [record] = await Biometric.upsert({ employeeId, ...(faceDescriptor !== undefined ? { faceDescriptor } : {}), ...(thumbCredential !== undefined ? { thumbCredential } : {}), registeredAt: new Date().toISOString() });
-        res.json(record);
+        const updates = {
+            ...(faceDescriptor !== undefined ? { faceDescriptor } : {}),
+            ...(thumbCredential !== undefined ? { thumbCredential } : {}),
+            registeredAt: new Date().toISOString(),
+        };
+        // Find existing record by employeeId (not PK), update if found, create if not
+        const existing = await Biometric.findOne({ where: { employeeId } });
+        if (existing) {
+            await existing.update(updates);
+            res.json(existing.toJSON());
+        } else {
+            const created = await Biometric.create({ employeeId, ...updates });
+            res.json(created.toJSON());
+        }
     } catch (e) { addError(e, 'POST /api/biometrics/:id'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.delete('/biometrics/:employeeId/face', async (req, res) => {
-    try { const r = await Biometric.findByPk(req.params.employeeId); if (r) await r.update({ faceDescriptor: null }); res.json({ success: true }); }
-    catch (e) { addError(e, 'DELETE /api/biometrics/:id/face'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
+    try {
+        const r = await Biometric.findOne({ where: { employeeId: req.params.employeeId } });
+        if (r) await r.update({ faceDescriptor: null });
+        res.json({ success: true });
+    } catch (e) { addError(e, 'DELETE /api/biometrics/:id/face'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.delete('/biometrics/:employeeId/thumb', async (req, res) => {
-    try { const r = await Biometric.findByPk(req.params.employeeId); if (r) await r.update({ thumbCredential: null }); res.json({ success: true }); }
-    catch (e) { addError(e, 'DELETE /api/biometrics/:id/thumb'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
+    try {
+        const r = await Biometric.findOne({ where: { employeeId: req.params.employeeId } });
+        if (r) await r.update({ thumbCredential: null });
+        res.json({ success: true });
+    } catch (e) { addError(e, 'DELETE /api/biometrics/:id/thumb'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.delete('/biometrics/:employeeId', async (req, res) => {
     try { await Biometric.destroy({ where: { employeeId: req.params.employeeId } }); res.json({ success: true }); }
@@ -411,14 +437,14 @@ router.get('/expenses', async (req, res) => {
 });
 router.post('/expenses', async (req, res) => {
     try {
-        const { id, companyId, date, category, amount, description, paidTo, addedBy, receiptUrl } = req.body;
+        const { companyId, date, category, amount, description, paidTo, addedBy, receiptUrl } = req.body;
         if (!date || !amount) return res.status(400).json({ error: 'date and amount are required' });
-        // Maker Workflow: Hardcode status to PENDING regardless of client payload
         const expense = await Expense.create({
-            id: id || `exp_${Date.now()}`,
-            companyId, date, category: category || 'OTHER', amount, description, paidTo, addedBy, receiptUrl,
+            id: `exp-${uuidv4()}`,                          // server-generated — ignore client id
+            companyId: req.companyId || companyId,         // JWT takes priority
+            date, category: category || 'OTHER', amount, description, paidTo, addedBy, receiptUrl,
             status: 'PENDING',
-            auditTrail: [{ id: Date.now().toString(), date: new Date().toISOString(), action: 'CREATED', performedBy: addedBy || 'system' }]
+            auditTrail: [{ id: uuidv4(), date: new Date().toISOString(), action: 'CREATED', performedBy: addedBy || 'system' }]
         });
         res.status(201).json(expense);
     } catch (e) { addError(e, 'POST /api/expenses'); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
@@ -430,13 +456,28 @@ router.patch('/expenses/:id', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMI
         if (!expense) return res.status(404).json({ error: 'Expense not found' });
         const { status, performedBy, remarks } = req.body;
         const trail = Array.isArray(expense.auditTrail) ? [...expense.auditTrail] : [];
-        trail.push({ id: Date.now().toString(), date: new Date().toISOString(), action: status, performedBy: performedBy || req.user?.name || 'system', details: remarks });
+        trail.push({ id: uuidv4(), date: new Date().toISOString(), action: status, performedBy: performedBy || req.user?.name || 'system', details: remarks });
         await expense.update({ status, auditTrail: trail });
         res.json(expense);
     } catch (e) { addError(e, `PATCH /api/expenses/${req.params.id}`); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 router.delete('/expenses/:id', async (req, res) => {
-    try { const e2 = await Expense.findByPk(req.params.id); if (!e2) return res.status(404).json({ error: 'Expense not found' }); await e2.destroy(); res.json({ success: true }); }
+    try {
+        const e2 = await Expense.findByPk(req.params.id);
+        if (!e2) return res.status(404).json({ error: 'Expense not found' });
+        // Cross-company check
+        if (req.companyId && e2.companyId && e2.companyId !== req.companyId) {
+            return res.status(403).json({ error: 'Forbidden — cross-company access denied' });
+        }
+        // Only the creator (by name) or privileged roles can delete
+        const isPrivileged = req.user && ['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN'].includes(req.user.role);
+        const isCreator = e2.addedBy === req.user?.name && e2.status === 'PENDING';
+        if (!isPrivileged && !isCreator) {
+            return res.status(403).json({ error: 'Forbidden — only the creator (while pending) or ADMIN can delete expenses' });
+        }
+        await e2.destroy();
+        res.json({ success: true });
+    }
     catch (e) { addError(e, `DELETE /api/expenses/${req.params.id}`); const h = getErrorHint(e); res.status(500).json({ error: e.message, why: h.why, fix: h.fix }); }
 });
 
@@ -543,7 +584,7 @@ router.post('/audit-logs', requireRole(['SUPER_ADMIN', 'ADMIN', 'ACCOUNT_ADMIN',
         if (req.user && log.userId !== req.user.id && req.user.role !== 'SUPER_ADMIN') {
             return res.status(403).json({ error: 'Cannot create audit log as a different user' });
         }
-        const created = await AuditLog.create({ ...log, id: log.id || `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, timestamp: log.timestamp || new Date().toISOString() });
+        const created = await AuditLog.create({ ...log, id: log.id || `audit-${uuidv4()}`, timestamp: log.timestamp || new Date().toISOString() });
         res.status(201).json(created);
     } catch (e) { addError(e, 'POST /api/audit-logs'); res.status(500).json({ error: e.message }); }
 });
@@ -908,9 +949,10 @@ router.delete('/employees/:id/permanent', requireRole(['SUPER_ADMIN']), async (r
         if (req.companyId) where.companyId = req.companyId;
         const emp = await Employee.findOne({ where });
         if (!emp) return res.status(404).json({ error: 'Employee not found or is not soft-deleted' });
+        const reason = req.body?.reason;
         await emp.destroy();
         await AuditLog.create({
-            id: `audit-permdel-${Date.now()}`,
+            id: `audit-${uuidv4()}`,
             companyId: req.companyId,
             userId: req.user?.id,
             userName: req.user?.name,
@@ -919,6 +961,7 @@ router.delete('/employees/:id/permanent', requireRole(['SUPER_ADMIN']), async (r
             entityType: 'EMPLOYEE',
             entityId: req.params.id,
             entityName: emp.name,
+            details: reason ? { reason } : undefined,
             status: 'SUCCESS',
             timestamp: new Date().toISOString(),
         });

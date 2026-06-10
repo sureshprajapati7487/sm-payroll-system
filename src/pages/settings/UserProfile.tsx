@@ -3,8 +3,7 @@ import { User, Camera, Mail, Phone, MapPin, ShieldCheck, CheckCircle2, XCircle }
 import { useAuthStore } from '@/store/authStore';
 import { useEmployeeStore } from '@/store/employeeStore';
 import { PasswordStrengthInput, isPasswordValid } from '@/components/ui/PasswordStrengthInput';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+import { apiFetch } from '@/lib/apiClient';
 
 export const UserProfile = () => {
     const { user: authUser } = useAuthStore();
@@ -51,9 +50,8 @@ export const UserProfile = () => {
 
         setPwdLoading(true);
         try {
-            const res = await fetch(`${API_URL}/employees/${empId}/change-password`, {
+            const res = await apiFetch(`/employees/${empId}/change-password`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     currentPassword: pwdForm.currentPassword.trim(),
                     newPassword: pwdForm.newPassword.trim(),

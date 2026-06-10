@@ -17,7 +17,7 @@ export const useRegularizationStore = create<RegularizationState>((set, get) => 
     addRequest: (req) => {
         const newRequest: RegularizationRequest = {
             ...req,
-            id: Math.random().toString(36).substr(2, 9),
+            id: crypto.randomUUID(),
             status: 'PENDING',
             createdAt: new Date().toISOString()
         };

@@ -27,7 +27,7 @@ export class RetryQueue {
             onFailure?: (error: any) => void;
         }
     ): string {
-        const itemId = `retry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const itemId = `retry-${Date.now()}-${crypto.randomUUID()}`;
 
         const item: QueueItem = {
             id: itemId,

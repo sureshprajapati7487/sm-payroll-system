@@ -31,7 +31,7 @@ export const CostCenterMapping = () => {
         if (!newCenter.name || !newCenter.code || !newCenter.department) return;
 
         const center: CostCenter = {
-            id: Date.now().toString(),
+            id: crypto.randomUUID(),
             ...newCenter,
             allocated: 0
         };

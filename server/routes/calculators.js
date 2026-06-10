@@ -27,7 +27,8 @@ const getActiveRule = async (companyId, targetDate = new Date()) => {
  */
 router.post('/pf-esi', async (req, res) => {
     try {
-        const { companyId, basicSalary = 0, grossSalary = 0, date } = req.body;
+        const { basicSalary = 0, grossSalary = 0, date } = req.body;
+        const companyId = req.companyId || req.body.companyId;
 
         let pfRate = 12;
         let pfCap = 1800;
@@ -118,7 +119,8 @@ const getPT = (grossAmount, rule, state) => {
  */
 router.post('/ctc', async (req, res) => {
     try {
-        const { companyId, basicSalary = 0, state } = req.body;
+        const { basicSalary = 0, state } = req.body;
+        const companyId = req.companyId || req.body.companyId;
 
         // Standard distribution logic 
         // We will build a standard salary structure matching the front-end logic:
@@ -204,7 +206,17 @@ router.post('/ctc', async (req, res) => {
  */
 router.post('/tds', async (req, res) => {
     try {
-        const { annualSalary = 0, section80C = 0, section80D = 0, customSlabs } = req.body;
+        const { annualSalary = 0, section80C = 0, section80D = 0 } = req.body;
+        // customSlabs validation: only accept if each slab has min (number), rate (0–1), and max (number|null)
+        const rawSlabs = req.body.customSlabs;
+        const isValidSlabArray = (arr) => Array.isArray(arr) && arr.every(s =>
+            typeof s.min === 'number' && typeof s.rate === 'number' && s.rate >= 0 && s.rate <= 1 &&
+            (s.max === null || typeof s.max === 'number')
+        );
+        const customSlabs = (rawSlabs && typeof rawSlabs === 'object' &&
+            (!rawSlabs.newRegime || isValidSlabArray(rawSlabs.newRegime)) &&
+            (!rawSlabs.oldRegime || isValidSlabArray(rawSlabs.oldRegime)))
+            ? rawSlabs : undefined;
 
         // Basic Logic matching the ui tdsCalculator
         // NEW REGIME SLABS (FY 2024-25)

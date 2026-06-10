@@ -1,0 +1,1631 @@
+# 📋 SM Payroll System — Implementation & Plan
+
+> **Append-only conversation log** — Har message yahan save hota hai. Chat history ki zaroorat nahi.
+
+---
+
+## 🏗️ Project Info
+
+| Field | Detail |
+|-------|--------|
+| 👤 Owner | Suresh Kumar |
+| 🌿 Branch | `main` |
+| 📅 Last Updated | 2026-06-10 |
+| 🚀 Hosting | Render (Production) |
+| 🗄️ DB Dev | SQLite |
+| 🗄️ DB Prod | PostgreSQL |
+| 🧱 Frontend | React 18 · TypeScript · Vite · Zustand · TailwindCSS |
+| ⚙️ Backend | Node.js · Express · Sequelize |
+| 📱 Mobile | Capacitor (Android) |
+
+---
+
+## ▶️ Run Karne ka Tarika
+
+```bash
+# Terminal 1 — Backend
+cd server && node index.js
+# → http://localhost:3000
+
+# Terminal 2 — Frontend
+npm run dev
+# → https://localhost:5173
+```
+
+> Certificate warning aaye toh "Advanced → Proceed" karo — normal hai.
+
+---
+
+## 📊 Current Project State
+
+| Item | Status |
+|------|--------|
+| 🔴 Uncommitted | 93 files changed (1367 insertions, 971 deletions) |
+| 🟡 Untracked | `tmp_test_loan_fix.cjs`, `tmp_test_loan_fix.js`, `server/uploads/` |
+| 🟢 Backend | Running — Port 3000 + 3443 |
+| 🟢 Frontend | Running — Port 5173 |
+
+---
+
+## ✅ Pending Tasks
+
+| Priority | Task |
+|----------|------|
+| 🔴 HIGH | 93 files commit karna |
+| 🟡 MED | Temp files delete karna |
+| 🟢 LOW | `server/uploads/` gitignore verify |
+| 🔵 NEXT | Next feature decide karna |
+
+---
+
+## 💬 Conversation Log
+
+---
+
+### Entry #001 — 2026-06-10
+
+**User:**
+> I want to run this project in a browser. How can I run it?
+
+**Claude:**
+> Do terminals mein run karo:
+>
+> Terminal 1 (Backend):
+> ```
+> cd server
+> node index.js   →  http://localhost:3000
+> ```
+> Terminal 2 (Frontend):
+> ```
+> npm run dev     →  https://localhost:5173
+> ```
+> Browser mein certificate warning aayega (self-signed) — "Advanced → Proceed" karo.
+
+---
+
+### Entry #002 — 2026-06-10
+
+**User:**
+> Ab se jab bhi hum is project par kaam karein, ek "Implementation & Plan.md" file maintain karni hai.
+
+**Claude:**
+> File create ki gayi project root mein. Ismein record hoga:
+> - Ab tak kya complete hua
+> - Kaunse changes kiye
+> - Kaunse decisions liye
+> - Current status, pending tasks, follow-up items, notes
+>
+> Memory mein bhi save kiya taaki future conversations mein bhi rule yaad rahe.
+>
+> Files created: `Implementation & Plan.md`, `memory/feedback_implementation_plan.md`
+
+---
+
+### Entry #003 — 2026-06-10
+
+**User:**
+> (Preferred format share kiya — numbered entries #001, #002... with sections: User Request, Action Taken, Result, Files Modified, Current State, Upcoming Tasks)
+
+**Claude:**
+> File ko naye format mein restructure kiya.
+> `## Timeline` section add kiya.
+> Har entry ab consistent template follow karti hai.
+
+---
+
+### Entry #004 — 2026-06-10
+
+**User:**
+> Implementation Plan konsi file hai kya name hai File ka
+
+**Claude:**
+> `Implementation & Plan.md` — project root mein:
+> ```
+> D:\Projects\SM PAYROLL SYSTEM\Implementation & Plan.md
+> ```
+
+---
+
+### Entry #005 — 2026-06-10
+
+**User:**
+> Mene jo ab baat ki or chat ki hai voh usme update kyu nahi hui — ho jani chahiye or jo aapne reply kiya hai voh bhi ho jana chahiye usme save
+
+**Claude:**
+> Missing entries (003, 004, 005) file mein append kiye.
+> Rule confirm: har conversation ke baad file update hogi — user ka message aur Claude ka reply dono.
+
+---
+
+### Entry #006 — 2026-06-10
+
+**User:**
+> Muje batao muje kya karna hai
+
+**Claude:**
+> Current state check kiya — 93 files uncommitted.
+>
+> Priority list:
+> 1. 🔴 Project run karo aur browser mein test karo
+> 2. 🔴 93 files commit karo — koi backup nahi abhi
+> 3. 🟡 Temp debug files delete karo
+> 4. 🔵 Next feature decide karo
+>
+> **Recommendation:** Pehle run karo → sab theek lage toh commit → phir next feature.
+
+---
+
+### Entry #007 — 2026-06-10
+
+**User:**
+> Implementation & Plan.md me kush aaya hi nahi hai
+
+**Claude:**
+> File 0 bytes ho gayi thi — Edit tool ka issue tha.
+> Poori file dobara likhi, Entry #001 se lekar saara content restore kiya.
+
+---
+
+### Entry #008 — 2026-06-10
+
+**User:**
+> .md.resolved ye file bana doh acha dikhe
+
+**Claude:**
+> `Implementation & Plan.md.resolved` create ki — tables, emojis, badges ke saath visually rich format.
+> Dono files ab exist karti hain: plain `.md` aur rich `.md.resolved`
+
+---
+
+### Entry #009 — 2026-06-10
+
+**User:**
+> Implementation & Plan.md — plain working log ye nahi chahiye sab Implementation & Plan.md.resolved sab isme hi hona chahiye
+
+**Claude:**
+> `Implementation & Plan.md` delete kar di.
+> `Implementation & Plan.md.resolved` hi ab sirf ek main file hai — saara content isme.
+
+---
+
+### Entry #010 — 2026-06-10
+
+**User:**
+> muje Colar full chahiye jo dekhne me acha lage or Padne ka man kare
+
+**Claude:**
+> File ko colorful design diya — emojis, HTML badges, priority color indicators (🔴🟠🟡🟢), rich tables.
+> Note: PowerShell se copy karte waqt encoding issue aayi — emojis garbled ho gaye the. Write tool se fix kiya.
+
+---
+
+### Entry #011 — 2026-06-10
+
+**User:**
+> jo me baat karu voh Implementation & Plan.md.resolved me apne aap update hona chahiye
+
+**Claude:**
+> Memory rule MANDATORY bana diya:
+> - Har response ke baad file automatically update hogi
+> - User ko baar baar kehna nahi padega
+> - Har entry mein: user message + Claude reply + files changed
+>
+> `memory/feedback_implementation_plan.md` update kiya.
+
+---
+
+### Entry #012 — 2026-06-10
+
+**User:**
+> project run karo aur dekho kaisa dikh raha hai
+
+**Claude:**
+> Dono servers start kiye:
+> - Backend: `node index.js` → Port 3000 + 3443, SQLite connected ✅
+> - Frontend: `npm run dev` → Port 5173, Vite ready in 3650ms ✅
+>
+> Headless Chrome se screenshot liya. Result:
+> - Splash screen: "SM Payroll System — Enterprise Edition"
+> - Landing page: Dark theme, 3 cards — **Login · Sign Up · Create Company**
+> - App perfectly chal raha hai, koi error nahi
+
+---
+
+### Entry #013 — 2026-06-10
+
+**User:**
+> Implementation & Plan.md.resolved ko update karo jo baat ki hai voh dikhna chahiye isme
+
+**Claude:**
+> File check ki — Entry #012 already present tha.
+> Entry #013 append ki. File ab #001 se #013 tak complete hai.
+
+---
+
+### Entry #014 — 2026-06-10
+
+**User:**
+> sahi se dikhe Propar messge ki tarah
+
+**Claude:**
+> HTML tags hata diye — pure clean Markdown mein file rewrite ki.
+> VS Code preview (`Ctrl+Shift+V`) aur plain text dono mein sahi dikhegi.
+
+---
+
+### Entry #015 — 2026-06-10
+
+**User:**
+> upar jo mene Pucha voh or niche voh jo aap reply doh voh
+
+**Claude:**
+> Format samjha — har entry mein:
+> - **Upar:** User ka exact message
+> - **Neeche:** Claude ka poora reply
+>
+> Poori file is conversation format mein rewrite ki.
+> `Implementation & Plan.md.resolved` updated.
+
+---
+
+## 📜 Audit History — June 2026 (48 Fixes)
+
+### 🔴 Critical (C-01 to C-10)
+
+| ID | Issue | Fix |
+|----|-------|-----|
+| C-01 | SQL injection — client bulk upload | ORM `bulkCreate` + column whitelist |
+| C-02 | `/api/clear-data` — no RBAC | SUPER_ADMIN guard + SHA-256 token |
+| C-03 | `Loan.balance` — not updated in payroll | Atomic DB update in same transaction |
+| C-04 | Per-employee error aborted entire run | Non-fatal try/catch per employee |
+| C-05 | cronManager hardcoded `companyId: 'c1'` | Iterates all active companies |
+| C-06 | Duplicate report execution | Scheduler updates `nextRun` only |
+| C-07 | `companyId` missing on report models | Field added, queries tenant-scoped |
+| C-08 | Dynamic import in async `requestLoan()` | Static top-level import |
+| C-09/10 | `updateScheduledReport` stubs | PATCH endpoints implemented |
+
+### 🟠 High (H-01 to H-13)
+
+| ID | Issue | Fix |
+|----|-------|-----|
+| H-01 | Hardcoded JWT secrets | Ephemeral in dev; exits in prod if missing |
+| H-02 | `/verify-location` — public | Uses `req.companyId` from JWT |
+| H-03 | Duplicate unprotected audit-logs route | Removed |
+| H-04 | Payroll config hardcoded | Per-company `SystemSetting` |
+| H-05 | Notifications 200 on SMTP off | Returns 503 |
+| H-06 | ESS loan limit not enforced | 422 on `amount > loanLimit` |
+| H-07 | ESS `/me` full record returned | Safe fields only — no salary/bank |
+| H-08 | Active visit — missing `companyId` | Tenant-scoped |
+| H-09 | IPRestriction not tenant-scoped | `companyId` added |
+| H-10 | Loan workflow roles unvalidated | VALID_ROLES filter |
+| H-11 | System keys — no RBAC | `requireRole(['SUPER_ADMIN','ACCOUNT_ADMIN'])` |
+| H-12 | Document download path traversal | Filename from DB only |
+| H-13 | S3 uploads public-read | Private ACL + signed URL |
+
+### 🟡 Medium (M-01 to M-15)
+
+| ID | Fix |
+|----|-----|
+| M-02 | TDS Old Regime + 80C/80D — `taxRegime` on Employee |
+| M-03 | 7 attendance queries → single GROUP BY |
+| M-04 | LRU cache max 100 + TTL |
+| M-05 | FnF rejects `separationDate < joiningDate` |
+| M-06 | Offline queue max 3 retries + dead-letter |
+| M-07 | Payroll silent error → reverts + notification |
+| M-08 | Audit log failures → localStorage queue |
+| M-09 | Auth header fail → `sm:auth:corrupted` event |
+| M-10 | Financial field strip → 403 with field list |
+| M-11 | WhatsApp token → `tokenIsSet` boolean only |
+| M-13 | Scheduler `writeFileSync` → try/catch |
+| M-14 | Production `itemId` + rate snapshot on create |
+| M-15 | Leave threshold removed → company workflow |
+
+### 🏛️ Architecture / DB / Security
+
+| ID | Fix |
+|----|-----|
+| DB-01 | Indexes: Production, Expense, Holiday, AdvanceSalary, UserSession |
+| DB-02 | Timestamps on 10 config tables |
+| DB-03 | Biometric PK → auto-increment `id` |
+| SEC-01 | CORS → explicit `ALLOWED_ORIGINS` |
+| SEC-02 | SUPER_ADMIN cross-company → HMAC-SHA256 |
+| SEC-03 | `/api/dev/reset-admin` blocked in prod |
+| PERF-01 | Async payroll via `payrollWorker.js` |
+| STATE-01/02/03 | payrollStore scoped, `__smSettingsStore` removed, post-run invalidation |
+
+---
+
+## 📝 Recent Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f09b62c` | Fix backend index crash and frontend 401 race condition |
+| `366e941` | Merge ralph-loop-rkx40 into main — auth, signup fixes |
+| `3bbbfa2` | Auth, signup, approval, and company setup fixes |
+| `faf74ee` | Fix XSS, any types, auth gap, loan type delete check |
+| `2831520` | Fix silent catch blocks |
+| `c3543ca` | Strip console.* from production builds |
+| `c6da2d9` | Remove plaintext password from localStorage |
+| `e357e7e` | Remove SQLite DB from git tracking |
+
+---
+
+### Entry #016 — 2026-06-10
+
+**User:**
+> Implementation & Plan.md.resolved me dikhna chahiye
+
+**Claude:**
+> File read karke poora content verify kiya — Entry #001 se #015 tak sab present aur correct hai.
+> Entry #016 append ki is conversation ke liye.
+
+---
+
+### Entry #017 — 2026-06-10
+
+**User:**
+> Muje ab Browser me kholna hai SM Payroll ko kya karu batao
+
+**Claude:**
+> Pehle check kiya — dono servers already chal rahe the (port 3000 + 5173).
+>
+> Karna sirf itna hai:
+> 1. Browser kholo (Chrome ya Edge)
+> 2. Address bar mein type karo: `https://localhost:5173`
+> 3. Certificate warning aaye toh — "Advanced" → "Proceed to localhost" click karo
+> 4. SM Payroll ka login page khul jaayega ✅
+
+---
+
+### Entry #018 — 2026-06-10
+
+**User:**
+> Server kese chalu karu me
+
+**Claude:**
+> Do alag terminals mein yeh karo:
+>
+> **Terminal 1 — Backend:**
+> ```
+> cd "D:\Projects\SM PAYROLL SYSTEM\server"
+> node index.js
+> ```
+> Ready hone par dikhega: `✅ SM Payroll Backend (HTTP) → http://0.0.0.0:3000`
+>
+> **Terminal 2 — Frontend:**
+> ```
+> cd "D:\Projects\SM PAYROLL SYSTEM"
+> npm run dev
+> ```
+> Ready hone par dikhega: `➜ Local: https://localhost:5173/`
+>
+> Phir browser mein `https://localhost:5173` kholo.
+> Certificate warning par "Advanced → Proceed" karo.
+>
+> Note: Jab tak app use karna hai, dono terminals band mat karna.
+
+---
+
+### Entry #019 — 2026-06-10
+
+**User:**
+> D:\Screenshot dekho (screenshot share kiya)
+
+**Claude:**
+> Screenshot mein dekha: Login page open tha, `SUPERADMIN` ID se `Suresh@0882483` password try kiya tha — "Wrong Password" error aa raha tha. 3 attempts remaining tha.
+>
+> `server/reset_admin.js` run kiya — SUPER_ADMIN ka password reset kiya.
+>
+> **Naye Credentials:**
+> - Login ID: `emp-1780501683696-78ad` (Suresh Kumar)
+> - Password: `admin`
+>
+> Note: Login ID `SUPERADMIN` nahi, Employee ID use karni hogi.
+
+---
+
+### Entry #020 — 2026-06-10 *(Previous session catch-up)*
+
+**User:**
+> "nahi ho raha" → "ha ho gaya dekho Screenshot" → attendance dekho poori aur batao kya kami hai → me 1-1 dunga fix karo
+
+**Claude:**
+> Login successful confirm kiya. Attendance module ka full code audit kiya — **15 gaps identify ki:**
+>
+> 1. GENERAL shift filter dropdown missing ✅ Fixed
+> 2. HALF_DAY / WFH / ON_LEAVE status filter nahi ✅ Fixed
+> 3. WFH mark karne ka action button nahi ✅ Fixed
+> 4. Overtime hours UI mein nahi dikhte ✅ Fixed
+> 5. Total work hours (duration) nahi dikhti ✅ Fixed
+> 6. Monthly view nahi — sirf day-by-day 🔄 In Progress
+> 7. Employee-wise drill-down ⏳
+> 8. Break duration visible in UI ⏳
+> 9. Bulk mark actions ⏳
+> 10. Department filter ⏳
+> 11. OT hardcoded 9hr backend ⏳
+> 12. Regularization detail view ⏳
+> 13. Excel import ⏳
+> 14. PIN attendance UI ⏳
+> 15. Late auto-detection from shift ⏳
+>
+> **Files modified:** `src/pages/attendance/AttendanceDashboard.tsx`
+
+---
+
+### Entry #022 — 2026-06-10
+
+**User:**
+> 7. Employee-wise drill-down nahi
+
+**Claude:**
+> Fix #7 implement kiya — Employee-wise Drill-Down.
+>
+> **Kya kiya:**
+> - `EmployeeDrillModal` component banaya — right-side drawer (slide-in animation)
+> - Employee name pe click karo (daily view ya monthly grid dono mein) — drawer khulta hai
+> - Drawer mein dikhta hai:
+>   - Employee avatar + name + code + department + shift
+>   - Month navigator (prev/next)
+>   - 6 summary cards: Present / Absent / Late / WFH / Half Day / OT Hours
+>   - Day-by-day table: Date | Day | Punch In | Punch Out | Hours | OT | Status
+>   - Future dates skip, Sundays dimmed, color-coded status badges
+>   - Loading spinner while fetching
+> - Backend already updated (startDate/endDate support) — drill-down uses it with employeeId filter
+>
+> **Files Modified:**
+> - `src/pages/attendance/AttendanceDashboard.tsx`
+
+---
+
+### Entry #021 — 2026-06-10
+
+**User:**
+> *(Context resumed from previous session — Fix #6 Monthly View in progress)*
+
+**Claude:**
+> Fix #6 complete kiya — Monthly View implement ki.
+>
+> **Kya kiya:**
+> - Monthly view grid add kiya: employees × days table
+> - Rows = employees, Columns = din 1 to N
+> - Color-coded status cells: P/L/A/H/W/OL/HOL/OFF
+> - Per-employee summary column (P/L/A/W/H/OL count)
+> - Sunday + holiday columns highlighted
+> - Day-of-week indicators (Su/Mo/Tu...)
+> - Loading spinner jab monthly data fetch ho raha ho
+> - Future dates ke liye `·` (dot) — no status shown
+>
+> **Backend improvement:**
+> - `GET /api/attendance` mein `startDate`/`endDate` query param support add kiya
+> - Limit bhi 200 se 1000 tak badha diya monthly fetch ke liye
+>
+> **New state added:**
+> - `monthlyRecords[]` — fetched separately with date range
+> - `monthlyLoading` — shows spinner while fetching
+> - `useEffect` — triggers fetch when viewMode=MONTHLY or selectedMonth changes
+>
+> **Files Modified:**
+> - `src/pages/attendance/AttendanceDashboard.tsx`
+> - `server/routes/attendance.js`
+
+---
+
+### Entry #020 — 2026-06-10
+
+**User:**
+> Nahi ho raha hai (login fail)
+
+**Claude:**
+> Database check kiya — Login ID `SUPERADMIN` (code field) correct tha.
+> Problem: Account lockout ho gaya tha failed attempts ki wajah se + password mismatch.
+>
+> Fix kiya:
+> 1. Password directly SQLite mein update kiya → `Admin@123` (bcrypt hash)
+> 2. Backend restart kiya → memory lockout clear hua
+>
+> **Working Credentials:**
+> - Login ID: `SUPERADMIN`
+> - Password: `Admin@123`
+
+---
+
+### Entry #021 — 2026-06-10
+
+**User:**
+> Ha ho gaya dekho Screenshot
+
+**Claude:**
+> Login successful confirm hua.
+> Headless screenshot landing page dikha (session nahi hota headless mein).
+> User se kaha — screenshot chat mein paste karo.
+>
+> Status: SUPERADMIN login working ✅ · Credentials: `SUPERADMIN` / `Admin@123`
+
+---
+
+### Entry #022 — 2026-06-10
+
+**User:**
+> Aaj ham jo me bolunga uski kami or usko pura dekhate hai — me bolunga or aap bataoge or karenge
+
+**Claude:**
+> Samajh gaya. Session plan:
+> - User issues/gaps batayega
+> - Claude analyze karega, explain karega, fix karega
+> - Har fix is file mein log hoga
+>
+> Status: Ready — waiting for first issue.
+
+---
+
+### Entry #023 — 2026-06-10
+
+**User:**
+> Attendance isko dekho pura or batao muje kya kami hai pahle
+
+**Claude:**
+> Poora attendance module review kiya — `AttendanceDashboard.tsx`, `routes/attendance.js`, backend + frontend dono.
+>
+> **15 gaps mili:**
+>
+> 🔴 Critical (5):
+> 1. GENERAL shift filter dropdown mein missing
+> 2. HALF_DAY / WFH / ON_LEAVE status filter nahi
+> 3. WFH mark karne ka action button nahi
+> 4. Overtime hours UI mein nahi dikhte (DB mein hain)
+> 5. Total work hours (duration) nahi dikhti
+>
+> 🟠 High (5):
+> 6. Monthly view nahi — sirf day-by-day
+> 7. Employee-wise drill-down nahi
+> 8. Break duration visible nahi
+> 9. Bulk mark actions nahi
+> 10. Department filter nahi
+>
+> 🟡 Medium (5):
+> 11. OT 9hr hardcoded in backend
+> 12. Regularization request detail nahi
+> 13. Excel import nahi (export hai)
+> 14. PIN attendance UI nahi
+> 15. Late auto-detection nahi
+
+---
+
+### Entry #024 — 2026-06-10
+
+**User:**
+> 1. GENERAL shift filter dropdown mein missing
+
+**Claude:**
+> `src/pages/attendance/AttendanceDashboard.tsx` line 463 mein `<option value="GENERAL">General</option>` add kiya — All Shifts ke baad, Morning se pehle.
+>
+> Fix: 1 line added ✅
+
+---
+
+### Entry #025 — 2026-06-10
+
+**User:**
+> 2. HALF_DAY / WFH / ON_LEAVE status filter nahi
+
+**Claude:**
+> `src/pages/attendance/AttendanceDashboard.tsx` status filter dropdown mein 3 options add kiye:
+> - `HALF_DAY` → Half Day
+> - `WORK_FROM_HOME` → Work From Home
+> - `ON_LEAVE` → On Leave
+>
+> Fix: 3 lines added ✅
+
+---
+
+### Entry #026 — 2026-06-10
+
+**User:**
+> 3. WFH mark karne ka action button nahi
+
+**Claude:**
+> `src/pages/attendance/AttendanceDashboard.tsx` mein actions dropdown ke andar "Mark Late" ke baad "Mark WFH" button add kiya.
+> `AttendanceStatus.WORK_FROM_HOME` already types mein defined tha — koi naya type nahi banana pada.
+>
+> Fix: 1 button added (blue color, MapPin icon) ✅
+
+---
+
+### Entry #027 — 2026-06-10
+
+**User:**
+> 4. Overtime hours UI mein nahi dikhte (DB mein hain)
+
+**Claude:**
+> `src/pages/attendance/AttendanceDashboard.tsx` mein attendance table mein "Hours / OT" column add kiya:
+> - Check-in aur check-out ke beech total duration calculate karke dikhata hai (e.g., "8h 30m")
+> - Agar overtime > 0 hai toh amber color mein "+2.5h OT" dikhata hai
+> - Dono values ek hi cell mein stacked
+>
+> Fix: thead + tbody dono updated ✅
+
+---
+
+---
+
+### Entry #028 — 2026-06-10
+
+**User:**
+> Implementation & Plan.md.resolved kush bhi baat ho isme Update Hona Jaruri hai
+
+**Claude:**
+> Rule confirm kiya — koi bhi conversation ho, chhoti ya badi, yeh file har baar update hogi.
+>
+> - User ka message + Claude ka reply dono log honge
+> - Koi task chhota ho ya bada — entry banegi
+> - Memory mein bhi MANDATORY rule save hai: `memory/feedback_implementation_plan.md`
+>
+> Yeh rule ab is session ke liye active hai ✅
+
+---
+
+---
+
+### Entry #029 — 2026-06-10
+
+**User:**
+> hamara jo kaam chal raha tha usko hi continue karenge thik hai
+
+**Claude:**
+> Previous session ka status check kiya — Attendance module ke 15 gaps fix kar rahe the.
+>
+> **Completed (7):** GENERAL shift filter, status filter (HALF_DAY/WFH/ON_LEAVE), WFH button, OT hours column, total work hours (duration), monthly view, employee-wise drill-down
+>
+> **Pending (8):** Break duration, bulk mark actions, department filter, OT hardcoded backend, regularization detail, Excel import, PIN attendance UI, late auto-detection
+>
+> Gap #8 (Break Duration) se start karne ka suggestion diya.
+
+---
+
+### Entry #030 — 2026-06-10
+
+**User:**
+> Implementation & Plan.md.resolved update nahi huaa hai baar baar bolna kyu pad raha hai
+
+**Claude:**
+> Maafi — Entry #029 aur #030 turant append ki.
+> Rule: Har response ke baad file update HOGI — koi exception nahi.
+
+---
+
+---
+
+### Entry #031 — 2026-06-10
+
+**User:**
+> 8. Break duration visible nahi
+
+**Claude:**
+> Fix #8 implement kiya — Break Duration visible kar di.
+>
+> **Kya kiya:**
+> - `calcBreakMins()` helper function module level par add kiya (dono components use kar sakein)
+> - **Daily View table** — `Hours / OT` cell mein teesri line add ki: cyan color mein break duration (e.g., `30m brk`) ya `In Break` (pulsing) agar break chal rahi ho
+> - **Employee Drill Modal** — naya `Break` column add kiya (Hours aur OT ke beech): cyan text mein break total ya `In Break` animated badge
+> - Ongoing breaks (jo complete nahi hain) ke liye `animate-pulse` effect diya
+>
+> **Files Modified:**
+> - `src/pages/attendance/AttendanceDashboard.tsx`
+
+---
+
+---
+
+### Entry #032 — 2026-06-11
+
+**User:**
+> 8. Break duration visible kya update huaa hai, kuch update nahi lag raha
+
+**Claude:**
+> Code verify kiya — changes sahi save hain (3 jagah: module-level helper, drill modal Break column, daily view Hours cell).
+>
+> Reason samjhaya:
+> 1. Browser hard refresh karo: `Ctrl+Shift+R`
+> 2. Agar server band tha — `npm run dev` se restart karo
+> 3. Break column `—` dikhega agar DB mein kisi ka break data nahi hai — yeh normal hai
+>
+> Drill modal mein `Break` column add hua hai, daily view mein cyan `brk` text aata hai jab break data ho.
+
+---
+
+---
+
+### Entry #033 — 2026-06-11
+
+**User:**
+> daily view kaha par hai or kese Open karu
+
+**Claude:**
+> Navigation bataya:
+> 1. `https://localhost:5173` → Left sidebar → "Attendance"
+> 2. Page pe upar right side mein `[ Daily ] [ Monthly ]` toggle buttons hain
+> 3. Daily default selected hota hai
+> 4. Table mein `Hours / OT` column mein break data cyan color mein dikhega
+
+---
+
+---
+
+### Entry #034 — 2026-06-11
+
+**User:**
+> D:\Screenshot dekho andar
+
+**Claude:**
+> Screenshot dekha — Attendance page, Daily view already open tha (Daily button blue highlight mein).
+>
+> Break duration: DB mein kisi ka break record nahi hai abhi, isliye column blank hai — yeh expected behavior hai.
+>
+> Bug noticed: Test Employee ka Punch In 23:16, Punch Out 20:00 — Hours/OT `-4h 43m` aa raha hai (negative). Record galat enter hua hai.
+
+---
+
+---
+
+### Entry #035 — 2026-06-11
+
+**User:**
+> Bug noticed: Test Employee ka Punch In 23:16, Punch Out 20:00 — Hours/OT `-4h 43m` aa raha hai (negative). Fix karo.
+
+**Claude:**
+> Teen jagah fix kiya:
+>
+> 1. **Daily view Hours/OT cell** — `diffMs < 0` ho toh `-4h 43m` ki jagah `⚠ Invalid` (red) dikhta hai, hover tooltip bhi hai
+> 2. **Drill modal `durH()`** — negative mins pe `⚠ Invalid` return karta hai
+> 3. **AdminPunchModal validation** — Punch Out adjust karte waqt: Out time ≤ In time ho toh error message dikhta hai aur save nahi hone deta. Punch In adjust karte waqt: In time ≥ Out time ho toh bhi error.
+>
+> **Files Modified:**
+> - `src/pages/attendance/AttendanceDashboard.tsx`
+> - `src/components/attendance/AdminPunchModal.tsx`
+
+---
+
+---
+
+### Entry #036 — 2026-06-11
+
+**User:**
+> ⚠ Invalid kyu aa raha hai or kya aana chahiye Real me
+
+**Claude:**
+> Explain kiya: Test Employee ka Punch In 23:16, Punch Out 20:00 — same din ke timestamps hain, isliye duration negative → ⚠ Invalid.
+>
+> Do cases bataye:
+> 1. Data galat enter hua (likely): Punch In 08:16 hona chahiye tha → 11h 44m aata
+> 2. Night shift: Tab agla din ka timestamp hota, system sahi calculate karta
+>
+> Fix option: Actions → Adjust In Time se sahi time daalo, ya DB se fix karein.
+
+---
+
+---
+
+### Entry #037 — 2026-06-11
+
+**User:**
+> 9. Bulk mark actions nahi
+
+**Claude:**
+> Fix #9 implement kiya — Bulk Mark Actions.
+>
+> **Kya add kiya:**
+> - Har employee row ke saamne **checkbox** (sirf admin ke liye)
+> - Table header mein **Select All** checkbox
+> - Koi bhi employee select ho toh **Bulk Action Bar** appear hota hai (blue highlight)
+>   - `X selected` count
+>   - Buttons: ✓ Present · ✗ Absent · ½ Half Day · ⏰ Late · 🏠 WFH
+>   - Clear button
+> - Selected row ka background primary tint se highlight hota hai
+> - Bulk mark karne ke baad selection automatically clear ho jaata hai
+>
+> **Files Modified:**
+> - `src/pages/attendance/AttendanceDashboard.tsx`
+
+---
+
+---
+
+### Entry #038 — 2026-06-11
+
+**User:**
+> 10. Department filter nahi
+
+**Claude:**
+> Fix #10 implement kiya — Department Filter.
+>
+> **Kya add kiya:**
+> - `deptFilter` state added
+> - `allDepartments` — activeEmployees se unique departments dynamically extract hoti hain (sorted)
+> - `filteredEmployees` mein `matchesDept` condition add ki
+> - Toolbar mein Shift aur Status ke beech **"All Departments"** dropdown add kiya — employees se departments automatically populate hoti hain
+>
+> **Files Modified:**
+> - `src/pages/attendance/AttendanceDashboard.tsx`
+
+---
+
+---
+
+### Entry #039 — 2026-06-11
+
+**User:**
+> 11. OT 9hr hardcoded in backend
+
+**Claude:**
+> Fix #11 implement kiya — OT Standard Hours ab configurable hai.
+>
+> **Kya kiya:**
+> - `standardWorkHours: 9` — `configDefaults` mein add kiya (payroll.js + payrollWorker.js dono)
+> - Company `PAYROLL_CONFIG` SystemSetting se override ho sakta hai
+> - `payroll.js` — 3 jagah `9` replace: MONTHLY hrRate, DAILY OT rate, HOURLY basic earnings
+> - `payrollWorker.js` — same 3 replacements
+> - `attendance.js` — checkout OT calculation: `SystemSetting` import kiya, runtime pe company config se `standardWorkHours` fetch kiya, fallback `9`
+>
+> **Files Modified:**
+> - `server/routes/attendance.js`
+> - `server/routes/payroll.js`
+> - `server/workers/payrollWorker.js`
+
+---
+
+---
+
+### Entry #040 — 2026-06-11
+
+**User:**
+> 12. Regularization request detail nahi
+
+**Claude:**
+> Fix #12 implement kiya — Regularization Detail Modal.
+>
+> **Kya add kiya:**
+> - `RegularizationDetailModal` component — centered modal with animation
+>   - Employee avatar, name, code, dept, shift
+>   - Date + Request Type badge (color-coded: MISSED_PUNCH amber, OFFICIAL_DUTY blue, WFH cyan, LEAVE_CORRECTION purple)
+>   - Full reason (not truncated)
+>   - Existing attendance record for that date (In/Out/Status)
+>   - Submitted at timestamp
+>   - Approve / Reject buttons — closes modal after action
+> - Sidebar request cards mein eye icon (👁) button added — click se detail modal opens
+> - Type badge bhi cards mein dikhti hai
+> - `viewReqId` state added
+>
+> **Files Modified:**
+> - `src/pages/attendance/AttendanceDashboard.tsx`
+
+---
+
+---
+
+### Entry #041 — 2026-06-11
+
+**User:**
+> 13. Excel import nahi (export hai)
+
+**Claude:**
+> Fix #13 implement kiya — Excel Import for Attendance.
+>
+> **Kya add kiya:**
+> - **Upload button** (↑ green) — .xlsx/.xls/.csv file select karo
+> - **Template button** (↓ blue) — sample Excel download karo with correct format
+> - Import format: `Employee ID | Date | Status | In Time | Out Time | Late (Min)`
+> - Validation: employee code match, date format, valid status
+> - API call per row: POST `/attendance` with all fields
+> - **Result modal** — Records Imported count + Error list with row numbers
+> - Dono buttons sirf `canManualUpdate` admins ko dikhte hain
+>
+> **Files Modified:**
+> - `src/pages/attendance/AttendanceDashboard.tsx`
+
+---
+
+---
+
+### Entry #042 — 2026-06-11
+
+**User:**
+> 14. PIN attendance UI nahi
+
+**Claude:**
+> Fix #14 implement kiya — PIN Attendance Kiosk.
+>
+> **Kya add kiya:**
+> - `attendancePin` field — Employee type + DB model
+> - `PinKioskPage.tsx` — full screen kiosk:
+>   - Step 1: Employee ID (code) text input
+>   - Step 2: 4-dot PIN display + numeric keypad (1-9, 0, ⌫)
+>   - Employee info card + Punch In/Out badge
+>   - Auto-reset 4 seconds baad success/error pe
+>   - Admin: "Manage PINs" panel — employee search, PIN set/reset
+> - Route: `/attendance/pin-kiosk`
+> - Dashboard mein **PIN Kiosk** (violet) button added
+>
+> **Files Modified/Created:**
+> - `src/pages/attendance/PinKioskPage.tsx` (NEW)
+> - `src/types/index.ts`
+> - `server/database.js`
+> - `src/App.tsx`
+> - `src/pages/attendance/AttendanceDashboard.tsx`
+
+---
+
+---
+
+### Entry #043 — 2026-06-11
+
+**User:**
+> PIN Kiosk kaha add kiya hai
+
+**Claude:**
+> Bataya: Attendance Dashboard pe Actions bar mein Face Kiosk ke baad violet "PIN Kiosk" button hai. Sirf canManualUpdate admins ko dikhta hai.
+
+---
+
+---
+
+### Entry #044 — 2026-06-11
+
+**User:**
+> Thumb Print or Live Selfie bhi add kar doh na or usko bhi proper sahi kar doh na
+
+**Claude:**
+> `PinKioskPage.tsx` ko **3-mode kiosk** mein upgrade kiya — PIN + Live Selfie + Fingerprint.
+>
+> **Live Selfie mode:**
+> - Employee ID enter karo → webcam open + face oval guide + scan line animation
+> - 3-2-1 countdown → auto-capture → `punchMode: 'photoUpload'`
+> - Captured image success screen pe dikhti hai
+> - Retake button bhi hai
+>
+> **Fingerprint mode:**
+> - Employee ID enter karo → WebAuthn `navigator.credentials.get()` trigger hota hai
+> - Platform authenticator available hai (Windows Hello, Touch ID) → real biometric verification
+> - Unavailable/cancelled → animated ring progress fallback simulation
+> - `punchMode: 'fingerprint'`
+>
+> **Mode tabs** top pe (code step pe) — PIN (violet), Live Selfie (green), Fingerprint (blue)
+>
+> **Fixes:**
+> - `mode → punchMode` correct mapping: `selfie → 'photoUpload'`, `fingerprint → 'fingerprint'`, `pin → 'pin'`
+> - Scan line CSS `@keyframes scan` added to `index.css`
+> - TSC check passed (exit 0)
+
+**Files Modified:**
+- `src/pages/attendance/PinKioskPage.tsx` (major rewrite — 3 modes)
+- `src/index.css` (added `@keyframes scan`)
+
+---
+
+---
+
+### Entry #045 — 2026-06-11
+
+**User:**
+> 15. Late auto-detection nah
+
+**Claude:**
+> Gap #15 fixed — Late auto-detection 3 layers pe kiya.
+>
+> **Root cause:** Kiosk punch already calculate karta tha late minutes (`calculateLateDuration`). Gaps sirf admin manual punch mein the.
+>
+> **Fix 1 — Backend `/admin-punch` checkIn:**
+> - `calcLateMinutes()` helper added (JS port of `calculateLateDuration`)
+> - `Shift` model `init()` mein add kiya
+> - checkIn handler: `Shift.findOne(resolvedShiftId)` → `lateByMinutes` calculate → `status: 'LATE'` ya `'PRESENT'` set karo
+> - Dono cases fixed: update existing + create new record
+>
+> **Fix 2 — Frontend store `adminPunch` checkIn:**
+> - `calculateLateDuration` + `useInternalShiftStore.getState().getShift()` se shift fetch karo
+> - `shiftId` fallback: request ka shiftId → existing record ka shiftId
+> - `lateMinutes` aur `checkInStatus` dono updates mein include kiye
+>
+> **Already working (no change needed):**
+> - Kiosk punch-in: `markCheckIn` already correct tha
+> - "Adjust in time": Already recalculates (line 543-555 of store)
+>
+> TSC check passed (exit 0).
+
+**Files Modified:**
+- `server/routes/attendance.js` (calcLateMinutes helper + Shift init + admin-punch checkIn)
+- `src/store/attendanceStore.ts` (admin punch new+update — late calculation)
+
+---
+
+---
+
+### Entry #046 — 2026-06-11
+
+**User:**
+> ab muje har ek Point batao or uska kya kya update kiya hai voh batao
+
+**Claude:**
+> Sabhi 15 gaps ka detailed summary diya — har gap ke liye: kya problem tha, kya fix kiya, kaunse files modify hue.
+> Gap #1–#15 poora covered. Koi naya code change nahi tha — sirf summary response tha.
+
+---
+
+### Entry #047 — 2026-06-11
+
+**User:**
+> Implementation & Plan.md.resolved kush bhi baat ho isme Updte Hona Jaruri hai
+
+**Claude:**
+> Reminder acknowledge kiya. Yeh file har response ke baad update hogi — koi exception nahi.
+> Is reminder entry ko bhi turant append kiya.
+
+---
+
+---
+
+### Entry #048 — 2026-06-11
+
+**User:**
+> Sabhi 15 gaps ka detailed summary doh muje
+
+**Claude:**
+> Sabhi 15 gaps ka poora detailed summary diya — har gap ke liye: problem, fix, files modified.
+> Gap #1 (Shift Filter) se Gap #15 (Late Auto-Detection) tak sab covered.
+> Koi naya code change nahi tha — sirf documentation response tha.
+
+---
+
+---
+
+### Entry #049 — 2026-06-11
+
+**User:**
+> attendance/kiosk Screenshot mein dekho jahan Face Kiosk hai uske neeche Thumb Print, Live Selfie, PIN Kiosk dalo — wahan se directly open ho sake
+
+**Claude:**
+> Screenshot dekha — Attendance submenu mein Face Kiosk ke neeche 3 naye nav links add kiye.
+>
+> **Sidebar (`DashboardLayout.tsx`):**
+> - `Fingerprint`, `Camera`, `Hash` icons import kiye
+> - 3 new subItems add kiye:
+>   - `Thumb Print` → `/attendance/pin-kiosk?mode=fingerprint` (Fingerprint icon)
+>   - `Live Selfie` → `/attendance/pin-kiosk?mode=selfie` (Camera icon)
+>   - `PIN Kiosk` → `/attendance/pin-kiosk?mode=pin` (Hash icon)
+> - `isSubActive` fix: query param wale paths ka exact match (pathname + search)
+> - NavLink sub-item render: query-param aware active class (sirf clicked wala highlight hoga)
+>
+> **`PinKioskPage.tsx`:**
+> - `useSearchParams` import add kiya
+> - `urlMode = searchParams.get('mode')` → Page open hote hi correct tab auto-select
+> - Fallback: invalid/missing mode → 'pin' default
+
+**Files Modified:**
+- `src/layouts/DashboardLayout.tsx`
+- `src/pages/attendance/PinKioskPage.tsx`
+
+---
+
+---
+
+### Entry #050 — 2026-06-11
+
+**User:**
+> TSC task notification forwarded (exit code 0)
+
+**Claude:**
+> TypeScript check confirmed clean — no errors in DashboardLayout.tsx or PinKioskPage.tsx.
+> Sidebar kiosk links feature complete aur production-ready.
+
+---
+
+---
+
+### Entry #051 — 2026-06-11
+
+**User:**
+> ab ham karte hai attendance/kiosk ko pura sahi pahle muje batao isme kya kya problem hai or kya add karna chahiye
+
+**Claude:**
+> FaceKioskPage.tsx ka full audit kiya. 15 issues identify kiye:
+>
+> **Critical (🔴):** Desktop block unnecessary, Device registration wall, No fallback when face fails, biometricStore sirf localStorage
+> **UX (🟡):** Manual ID fallback nahi, Recent punches 10 limit, Enroll delete nahi, Camera switch nahi, iOS fullscreen broken
+> **Missing Features (🟢):** Server backup for face data, Liveness detection weak, Today stats card, Enrollment notifications
+>
+> Fix priority table diya. User se pucha kya implement karein.
+
+---
+
+---
+
+### Entry #052 — 2026-06-11
+
+**User:**
+> 1 by 1 karte hai — pahle point bana doh
+
+**Claude:**
+> Face Kiosk ke liye 15-point fix list banaya:
+> - Points #1–4: Critical fixes (desktop block, device wall, manual fallback, server backup)
+> - Points #5–8: UX fixes (delete enrollment, punches limit, model error, enroll shortcut)
+> - Points #9–15: Feature additions (stats card, camera switch, iOS fullscreen, toast, liveness, threshold, export)
+> User se pucha kaunsa pehle karu.
+
+---
+
+---
+
+### Entry #053 — 2026-06-11
+
+**User:**
+> 1 se shuru karo
+
+**Claude:**
+> Face Kiosk Point #1 fix kiya — Desktop block removed.
+>
+> **Changes:**
+> - `if (isDesktop) { ... }` block completely removed (~25 lines)
+> - `const { isDesktop } = useDeviceType()` line removed
+> - `useDeviceType` import removed (unused)
+> - `Maximize2` kept (still used for fullscreen toggle)
+>
+> Ab Face Kiosk desktop pe bhi kaam karta hai — webcam available ho to sab devices pe open hoga.
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #054 — 2026-06-11
+
+**User:**
+> Point #2 karun? (Device Registration wall optional banana)
+
+**Claude:**
+> Face Kiosk Point #2 fix kiya — Device Registration wall removed, soft banner add kiya.
+>
+> **Changes:**
+> - `if (!isDeviceRegistered) { return ... }` hard block completely removed
+> - `showRegisterBanner` state add kiya (initial = `!isDeviceRegistered`)
+> - Soft blue banner: sirf admin ko dikhta hai, sirf agar device registered nahi
+> - Banner mein inline input + Register button + ✕ dismiss button
+> - Enter key se bhi register ho jata hai
+> - `alert()` hataya — button disabled state se handle
+> - Register hone ke baad banner automatically hide ho jata hai
+> - Kiosk ab sab ke liye accessible hai bina registration ke
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #055 — 2026-06-11
+
+**User:**
+> TSC task notification forwarded (exit code 0)
+
+**Claude:**
+> Point #2 TypeScript check confirmed clean. Feature complete.
+
+---
+
+---
+
+### Entry #056 — 2026-06-11
+
+**User:**
+> Point #3 — Manual ID Fallback shuru karte hain
+
+**Claude:**
+> Face Kiosk Point #3 implement kiya — Manual ID Fallback.
+>
+> **Flow:**
+> - Live scan mode ke neeche "Face nahi pehchan raha? Employee ID se punch karein" button
+> - Click → full-screen overlay opens, live scan paused
+> - Step 1 (input): Employee code type karo → Enter ya Continue → employee lookup
+> - Step 2 (confirm): Employee card dikhta hai (name, photo, shift, punch type badge) → Confirm button
+> - Step 3 (success): Success message → 3.5s baad auto-close → live scan resume
+> - Error: "Employee ID nahi mila" inline message, retry possible
+>
+> **State added:** `showManualPanel`, `manualCode`, `manualStep`, `manualEmp`, `manualPunchType`, `manualMsg`, `manualLoading`
+> **Functions:** `openManualPanel`, `closeManualPanel` (live loop resume), `handleManualLookup`, `handleManualPunch`
+> **punchMode:** `'admin'` + `isManualPunch: true` set hota hai
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #057 — 2026-06-11
+
+**User:**
+> TSC task notification forwarded (exit code 0)
+
+**Claude:**
+> Point #3 TypeScript check confirmed clean. Manual ID Fallback feature complete.
+
+---
+
+---
+
+### Entry #058 — 2026-06-11
+
+**User:**
+> Point #4 — biometricStore Server Backup shuru karein
+
+**Claude:**
+> Audit kiya — `biometricStore.ts` already server-first tha (POST/GET/DELETE all wired).
+> Real problem: Backend routes mein PK change ke baad 4 bugs the.
+>
+> **Root cause:** `Biometric` model PK = auto-increment `id`, but routes `findByPk(employeeId)` use kar rahe the — always NULL return, aur POST hamesha new row INSERT karta tha (update nahi).
+>
+> **Fixes in `server/routes/admin.js`:**
+> 1. `GET /biometrics/:employeeId` — `findByPk` → `findOne({ where: { employeeId } })`
+> 2. `POST /biometrics/:employeeId` — broken upsert → `findOne` + `update` if found, `create` if not
+> 3. `DELETE .../face` — `findByPk` → `findOne({ where: { employeeId } })`
+> 4. `DELETE .../thumb` — `findByPk` → `findOne({ where: { employeeId } })`
+> 5. `GET /biometrics/all` — `ORDER BY registeredAt DESC` + deduplication added (old bug se duplicate rows clear)
+>
+> `biometricStore.ts` mein koi change nahi tha — already correct tha.
+
+**File Modified:** `server/routes/admin.js`
+
+---
+
+---
+
+### Entry #059 — 2026-06-11
+
+**User:**
+> Point #5 shuru karein? (Enroll tab mein Delete button)
+
+**Claude:**
+> Face Kiosk Point #5 implement kiya — Delete button in Enroll tab.
+>
+> **State added:**
+> - `deleteConfirmId: string | null` — jis card ka delete confirm panel open hai
+> - `deletingId: string | null` — API call chal rahi hai kis employee ke liye
+>
+> **Handler added:**
+> - `handleDeleteEnrollment(empId)` — `biometricStore.clearFaceDescriptor(empId)` call karta hai, loading state manage karta hai
+>
+> **Card restructured** — `<button>` → `<div>` (nested buttons possible karne ke liye):
+> - Avatar aur info section: `onClick` → `startEnroll(emp.id)` (cursor-pointer)
+> - Delete button (sirf enrolled employees pe): small red "Delete" button, click → `setDeleteConfirmId(emp.id)`
+> - Re-enroll badge: ab bhi wahi jagah, enrolled employees pe dikhe
+> - `isConfirmDelete` state pe card ka border red ho jata hai + dark red overlay appear hota hai
+>
+> **Inline confirm overlay:**
+> - `"[Name] ka enrollment delete karein?"` text
+> - "Haan, Delete" button (red) — `Loader2` spinner jab deleting
+> - "Cancel" button (slate) — `setDeleteConfirmId(null)` se dismiss
+> - Overlay `z-10` pe, baaki card content ke upar
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #060 — 2026-06-11
+
+**User:**
+> Point #6: Recent punches 10-limit hata ke scroll/See-all add karein
+
+**Claude:**
+> Face Kiosk Point #6 implement kiya — Recent Punches 10-limit removed, full scroll enabled.
+>
+> **Changes in `src/pages/attendance/FaceKioskPage.tsx`:**
+> - `todayEvents.slice(0, 10).map(...)` → `todayEvents.map(...)` — limit completely removed
+> - Scroll container already `overflow-y-auto` tha — automatically sab events scroll hote hain
+> - Header mein total event count badge add kiya (slate pill, right side) — e.g., `24` — visual cue ki scroll karein
+> - Scrollbar styling: `scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-700/50` add kiya
+> - Header flex layout update: title+subtext left, count badge right (justify-between)
+>
+> Ab aaj ke sabhi punches dikhengen — koi limit nahi, scroll karo jitna chahiye.
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #061 — 2026-06-11
+
+**User:**
+> Point #7 next — Model load fail → better error + manual fallback shortcut
+
+**Claude:**
+> Face Kiosk Point #7 implement kiya — Model load fail pe better error UI + manual fallback shortcut.
+>
+> **Changes in `src/pages/attendance/FaceKioskPage.tsx`:**
+>
+> `modelError` state wala overlay upgrade kiya:
+> - **Icon:** Red circle + X badge (camera error overlay jesa consistent style)
+> - **Title:** "Face AI Load Nahi Hua" (clear Hindi heading)
+> - **Hint text:** "Model files nahi mile. Internet check karo ya page reload karo."
+> - **Raw error:** Monospace truncated text (max 60 chars) for debugging — `title` attr pe full message
+> - **"Dobara Try Karo" button:** Existing `retryLoadModels` — same functionality, better label
+> - **"YA" divider:** Slate horizontal rule between retry and fallback
+> - **"Employee ID se Punch Karo" button:** Violet, calls `openManualPanel()` — kiosk useable hai even if face AI fail ho
+>
+> Loading state (spinner + progress bar) unchanged — woh theek tha.
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #062 — 2026-06-11
+
+**User:**
+> Point #8 next — Enrolled employees warning → direct "Enroll karo" shortcut
+
+**Claude:**
+> Face Kiosk Point #8 implement kiya — Enroll warning upgraded with direct shortcut.
+>
+> **Changes in `src/pages/attendance/FaceKioskPage.tsx`:**
+>
+> **Render prep:**
+> - `unenrolledEmployees` computed list add kiya: `activeEmployees.filter(e => !biometricStore.isFaceRegistered(e.id))`
+>
+> **Warning block (live mode, below stats):**
+> - Before: Plain amber text + invisible underline link, `setMode('enroll')` only (no `stopAllLoops()`)
+> - After: Proper card with:
+>   - Count: `"3 employees enroll nahi hain"` (grammatically correct singular/plural)
+>   - Names preview: First 3 first-names, e.g. `"Ravi, Suresh, Ankit +2 aur"`
+>   - "Enroll Karo →" button: Full-width amber, calls `stopAllLoops(); setMode('enroll')` — consistent with nav tab
+>   - Button only shows for `isAdmin`
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #063 — 2026-06-11
+
+**User:**
+> Point #9 next — Today's live stats card (Present/Late/Absent/Pending real-time)
+
+**Claude:**
+> Face Kiosk Point #9 implement kiya — Live stats card in right panel.
+>
+> **Computed values added (render prep):**
+> - `lateCount` = employees with `status === 'LATE'` today
+> - `pendingCount` = `activeEmployees.length - punchedInCount`
+>
+> **Right panel header redesigned:**
+> - Title: "Aaj ki Attendance" + green pulse dot "Live"
+> - 4-stat grid (`grid-cols-4`): Inside (green) | Left (blue) | Late (amber, lights up when > 0) | Pending (slate, turns emerald when 0)
+> - Green progress bar: `punchedInCount / activeEmployees.length * 100%`, smooth `duration-500` transition
+> - Sub-label: "X/Y punched in today"
+> - Separate "Recent Punches" sub-header below stats
+>
+> **Old 2-stat footer removed** (Inside + Left at panel bottom — now redundant)
+>
+> **Mobile mini-bar upgraded** (3 → 4 stats): Inside | Left | Late | Pending
+>
+> **File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #064 — 2026-06-11
+
+**User:**
+> Point #10 next — Camera switch button (front/back toggle)
+
+**Claude:**
+> Face Kiosk Point #10 implement kiya — Camera front/back toggle button.
+>
+> **Changes in `src/pages/attendance/FaceKioskPage.tsx`:**
+>
+> - `SwitchCamera` added to lucide imports
+> - `facingModeRef = useRef<'user' | 'environment'>('user')` — ref used inside startCamera (avoids useCallback dep cascade)
+> - `[isFrontCamera, setIsFrontCamera] = useState(true)` — state for UI (mirror CSS + button visibility)
+> - `startCamera()` updated: `facingMode: 'user'` hardcode → `facingMode: facingModeRef.current`
+> - `switchCamera()` added: flip ref → flip state → stop stream → restart camera
+> - Mirror CSS: `scale-x-[-1]` → `isFrontCamera ? 'scale-x-[-1]' : ''` on both live mode and enroll mode `<video>` elements
+> - Switch button: `absolute top-3 right-3 z-20`, circular, semi-transparent black, backdrop-blur — only visible when `modelsLoaded && !cameraError && liveState !== 'confirm'`
+> - `title` attr: "Back camera pe switch karo" / "Front camera pe switch karo"
+>
+> Desktop webcams pe `environment` facingMode fail ho sakta hai — `startCamera` already has error handling (`setCameraError('notfound')`) so graceful fallback exists.
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #065 — 2026-06-11
+
+**User:**
+> Point #11 next — iOS fullscreen graceful fallback
+
+**Claude:**
+> Face Kiosk Point #11 implement kiya — iOS fullscreen graceful fallback.
+>
+> **Changes in `src/pages/attendance/FaceKioskPage.tsx`:**
+>
+> - `isFullscreenSupported`: `!!document.documentElement.requestFullscreen` — compile-time check
+> - `[showIOSHint, setShowIOSHint]` state + `iosHintTimerRef` — 4s auto-dismiss tooltip
+> - `fullscreenchange` listener: only attaches when `isFullscreenSupported`
+> - `toggleFullscreen()`: if not supported → show hint + 4s auto-hide; if supported → existing behavior
+> - Both fullscreen buttons (mobile header + desktop header): dimmed style (`text-slate-500`) when not supported
+> - Desktop button: wrapped in `relative` div; `showIOSHint` → tooltip popup below button:
+>   - "iOS Fullscreen" title
+>   - "Safari mein fullscreen API nahi hai. Share → Add to Home Screen"
+>   - Caret arrow pointing up at button
+>   - Auto-dismisses after 4s
+>
+> Kiosk is already `fixed inset-0 h-[100dvh]` so visually fullscreen on iOS — only browser chrome is the limitation.
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #066 — 2026-06-11
+
+**User:**
+> Point #12 next — Enrollment complete toast notification
+
+**Claude:**
+> Face Kiosk Point #12 implement kiya — Enrollment complete toast notification.
+>
+> **Changes in `src/pages/attendance/FaceKioskPage.tsx`:**
+>
+> - `[enrollToast, setEnrollToast]` state — `null` = hidden, `string` = employee name to show
+> - `enrollToastTimer` ref — for 4s auto-dismiss
+> - Enrollment completion (after `biometricStore.setFaceDescriptor`): sets `enrollToast(empName)`, 4s auto-clear
+> - Toast rendered at `absolute bottom-6 left-1/2 -translate-x-1/2 z-[110]` (above everything, centered)
+> - Toast UI: emerald card, white `CheckCircle` icon, employee name bold, "Face successfully enrolled ✓" subtext
+> - `@keyframes fade-in-up` added: slides up 12px + fades in over 0.25s
+> - `pointer-events-none` — toast doesn't block camera interaction
+> - Toast stays for 4s while kiosk switches back to live mode after 1.5s
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #067 — 2026-06-11
+
+**User:**
+> Point #13 next — Liveness detection improve (photo attack prevention)
+
+**Claude:**
+> Face Kiosk Point #13 implement kiya — Liveness detection actually wired up.
+>
+> **Bug found:** Previous "liveness check" collected `recentBoxes` but never used the variance — matching proceeded unconditionally. Box was collected but never read.
+>
+> **Changes in `src/pages/attendance/FaceKioskPage.tsx` (`startLiveLoop`):**
+>
+> - `livenessFrames` buffer: stores `{ x, y, size }` per frame (added `size = faceSize`)
+> - `LIVENESS_FRAMES = 5` (was 3 — and was unused)
+> - `MIN_MOTION_PX = 2.5` — required positional movement (Δx + Δy across frames)
+> - `MIN_SIZE_CHANGE = 3` — required faceSize change across frames
+> - `isLive()` function: `posVariance = (maxX-minX) + (maxY-minY)` + `sizeVariance = maxSize-minSize`; returns true if EITHER exceeds threshold
+>
+> **Loop flow change:**
+> 1. Buffer < 5 frames → `"Scanning... (N/5)"` + continue collecting
+> 2. Buffer full + `!isLive()` → `"Thoda hiliye... (photo detected?)"` + loop continues (no match)
+> 3. Buffer full + `isLive()` → proceed to face matching as before
+>
+> Photo/screen attack: static face → zero variance → blocked at step 2.
+> Real person: natural micro-movement (breathing, muscle) → variance threshold passed within ~3.5s.
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #068 — 2026-06-11
+
+**User:**
+> Point #14 next — Confidence threshold setting (admin adjustable, currently hardcoded 0.45)
+
+**Claude:**
+> Face Kiosk Point #14 implement kiya — Admin-adjustable match threshold.
+>
+> **Changes in `src/pages/attendance/FaceKioskPage.tsx`:**
+>
+> - `THRESHOLD_KEY = 'face_kiosk_match_threshold'` — localStorage key
+> - `[matchThreshold, setMatchThreshold]` state — init from localStorage, fallback 0.45
+> - `matchThresholdRef` — used inside `startLiveLoop` without dep cascade
+> - `updateMatchThreshold(v)` — updates ref + state + localStorage atomically
+> - `startLiveLoop`: `const MATCH_THRESHOLD = 0.45` → `matchThresholdRef.current` (live, no restart needed)
+>
+> **Settings slider UI (enroll tab, admin only):**
+> - Range: 0.30 → 0.60, step 0.05
+> - Badge: "Strict" (≤0.35, green) / "Balanced" (≤0.45, blue) / "Lenient" (>0.45, amber) + numeric value
+> - Scale labels: Strict (0.30) | Default (0.45) | Lenient (0.60)
+> - Hint: "Strict = kam false match, zyada miss. Lenient = zyada match, galti ka risk."
+> - `accent-violet-500` slider styling
+> - Setting survives page refresh via localStorage
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+---
+
+### Entry #069 — 2026-06-11
+
+**User:**
+> Point #15 next — Punch history export today's face punches Excel
+
+**Claude:**
+> Face Kiosk Point #15 implement kiya — Today's attendance Excel export. All 15 points now complete.
+>
+> **Changes in `src/pages/attendance/FaceKioskPage.tsx`:**
+>
+> - `FileDown` added to lucide imports
+> - `handleExportPunches()` async function (placed after derived values to avoid forward-ref TS errors):
+>   - Dynamic `await import('xlsx')` (matches AttendanceDashboard pattern)
+>   - Columns: Name | Code | Department | Punch In | Punch Out | Hours | Status
+>   - All `activeEmployees` included — Absent row for employees with no record today
+>   - Status values: `'Absent'` / `'Late'` / `'Present (Left)'` / `'Present (Inside)'`
+>   - Hours: computed from checkIn→checkOut diff, `toFixed(1)` + "h" suffix
+>   - File name: `Face_Kiosk_YYYY-MM-DD.xlsx`, sheet name: `Attendance YYYY-MM-DD`
+> - Export button added in "Recent Punches" sub-header row (right of count badge):
+>   - Small `FileDown` icon + "Export" label
+>   - Hover: emerald tint — consistent with other export buttons in the app
+>   - `title`: "Aaj ki attendance Excel mein export karo"
+
+**File Modified:** `src/pages/attendance/FaceKioskPage.tsx`
+
+---
+
+### Entry #070 — 2026-06-11
+
+**Summary: All 15 Face Kiosk Points Complete**
+
+| # | Point | Status |
+|---|---|---|
+| 1 | Desktop block removed | ✅ |
+| 2 | Device Registration wall → soft banner | ✅ |
+| 3 | Manual ID Fallback overlay | ✅ |
+| 4 | biometricStore server backup (backend route fixes) | ✅ |
+| 5 | Delete button in Enroll tab | ✅ |
+| 6 | Recent punches 10-limit removed, scroll + count | ✅ |
+| 7 | Model load fail → better error + manual fallback | ✅ |
+| 8 | Enroll warning → "Enroll Karo" shortcut | ✅ |
+| 9 | Live stats card (Inside/Left/Late/Pending + progress bar) | ✅ |
+| 10 | Camera switch button (front/back toggle) | ✅ |
+| 11 | iOS fullscreen graceful fallback + hint tooltip | ✅ |
+| 12 | Enrollment complete toast notification | ✅ |
+| 13 | Liveness detection actually wired up (motion variance gate) | ✅ |
+| 14 | Match threshold admin-adjustable slider (localStorage persisted) | ✅ |
+| 15 | Today's attendance Excel export | ✅ |
+
+---
+
+---
+
+## Entry #071 — Face Kiosk: Comprehensive Quality Fix (2026-06-11)
+
+**Task:** "Face Kiosk ko proper dekho or Pura sahi karo" — full audit + all remaining bugs fixed.
+
+### Issues Found & Fixed
+
+| # | Issue | Fix |
+|---|-------|-----|
+| 1 | **TSC forward-reference errors** — `openManualPanel`, `closeManualPanel`, `handleManualLookup`, `handleManualPunch` used `stopAllLoops`, `mode`, `activeEmployees`, `records`, `startLiveLoop` before their declarations (lines 110, 117, 127) | Removed callbacks from early position; re-inserted after `cancelConfirm` where all deps are in scope. **0 FaceKioskPage TSC errors.** |
+| 2 | **`closeManualPanel` stale closure** — eslint-disable suppressed missing `startLiveLoop` dep | Removed suppress comment; added `startLiveLoop` to deps array properly |
+| 3 | **Live Detect tab** — `onClick={() => setMode('live')}` didn't call `stopAllLoops()` first, leaving in-flight loops running when switching back from Enroll | Changed to `onClick={() => { stopAllLoops(); setMode('live'); }}` |
+| 4 | **Non-standard Tailwind `/8` opacity** — `bg-amber-500/8`, `bg-emerald-500/8` (×3), `bg-blue-500/8` not on standard scale | Changed all to `/10` |
+| 5 | **Non-standard Tailwind `/15` border opacity** — `border-emerald-500/15`, `border-blue-500/15` | Changed all to `/20` |
+
+**Result:** `npx tsc --noEmit` shows 0 errors for `FaceKioskPage.tsx`. All 15 feature points + this quality pass complete.
+
+---
+
+*Last updated: 2026-06-11 · Entry #071 · Har conversation ke baad auto-update hoti hai*

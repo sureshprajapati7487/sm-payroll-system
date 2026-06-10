@@ -29,17 +29,15 @@ import { exportToExcel } from '@/utils/exportUtils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-// ── Date helpers ──────────────────────────────────────────────────────────────
-const today = () => new Date().toISOString().split('T')[0];
-const firstOfMonth = () => {
-    const d = new Date(); d.setDate(1);
-    return d.toISOString().split('T')[0];
-};
+// ── Date helpers (local timezone) ─────────────────────────────────────────────
+const localDate = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const today = () => localDate(new Date());
+const firstOfMonth = () => { const d = new Date(); d.setDate(1); return localDate(d); };
 const firstOfWeek = () => {
     const d = new Date();
-    const day = d.getDay();
-    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-    return d.toISOString().split('T')[0];
+    d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1));
+    return localDate(d);
 };
 
 const fmt = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });

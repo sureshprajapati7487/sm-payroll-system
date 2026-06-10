@@ -18,8 +18,8 @@ export const ManagerDashboard = () => {
         ? employees.filter(e => e.companyId === currentCompanyId)
         : employees;
 
-    const managerProfile = companyEmployees.find(e => e.email === user?.email);
-    const teamEmployees = companyEmployees.filter(e => e.department === managerProfile?.department);
+    const managerProfile = companyEmployees.find(e => e.id === user?.id) || companyEmployees.find(e => e.email === user?.email);
+    const teamEmployees = companyEmployees.filter(e => e.department && e.department === managerProfile?.department);
     const teamIds = teamEmployees.map(e => e.id);
 
     const teamActive = teamEmployees.filter(e => e.status === 'ACTIVE').length;
@@ -29,6 +29,20 @@ export const ManagerDashboard = () => {
     const teamProduction = entries
         .filter(p => teamIds.includes(p.employeeId) && p.date.startsWith(currentMonth))
         .reduce((sum, p) => sum + p.totalAmount, 0);
+
+    if (companyEmployees.length > 0 && !managerProfile) {
+        return (
+            <div className="flex flex-col items-center justify-center p-16 text-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-yellow-500/10 flex items-center justify-center">
+                    <span className="text-3xl">👤</span>
+                </div>
+                <h2 className="text-white font-bold text-lg">Profile Not Linked</h2>
+                <p className="text-dark-muted text-sm max-w-xs">
+                    Your manager account is not linked to an employee profile. Contact HR or Admin to assign your employee record.
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

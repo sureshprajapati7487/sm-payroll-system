@@ -106,8 +106,8 @@ export const Form16Generator = () => {
       <div class="box-title">Employer Details</div>
       <table style="border:none; margin:0;">
         <tr><td style="border:none; width:120px; color:#555;">Name</td><td style="border:none; font-weight:bold;">${company?.name || 'N/A'}</td></tr>
-        <tr><td style="border:none; color:#555;">TAN</td><td style="border:none;">${(company as any)?.tan || 'MUMB12345G'}</td></tr>
-        <tr><td style="border:none; color:#555;">PAN</td><td style="border:none;">${(company as any)?.taxId || 'AABCS1234A'}</td></tr>
+        <tr><td style="border:none; color:#555;">TAN</td><td style="border:none; ${!(company as any)?.tan ? 'color:red;' : ''}">${(company as any)?.tan || 'NOT CONFIGURED — Update in Company Settings'}</td></tr>
+        <tr><td style="border:none; color:#555;">PAN</td><td style="border:none; ${!(company as any)?.taxId ? 'color:red;' : ''}">${(company as any)?.taxId || 'NOT CONFIGURED — Update in Company Settings'}</td></tr>
         <tr><td style="border:none; color:#555;">Address</td><td style="border:none;">${company?.address || 'Mumbai, India'}</td></tr>
       </table>
     </div>
@@ -179,10 +179,10 @@ export const Form16Generator = () => {
         setIsPrinting(false);
     };
 
-    // Need to load payroll if not yet fetched
+    // Load payroll only when store is empty — avoids re-fetching on every employee change
     const handleEmployeeChange = async (empId: string) => {
         setSelectedEmployee(empId);
-        if (empId) await fetchPayroll();
+        if (empId && slips.length === 0) await fetchPayroll();
     };
 
     const activeEmployees = employees.filter(e => e.status === 'ACTIVE');

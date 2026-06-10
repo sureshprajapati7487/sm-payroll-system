@@ -16,9 +16,7 @@ export const DataSeeding = () => {
         addLog('Starting data generation...');
 
         try {
-            await new Promise(resolve => setTimeout(resolve, 500)); // UI delay
-
-            const { employees } = generateDemoData();
+                const { employees } = generateDemoData();
 
             // Import Stores dynamically to avoid circular deps or ensure fresh state
             const { useEmployeeStore } = await import('@/store/employeeStore');
@@ -39,22 +37,20 @@ export const DataSeeding = () => {
             // 2. Seed Attendance (Simplified)
             // Skipped for now
 
-            // 3. Seed Loans (Optional)
-            if (Math.random() > 0.5) {
-                const loanStore = useLoanStore.getState();
-                const randomEmp = employees[0];
-                if (randomEmp) {
-                    loanStore.requestLoan({
-                        amount: 50000,
-                        reason: 'Home Renovation',
-                        tenureMonths: 12,
-                        type: 'ADVANCE_CASH' as any, // Using existing type
-                        employeeId: randomEmp.id,
-                        emiAmount: 4166,
-                        issuedDate: new Date().toISOString().split('T')[0]
-                    });
-                    addLog('Created sample loan request');
-                }
+            // 3. Seed Loans — always create one sample loan for the first employee
+            const loanStore = useLoanStore.getState();
+            const firstEmp = employees[0];
+            if (firstEmp) {
+                loanStore.requestLoan({
+                    amount: 50000,
+                    reason: 'Home Renovation',
+                    tenureMonths: 12,
+                    type: 'ADVANCE_CASH' as any,
+                    employeeId: firstEmp.id,
+                    emiAmount: 4167,
+                    issuedDate: new Date().toISOString().split('T')[0]
+                });
+                addLog('Created sample loan request');
             }
 
             addLog(`Successfully added ${employees.length} staff members!`);

@@ -33,9 +33,9 @@ export const CompanySetup = () => {
         e.preventDefault();
         setError('');
 
-        // Validate License Key
-        if (formData.licenseKey !== 'SURESH8824') {
-            setError('Invalid License Key! Please contact administrator.');
+        // Client-side: only check the field is not empty (server validates the actual key)
+        if (!formData.licenseKey.trim()) {
+            setError('License Key required — Admin se license key maangein.');
             return;
         }
         // Password strength check
@@ -45,9 +45,6 @@ export const CompanySetup = () => {
         }
 
         setIsSubmitting(true);
-
-        // Add dummy delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
 
         // Create Company
         const newCompany = {

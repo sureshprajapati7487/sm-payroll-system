@@ -77,7 +77,7 @@ export const useInternalWorkGroupStore = create<WorkGroupState>((set, get) => ({
             const res = await apiFetch(`/work-groups`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...newGroup, id: Math.random().toString(36).substr(2, 9) })
+                body: JSON.stringify({ ...newGroup, id: crypto.randomUUID() })
             });
 
             if (res.ok) {

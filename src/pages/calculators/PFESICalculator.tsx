@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Shield, AlertTriangle, Loader2 } from 'lucide-react';
 import { useMultiCompanyStore } from '@/store/multiCompanyStore';
+import { apiFetch } from '@/lib/apiClient';
 
 export const PFESICalculator = () => {
     const currentCompanyId = useMultiCompanyStore(s => s.currentCompanyId);
@@ -15,20 +16,12 @@ export const PFESICalculator = () => {
         setIsLoading(true);
         setError('');
         try {
-            const response = await fetch('/api/calculators/pf-esi', {
+            const response = await apiFetch('/calculators/pf-esi', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                body: JSON.stringify({
-                    companyId: currentCompanyId,
-                    basicSalary,
-                    grossSalary,
-                    date: new Date().toISOString()
-                })
+                body: JSON.stringify({ basicSalary, grossSalary }),
             });
-
             if (!response.ok) throw new Error('Failed to compute calculation');
             const data = await response.json();
-
             setPfResult(data.pf);
             setEsiResult(data.esi);
         } catch (err: any) {

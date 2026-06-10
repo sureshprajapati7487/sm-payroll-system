@@ -81,7 +81,7 @@ export const useAuditStore = create<AuditState>()(
             addLog: (log) => {
                 const newLog: AuditLog = {
                     ...log,
-                    id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    id: `audit-${Date.now()}-${crypto.randomUUID()}`,
                     timestamp: new Date().toISOString()
                 };
 
